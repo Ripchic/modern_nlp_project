@@ -203,7 +203,8 @@
         "Шаг 5: docker compose down -v — чистое завершение"
       ],
       "dependencies": ["TASK-001"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Создан Dockerfile (multi-stage: builder с uv + runtime python:3.11-slim, non-root user appuser). Создан docker-compose.yml: 8 сервисов (api, bot, worker, beat, flower, postgres, redis, qdrant) в сети reviewmind-network. Healthcheck для postgres (pg_isready), redis (redis-cli ping), qdrant (/readyz). Volumes: postgres_data, redis_data, qdrant_data. Env vars DATABASE_URL/REDIS_URL/QDRANT_URL переопределяются на docker-внутренние адреса. Создан alembic.ini (без hardcoded sqlalchemy.url — читается из env в runtime). Создан .dockerignore (секреты, .venv, __pycache__ исключены). docker compose config — OK, ruff check — 0 ошибок, pytest — 228 passed (6 pre-existing failures в test_config.py из-за .env файла со значениями docker-style URLs, не связаны с TASK-002)."
     },
     {
       "id": "TASK-003",

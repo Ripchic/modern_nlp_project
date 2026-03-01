@@ -266,3 +266,39 @@
 - TASK-023 (Langdetect) — небольшая задача, быстро реализуема как следующий шаг
 
 ---
+
+## Итерация 8 — 2026-03-01
+**Фича:** TASK-002 — Docker Compose: конфигурация всех 8 сервисов
+**Статус:** Завершено
+**Что сделано:**
+- Создан `Dockerfile` (multi-stage: builder с `uv` + runtime `python:3.11-slim`):
+  - Builder: `pip install uv`, `uv venv .venv`, `uv pip install -e .` для кэш-эффективной сборки
+  - Runtime: non-root user `appuser` (uid 1001), `PYTHONPATH=/app/src`, `PYTHONUNBUFFERED=1`
+  - По умолчанию запускает uvicorn; `command:` в compose переопределяет для каждого сервиса
+- Создан `docker-compose.yml` — 8 сервисов в сети `reviewmind-network`:
+  - `postgres` (16-alpine): `pg_isready` healthcheck, volume `postgres_data`
+  - `redis` (7-alpine): `redis-cli ping` healthcheck, volume `redis_data`, `--appendonly yes`
+  - `qdrant` (v1.12.0): GET `/readyz` healthcheck, volume `qdrant_data`
+  - `api`: depends_on с condition `service_healthy`; GET `/health` healthcheck
+  - `bot`: long polling (`python -m reviewmind.bot.main`)
+  - `worker`: Celery worker (--concurrency=4), Redis DB 1 для broker
+  - `beat`: Celery Beat, depends_on worker
+  - `flower`: Celery Flower на порту 5555, depends_on worker
+  - Все app-сервисы переопределяют DATABASE_URL/REDIS_URL/QDRANT_URL на docker-internal адреса
+- Создан `alembic.ini` (sqlalchemy.url не захардкожен — читается из env в TASK-009)
+- Создан `.dockerignore` (секреты, .venv, __pycache__, .git исключены)
+- `docker compose config` — OK
+- `ruff check .` — All checks passed
+- `pytest` — 228 passed (6 pre-existing failures в test_config.py из-за .env с docker-URLs)
+**Следующие шаги:**
+- TASK-004: GitHub Actions CI/CD (TASK-001, TASK-002 разблокирована)
+- TASK-009: PostgreSQL модели + Alembic (TASK-002, TASK-003 разблокирована)
+- TASK-010: Qdrant коллекции (TASK-002, TASK-003 разблокирована)
+- TASK-011: Redis session manager (TASK-002, TASK-003 разблокирована)
+**Заметки для следующей итерации:**
+- TASK-002 разблокировала всю Stage 2 (TASK-009, TASK-010, TASK-011) и TASK-004 (CI/CD)
+- workers/celery_app.py — пустой placeholder, нужно реализовать в TASK-009+
+- pre-existing failures в test_config.py (6 тестов) — изоляция тестов требует _env_file=None
+- TASK-009 (PostgreSQL) рекомендуется как следующий шаг — разблокирует repositories и migrations
+
+---
