@@ -8,7 +8,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from reviewmind.core.prompts import ChunkContext
 
 import openai
 from openai import AsyncOpenAI
@@ -96,6 +99,7 @@ class LLMClient:
         *,
         temperature: float | None = None,
         max_tokens: int | None = None,
+        top_p: float | None = None,
         model: str | None = None,
         messages: list[dict[str, str]] | None = None,
     ) -> str:
@@ -111,6 +115,9 @@ class LLMClient:
             Override default temperature for this call.
         max_tokens:
             Override default max_tokens for this call.
+        top_p:
+            Nucleus-sampling parameter (0–1).  If *None*, not sent to the
+            API (model default applies).
         model:
             Override default model for this call.
         messages:
@@ -140,6 +147,63 @@ class LLMClient:
             model=resolved_model,
             temperature=resolved_temperature,
             max_tokens=resolved_max_tokens,
+            top_p=top_p,
+        )
+
+    async def generate_analysis(
+        self,
+        user_query: str,
+        chunks: list[ChunkContext] | None = None,
+        *,
+        chat_history: list[dict[str, str]] | None = None,
+    ) -> str:
+        """Generate a structured product-review analysis using the RAG prompt.
+
+        Builds the full system prompt from :func:`~reviewmind.core.prompts.
+        build_rag_system_prompt` (PRD section 7 template) and calls the LLM
+        with the RAG-specific generation parameters
+        (temperature=0.3, max_tokens=1000, top_p=0.9).
+
+        Parameters
+        ----------
+        user_query:
+            The user's question or product query.
+        chunks:
+            Optional list of retrieved :class:`~reviewmind.core.prompts.
+            ChunkContext` objects.  When *None* or empty the prompt will
+            include a "no context available" notice.
+        chat_history:
+            Optional list of prior ``{"role": ..., "content": ...}``
+            messages for multi-turn context.
+
+        Returns
+        -------
+        str
+            The structured LLM response.
+
+        Raises
+        ------
+        LLMError
+            If the underlying LLM call fails.
+        """
+        from reviewmind.core.prompts import (
+            RAG_MAX_TOKENS,
+            RAG_TEMPERATURE,
+            RAG_TOP_P,
+            build_rag_system_prompt,
+        )
+
+        system_prompt = build_rag_system_prompt(
+            chunks=chunks or [],
+            chat_history=chat_history,
+        )
+
+        return await self.generate(
+            system_prompt=system_prompt,
+            user_message=user_query,
+            temperature=RAG_TEMPERATURE,
+            max_tokens=RAG_MAX_TOKENS,
+            top_p=RAG_TOP_P,
         )
 
     async def close(self) -> None:
@@ -168,17 +232,24 @@ class LLMClient:
         model: str,
         temperature: float,
         max_tokens: int,
+        top_p: float | None = None,
     ) -> str:
         """Execute the API call with exponential-backoff retry on transient errors."""
         last_error: Exception | None = None
 
         for attempt in range(1, self._max_retries + 1):
             try:
+                kwargs: dict[str, Any] = {
+                    "model": model,
+                    "messages": chat_messages,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                }
+                if top_p is not None:
+                    kwargs["top_p"] = top_p
+
                 response = await self._client.chat.completions.create(
-                    model=model,
-                    messages=chat_messages,  # type: ignore[arg-type]
-                    temperature=temperature,
-                    max_tokens=max_tokens,
+                    **kwargs,  # type: ignore[arg-type]
                 )
                 content = self._extract_content(response)
                 logger.debug(

@@ -697,7 +697,8 @@
         "Шаг 5: Отправить запрос на русском → ответ на русском; на английском → на английском"
       ],
       "dependencies": ["TASK-006"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Реализован src/reviewmind/core/prompts.py: ChunkContext dataclass (text, source_url, source_type, is_sponsored, is_curated, score, author, extra_metadata), SYSTEM_PROMPT_TEMPLATE точно по PRD секция 7 (8 правил + параметры генерации), FALLBACK_SYSTEM_PROMPT для режима без RAG, константы RAG_TEMPERATURE=0.3/RAG_MAX_TOKENS=1000/RAG_TOP_P=0.9, SPONSORED_MARKER='[sponsored]', CURATED_MARKER='📚'. Хелперы: format_chunks_for_context() — нумерует чанки, маркирует sponsored/curated/author; format_chat_history() — переводит роли на русский; build_rag_system_prompt() — собирает полный системный промпт. Расширен LLMClient в core/llm.py: добавлен параметр top_p в generate() и _call_with_retry() (передаётся в API только если не None), добавлен generate_analysis(user_query, chunks?, chat_history?) — вызывает build_rag_system_prompt и generate() с RAG параметрами. 65 новых unit-тестов: TestChunkContext (8), TestFormatChunksForContext (15), TestFormatChatHistory (7), TestBuildRagSystemPrompt (13), TestPromptConstants (8), TestTopPSupport (3), TestGenerateAnalysis (11). ruff check — 0 ошибок, pytest — 228 passed (169 existing + 59 new)."
     },
     {
       "id": "TASK-023",

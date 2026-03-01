@@ -225,3 +225,44 @@
 - Для Stage 3 (Scrapers) зависимости TASK-012..TASK-016 уже разблокированы
 
 ---
+## Итерация 7 — 2026-03-01
+**Фича:** TASK-022 — Системный промпт + LLM генерация структурированного ответа (Плюсы/Минусы/Спорные/Вывод)
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/core/prompts.py` с полным содержимым из PRD секция 7:
+  - `SYSTEM_PROMPT_TEMPLATE` — 8 правил + слоты {retrieved_chunks}, {chat_history}
+  - `FALLBACK_SYSTEM_PROMPT` — для прямого LLM-режима (без RAG)
+  - `RAG_TEMPERATURE=0.3`, `RAG_MAX_TOKENS=1000`, `RAG_TOP_P=0.9` — константы из PRD
+  - `SPONSORED_MARKER='[sponsored]'`, `CURATED_MARKER='📚'`
+  - `ChunkContext` dataclass: text, source_url, source_type, is_sponsored, is_curated, score, author, extra_metadata
+  - `format_chunks_for_context(chunks)` — нумерует чанки, маркирует [sponsored] и 📚, включает автора
+  - `format_chat_history(history)` — переводит роли на русский (Пользователь/ReviewMind/Система)
+  - `build_rag_system_prompt(chunks, chat_history)` — собирает полный заполненный промпт
+- Расширен `src/reviewmind/core/llm.py`:
+  - Добавлен параметр `top_p` в `generate()` и `_call_with_retry()` (передаётся в API только если не None)
+  - Добавлен метод `generate_analysis(user_query, chunks?, chat_history?)` — использует PRD-параметры (temperature=0.3, max_tokens=1000, top_p=0.9)
+  - Ленивый импорт из prompts.py внутри generate_analysis избегает циклических зависимостей
+- 65 новых unit-тестов в `tests/unit/test_core/test_prompts.py` и расширен `test_llm.py`:
+  - TestChunkContext (8 тестов): поля, дефолты, изоляция mutable defaults
+  - TestFormatChunksForContext (15): sponsored/curated маркеры, author, множественные чанки, stripping
+  - TestFormatChatHistory (7): пустая история, переводы ролей, порядок
+  - TestBuildRagSystemPrompt (13): правила PRD, контекст/история, маркеры, параметры генерации
+  - TestPromptConstants (8): значения констант, слоты шаблона
+  - TestTopPSupport (3): передача/непередача top_p
+  - TestGenerateAnalysis (11): температура, max_tokens, top_p, sponsored в промпте, структурный формат
+- `ruff check .` — All checks passed
+- `pytest` — 228 passed (169 existing + 59 new)
+**Следующие шаги:**
+- TASK-002: Docker Compose — по-прежнему critical blocker для Stage 2
+- TASK-023: Автоопределение языка (langdetect) — зависит от TASK-022 ✅, РАЗБЛОКИРОВАНА
+- TASK-024: Полный RAG pipeline — зависит от TASK-020, TASK-021, TASK-022 ✅
+- TASK-012..TASK-016: Scrapers и ingestion — все зависимости выполнены (кроме TASK-002)
+**Заметки для следующей итерации:**
+- TASK-022 ✅ разблокировала TASK-023 (langdetect) и частично TASK-024 (RAG pipeline)
+- generate_analysis() использует lazy import из prompts.py — избегает циклических зависимостей
+- ChunkContext — основной тип данных для передачи чанков в generate_analysis() и будущий RAGPipeline
+- top_p передаётся в API только если не None — совместимость с моделями без поддержки top_p
+- TASK-002 (Docker) — по-прежнему critical blocker для TASK-009, TASK-010, TASK-011
+- TASK-023 (Langdetect) — небольшая задача, быстро реализуема как следующий шаг
+
+---

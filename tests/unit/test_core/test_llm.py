@@ -9,6 +9,7 @@ import openai
 import pytest
 
 from reviewmind.core.llm import LLMClient, LLMError
+from reviewmind.core.prompts import ChunkContext
 
 # ── Helpers ──────────────────────────────────────────────────
 
@@ -483,3 +484,205 @@ class TestLLMError:
         err = LLMError("wrapped")
         err.__cause__ = original
         assert err.__cause__ is original
+
+
+# ── top_p support in generate() ──────────────────────────────
+
+
+class TestTopPSupport:
+    """Test that top_p is forwarded to the API when provided."""
+
+    @pytest.mark.asyncio
+    async def test_top_p_passed_to_api(self):
+        """When top_p is specified it must be included in the API call kwargs."""
+        client = _create_client()
+        mock_create = AsyncMock(return_value=_make_response("ok"))
+        client._client.chat.completions.create = mock_create
+
+        await client.generate("system", "user", top_p=0.9)
+
+        call_kwargs = mock_create.call_args.kwargs
+        assert call_kwargs.get("top_p") == 0.9
+
+    @pytest.mark.asyncio
+    async def test_top_p_none_not_passed_to_api(self):
+        """When top_p is None it must NOT be included in the API call kwargs."""
+        client = _create_client()
+        mock_create = AsyncMock(return_value=_make_response("ok"))
+        client._client.chat.completions.create = mock_create
+
+        await client.generate("system", "user", top_p=None)
+
+        call_kwargs = mock_create.call_args.kwargs
+        assert "top_p" not in call_kwargs
+
+    @pytest.mark.asyncio
+    async def test_top_p_default_is_none(self):
+        """Calling generate() without top_p should not pass top_p to the API."""
+        client = _create_client()
+        mock_create = AsyncMock(return_value=_make_response("ok"))
+        client._client.chat.completions.create = mock_create
+
+        await client.generate("system", "user")
+
+        call_kwargs = mock_create.call_args.kwargs
+        assert "top_p" not in call_kwargs
+
+
+# ── generate_analysis() tests ─────────────────────────────────
+
+
+class TestGenerateAnalysis:
+    """Tests for LLMClient.generate_analysis()."""
+
+    @pytest.mark.asyncio
+    async def test_returns_string(self):
+        client = _create_client()
+        client._client.chat.completions.create = AsyncMock(return_value=_make_response("Analysis result"))
+
+        result = await client.generate_analysis("Sony WH-1000XM5 review")
+
+        assert isinstance(result, str)
+        assert result == "Analysis result"
+
+    @pytest.mark.asyncio
+    async def test_uses_rag_temperature(self):
+        """generate_analysis must use temperature=0.3 (PRD section 7)."""
+        client = _create_client(temperature=0.9)  # non-default
+        mock_create = AsyncMock(return_value=_make_response("ok"))
+        client._client.chat.completions.create = mock_create
+
+        await client.generate_analysis("query")
+
+        call_kwargs = mock_create.call_args.kwargs
+        assert call_kwargs["temperature"] == 0.3
+
+    @pytest.mark.asyncio
+    async def test_uses_rag_max_tokens(self):
+        """generate_analysis must use max_tokens=1000 (PRD section 7)."""
+        client = _create_client(max_tokens=5000)  # non-default
+        mock_create = AsyncMock(return_value=_make_response("ok"))
+        client._client.chat.completions.create = mock_create
+
+        await client.generate_analysis("query")
+
+        call_kwargs = mock_create.call_args.kwargs
+        assert call_kwargs["max_tokens"] == 1000
+
+    @pytest.mark.asyncio
+    async def test_uses_rag_top_p(self):
+        """generate_analysis must use top_p=0.9 (PRD section 7)."""
+        client = _create_client()
+        mock_create = AsyncMock(return_value=_make_response("ok"))
+        client._client.chat.completions.create = mock_create
+
+        await client.generate_analysis("query")
+
+        call_kwargs = mock_create.call_args.kwargs
+        assert call_kwargs.get("top_p") == 0.9
+
+    @pytest.mark.asyncio
+    async def test_no_chunks_uses_no_context_text_in_system_prompt(self):
+        """Without chunks, the system prompt should contain the no-context notice."""
+        from reviewmind.core.prompts import NO_CONTEXT_TEXT
+
+        client = _create_client()
+        mock_create = AsyncMock(return_value=_make_response("ok"))
+        client._client.chat.completions.create = mock_create
+
+        await client.generate_analysis("query", chunks=None)
+
+        messages = mock_create.call_args.kwargs["messages"]
+        system_content = messages[0]["content"]
+        assert NO_CONTEXT_TEXT in system_content
+
+    @pytest.mark.asyncio
+    async def test_chunks_text_in_system_prompt(self):
+        """Chunk text should appear in the system prompt sent to the API."""
+        client = _create_client()
+        mock_create = AsyncMock(return_value=_make_response("ok"))
+        client._client.chat.completions.create = mock_create
+
+        chunks = [ChunkContext(text="Excellent ANC performance", source_url="https://ex.com")]
+        await client.generate_analysis("Best headphones?", chunks=chunks)
+
+        messages = mock_create.call_args.kwargs["messages"]
+        system_content = messages[0]["content"]
+        assert "Excellent ANC performance" in system_content
+
+    @pytest.mark.asyncio
+    async def test_sponsored_chunk_marked_in_system_prompt(self):
+        """Sponsored chunks must be flagged with [sponsored] in the prompt."""
+        client = _create_client()
+        mock_create = AsyncMock(return_value=_make_response("ok"))
+        client._client.chat.completions.create = mock_create
+
+        chunks = [
+            ChunkContext(
+                text="Great product",
+                source_url="https://yt.com",
+                is_sponsored=True,
+            )
+        ]
+        await client.generate_analysis("query", chunks=chunks)
+
+        messages = mock_create.call_args.kwargs["messages"]
+        system_content = messages[0]["content"]
+        assert "[sponsored]" in system_content
+
+    @pytest.mark.asyncio
+    async def test_user_query_is_user_message(self):
+        """The user_query must appear as the user message in the chat."""
+        client = _create_client()
+        mock_create = AsyncMock(return_value=_make_response("ok"))
+        client._client.chat.completions.create = mock_create
+
+        await client.generate_analysis("Which headphones are best for commuting?")
+
+        messages = mock_create.call_args.kwargs["messages"]
+        user_message = next(m for m in messages if m["role"] == "user")
+        assert "Which headphones are best for commuting?" in user_message["content"]
+
+    @pytest.mark.asyncio
+    async def test_chat_history_included(self):
+        """Provided chat history must appear in the system prompt or messages."""
+        client = _create_client()
+        mock_create = AsyncMock(return_value=_make_response("ok"))
+        client._client.chat.completions.create = mock_create
+
+        history = [{"role": "user", "content": "What about battery?"}]
+        await client.generate_analysis("query", chat_history=history)
+
+        messages = mock_create.call_args.kwargs["messages"]
+        all_content = " ".join(m["content"] for m in messages)
+        assert "What about battery?" in all_content
+
+    @pytest.mark.asyncio
+    async def test_propagates_llm_error(self):
+        """LLMError raised by LLM should propagate from generate_analysis."""
+        client = _create_client()
+        client._client.chat.completions.create = AsyncMock(
+            side_effect=openai.AuthenticationError(
+                "bad key",
+                response=MagicMock(status_code=401, headers={}),
+                body={"error": "auth"},
+            )
+        )
+
+        with pytest.raises(LLMError, match="Authentication"):
+            await client.generate_analysis("query")
+
+    @pytest.mark.asyncio
+    async def test_system_prompt_has_structured_format_rule(self):
+        """PRD rule 4 (Плюсы/Минусы/Спорные/Вывод) must be in the system prompt."""
+        client = _create_client()
+        mock_create = AsyncMock(return_value=_make_response("ok"))
+        client._client.chat.completions.create = mock_create
+
+        await client.generate_analysis("query")
+
+        messages = mock_create.call_args.kwargs["messages"]
+        system_content = messages[0]["content"]
+        assert "✅ Плюсы" in system_content
+        assert "❌ Минусы" in system_content
+        assert "🏆 Вывод" in system_content
