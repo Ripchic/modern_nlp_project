@@ -302,3 +302,54 @@
 - TASK-009 (PostgreSQL) рекомендуется как следующий шаг — разблокирует repositories и migrations
 
 ---
+## Итерация 9 — 2026-03-01
+**Фича:** TASK-009 — PostgreSQL: SQLAlchemy async модели + Alembic начальная миграция (все 6 таблиц)
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/db/models.py` с 6 SQLAlchemy ORM моделями точно по PRD секция 6.1:
+  - `User` (BigInteger PK telegram_user_id, is_admin, subscription, sub_expires_at, created_at + relationships)
+  - `UserLimit` (composite PK user_id+date, requests_used, UniqueConstraint, FK→users CASCADE)
+  - `Subscription` (SERIAL PK, telegram_payment_charge_id UNIQUE, amount_stars, activated_at, expires_at, status)
+  - `Source` (SERIAL PK, source_url UNIQUE, source_type, product_query, is_sponsored, is_curated, language, author + 3 indexes)
+  - `Job` (UUID PK default=uuid4, user_id, job_type, status, celery_task_id, created_at, completed_at + 2 indexes)
+  - `QueryLog` (SERIAL PK, session_id, mode, query_text, response_text, sources_used JSON, rating SMALLINT, used_tavily + 2 indexes)
+- Реализован `src/reviewmind/db/session.py`:
+  - `build_engine()` — asyncpg + pool_size/max_overflow/pool_pre_ping=True
+  - `build_session_factory()` — expire_on_commit=False, autoflush=False
+  - `get_session()` — FastAPI dependency с commit/rollback на yield
+  - `create_all_tables()` / `drop_all_tables()` — для dev/test без Alembic
+- Настроен `alembic/env.py` для async миграций (asyncpg):
+  - offline mode + online async mode через `asyncio.run()`
+  - DATABASE_URL читается из env, автоматически добавляет `+asyncpg` prefix
+  - `target_metadata = Base.metadata` для autogenerate, `compare_type=True`
+- Создана `alembic/versions/0001_initial_schema.py`:
+  - `upgrade()`: создание всех 6 таблиц с FK constraints, indexes, server defaults
+  - `downgrade()`: удаление всех таблиц в правильном порядке
+- Реализованы 6 репозиториев в `db/repositories/`:
+  - `UserRepository`: get_by_id, create, get_or_create, update, delete
+  - `UserLimitRepository`: get, get_or_create, increment(by=1), reset
+  - `SourceRepository`: get_by_id, get_by_url, create, get_or_create, update, delete
+  - `JobRepository`: get_by_id, create, update_status(+celery_task_id, completed_at), list_by_user, delete
+  - `QueryLogRepository`: create, get_by_id, update_rating, list_by_user
+  - `SubscriptionRepository`: create, get_by_id, get_by_charge_id, update, list_by_user
+  - `repositories/__init__.py` экспортирует все 6 репозиториев
+- 97 новых unit-тестов в `tests/unit/test_db/`:
+  - `test_models.py` (45): TestBase (2), TestUser (9), TestUserLimit (6), TestSubscription (5), TestSource (8), TestJob (7), TestQueryLog (8)
+  - `test_repositories.py` (43): полное CRUD тестирование всех 6 репозиториев с mocked AsyncSession
+  - `test_session.py` (9): build_engine (4), session_factory (2), table ops (2), imports (1)
+- `ruff check .` — All checks passed
+- `pytest` — 325 passed (228 existing + 97 new), 6 pre-existing failures в test_config.py (docker-URLs, не связаны)
+**Следующие шаги:**
+- TASK-010: Qdrant коллекции auto_crawled + curated_kb (TASK-002 ✅, TASK-003 ✅) — РАЗБЛОКИРОВАНА
+- TASK-011: Redis session manager (TASK-002 ✅, TASK-003 ✅) — РАЗБЛОКИРОВАНА
+- TASK-004: GitHub Actions CI/CD (TASK-001 ✅, TASK-002 ✅)
+- TASK-017: Embedding service (TASK-006 ✅, TASK-010)
+**Заметки для следующей итерации:**
+- TASK-009 ✅ завершает PostgreSQL слой; TASK-010 + TASK-011 — следующие критичные задачи Stage 2
+- SQLAlchemy `mapped_column(default=False)` — INSERT-time default, not Python instantiation default; server_default на уровне БД
+- `alembic upgrade head` требует живую PostgreSQL: `docker compose up -d postgres && alembic upgrade head`
+- Все репозитории используют `session.flush()` вместо `session.commit()` — commit на уровне FastAPI `get_session()` dependency
+- UUID для `Job.id` генерируется в Python (`uuid.uuid4()`), не на сервере — надёжнее для unit-тестов без БД
+- TASK-010 (Qdrant) рекомендуется как следующий шаг — разблокирует TASK-017 (Embeddings) и TASK-018 (Upsert)
+
+---
