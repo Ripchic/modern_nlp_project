@@ -82,3 +82,35 @@
 - `value_is_complex` параметр в `prepare_field_value` может быть False для list-полей — нужно использовать `self.field_is_complex(field)` вместо параметра
 
 ---
+
+## Итерация 3 — 2026-03-01
+**Фича:** TASK-006 — OpenAI client wrapper (configurable base_url)
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/core/llm.py` — async wrapper вокруг `openai.AsyncOpenAI`
+- Класс `LLMClient` с параметрами из config: api_key, base_url, model, temperature, max_tokens
+- Метод `generate(system_prompt, user_message, temperature?, max_tokens?, model?, messages?) → str`
+- Поддержка multi-turn контекста через параметр `messages` (chat history)
+- Retry с exponential backoff (1s, 2s, 4s) для transient ошибок: RateLimitError, APITimeoutError, APIConnectionError, InternalServerError
+- Non-retryable ошибки (AuthenticationError, BadRequestError) сразу выбрасывают `LLMError`
+- Переключение GitHub Models ↔ OpenAI через замену `base_url`
+- Async context manager support (`async with LLMClient() as client`)
+- Custom exception `LLMError` для всех ошибок LLM
+- 35 unit-тестов в `tests/unit/test_core/test_llm.py`: init (8), message building (4), generate (7), error handling (10), retry timing (1), context manager (2), LLMError (3)
+- `ruff check .` — All checks passed
+- `pytest` — 58 passed (23 existing + 35 new)
+**Следующие шаги:**
+- TASK-005: FastAPI app factory + /health (зависит от TASK-001 ✅ + TASK-003 ✅)
+- TASK-007: aiogram Telegram bot (зависит от TASK-003 ✅)
+- TASK-008: E2E чат (зависит от TASK-005 + TASK-006 ✅ + TASK-007)
+- TASK-017: Embedding service (зависит от TASK-006 ✅ + TASK-010)
+- TASK-022: Системный промпт + LLM генерация (зависит от TASK-006 ✅)
+**Заметки для следующей итерации:**
+- TASK-006 ✅ разблокировала TASK-008, TASK-017, TASK-022 (частично)
+- TASK-005 + TASK-007 — следующие critical задачи для Stage 1 completion
+- TASK-002 (Docker) — по-прежнему блокирует TASK-009, TASK-010, TASK-011 (Stage 2)
+- LLMClient использует lazy import `from reviewmind.config import settings` внутри `__init__` — не падает при import без .env
+- openai SDK max_retries=0 установлен, retry логика полностью кастомная
+- При тестировании с реальным API помнить про rate limits GitHub Models (15 RPM free tier)
+
+---

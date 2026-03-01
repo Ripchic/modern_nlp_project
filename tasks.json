@@ -297,7 +297,8 @@
         "Шаг 4: Отключить интернет → generate() выбрасывает понятное исключение"
       ],
       "dependencies": ["TASK-003"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Реализован src/reviewmind/core/llm.py — async wrapper вокруг openai.AsyncOpenAI. LLMClient создаётся с параметрами из config (api_key, base_url, model, temperature, max_tokens). Метод generate(system_prompt, user_message, temperature?, max_tokens?, model?, messages?) → str. Поддержка multi-turn через параметр messages (chat history). Retry с exponential backoff (1s, 2s, 4s) для transient ошибок (RateLimitError, APITimeoutError, APIConnectionError, InternalServerError). Non-retryable ошибки (AuthenticationError, BadRequestError) сразу выбрасывают LLMError. Переключение GitHub Models ↔ OpenAI через base_url. Async context manager support. 35 unit-тестов в tests/unit/test_core/test_llm.py: init, message building, generate, error handling, retry timing, context manager, LLMError. ruff check — 0 ошибок, pytest — 58/58 passed."
     },
     {
       "id": "TASK-007",
