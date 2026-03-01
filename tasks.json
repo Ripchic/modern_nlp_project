@@ -227,7 +227,8 @@
         "Шаг 4: Проверить, что ADMIN_USER_IDS='123,456' парсится в [123, 456]"
       ],
       "dependencies": ["TASK-001"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Реализован config.py на pydantic-settings BaseSettings с 20+ полями, валидацией типов и дефолтами. ADMIN_USER_IDS парсится как list[int] из comma-separated строки через field_validator + custom GracefulEnvSource (graceful JSON fallback). OPENAI_BASE_URL дефолт — GitHub Models. Создан .env.example со всеми переменными. .env уже в .gitignore. Lazy proxy для settings (не падает при импорте без .env). 20 unit-тестов в tests/unit/test_config.py: parsing, defaults, validation, env vars. ruff check — 0 ошибок, pytest — 23/23 passed."
     },
     {
       "id": "TASK-004",

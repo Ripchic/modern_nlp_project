@@ -55,3 +55,30 @@
 - Hatch build backend: `hatchling.build` (не hatchling.backends)
 
 ---
+
+## Итерация 2 — 2026-03-01
+**Фича:** TASK-003 — Конфигурация окружения: .env.example + config.py (pydantic-settings)
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/config.py` на pydantic-settings BaseSettings с 20+ полями
+- Все переменные из PRD: Telegram, OpenAI, YouTube, Reddit, Tavily, PostgreSQL, Redis, Qdrant
+- ADMIN_USER_IDS парсится как `list[int]` из comma-separated строки (field_validator + custom GracefulEnvSource)
+- OPENAI_BASE_URL дефолт — GitHub Models (`https://models.inference.ai.azure.com`)
+- Lazy proxy для `settings` — не падает при импорте без .env
+- Создан `.env.example` со всеми переменными и комментариями
+- `.env` уже был в `.gitignore` (из TASK-001)
+- 20 unit-тестов в `tests/unit/test_config.py`: parsing, defaults, validation, env vars
+- `ruff check .` — All checks passed
+- `pytest` — 23 passed (3 structure + 20 config)
+**Следующие шаги:**
+- TASK-002: Docker Compose (зависит от TASK-001 ✅)
+- TASK-005: FastAPI app factory + /health (зависит от TASK-001 ✅ + TASK-003 ✅)
+- TASK-006: OpenAI client wrapper (зависит от TASK-003 ✅)
+- TASK-007: aiogram Telegram bot (зависит от TASK-003 ✅)
+**Заметки для следующей итерации:**
+- TASK-003 ✅ разблокировала TASK-005, TASK-006, TASK-007, TASK-009..TASK-013
+- TASK-002 (Docker) — следующий critical blocker для TASK-004, TASK-009, TASK-010, TASK-011
+- pydantic-settings v2.8+ имеет отдельные EnvSettingsSource и DotEnvSettingsSource в `sources/providers/`
+- `value_is_complex` параметр в `prepare_field_value` может быть False для list-полей — нужно использовать `self.field_is_complex(field)` вместо параметра
+
+---
