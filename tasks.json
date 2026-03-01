@@ -274,7 +274,8 @@
         "Шаг 4: curl http://localhost:8000/docs — Swagger UI доступен"
       ],
       "dependencies": ["TASK-001", "TASK-003"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Реализован src/reviewmind/main.py с FastAPI app factory (create_app), lifespan для подключения/отключения PostgreSQL (SQLAlchemy async engine), Redis (redis.asyncio) и Qdrant (AsyncQdrantClient). Создан GET /health endpoint — возвращает {status: 'ok'|'degraded', postgres: bool, redis: bool, qdrant: bool} с graceful exception handling. Настроен structlog для JSON-логирования в stdout. Создан api/router.py для подключения endpoints. Создан api/dependencies.py с DI-функциями. HealthResponse — Pydantic модель. 29 unit-тестов. ruff check — 0 ошибок, pytest — 87/87 passed."
     },
     {
       "id": "TASK-006",

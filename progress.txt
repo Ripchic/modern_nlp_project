@@ -114,3 +114,36 @@
 - При тестировании с реальным API помнить про rate limits GitHub Models (15 RPM free tier)
 
 ---
+
+## Итерация 4 — 2026-03-01
+**Фича:** TASK-005 — FastAPI приложение: app factory, lifespan, /health endpoint, structlog логирование
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/main.py` с FastAPI app factory (`create_app`), asynccontextmanager lifespan
+- Lifespan инициализирует/закрывает 3 ресурса: PostgreSQL (SQLAlchemy async engine), Redis (redis.asyncio), Qdrant (AsyncQdrantClient)
+- Каждый ресурс инициализируется в try/except — если сервис недоступен, атрибут устанавливается в None (graceful degradation)
+- При shutdown вызываются dispose/aclose/close для всех живых клиентов
+- Создан GET `/health` endpoint — возвращает `{status: "ok"|"degraded", postgres: bool, redis: bool, qdrant: bool}`
+- Проверки: PostgreSQL — `SELECT 1`, Redis — `PING`, Qdrant — `get_collections()`
+- При исключении в любой проверке — возвращает `false` (не падает)
+- Настроен structlog: JSON-формат, TimestamperProcessor (ISO), add_log_level, PrintLoggerFactory (stdout)
+- Создан `api/router.py` — подключает health_router, легко расширяется для будущих endpoints
+- Создан `api/dependencies.py` — DI-функции: `get_db_engine`, `get_redis`, `get_qdrant`
+- `HealthResponse` — Pydantic модель для типизированного ответа
+- 29 unit-тестов: configure_logging (4), create_app (6), lifespan (4: all up, pg fail, all fail, shutdown dispose), health endpoint (15: schema, all-down, all-up, partial, exceptions)
+- `ruff check .` — All checks passed
+- `pytest` — 87 passed (58 existing + 29 new)
+**Следующие шаги:**
+- TASK-007: aiogram Telegram bot (зависит от TASK-003 ✅) — следующая critical задача для Stage 1
+- TASK-008: E2E чат (зависит от TASK-005 ✅ + TASK-006 ✅ + TASK-007)
+- TASK-002: Docker Compose — блокирует TASK-009, TASK-010, TASK-011 (Stage 2)
+- TASK-022: Системный промпт + LLM генерация (зависит от TASK-006 ✅)
+**Заметки для следующей итерации:**
+- TASK-005 ✅ разблокировала TASK-008 (частично, нужен ещё TASK-007) и TASK-027 (POST /query)
+- Lifespan использует lazy import settings — не падает при import без .env
+- Для Stage 1 completion осталось: TASK-007 (бот) + TASK-008 (E2E чат)
+- TASK-002 (Docker) — critical blocker для Stage 2 (TASK-009, TASK-010, TASK-011)
+- `app = create_app()` создаётся на уровне модуля — uvicorn запускает через `reviewmind.main:app`
+- api/router.py легко расширяется: добавить `include_router(...)` при реализации query/ingest/status/feedback endpoints
+
+---
