@@ -147,3 +147,43 @@
 - api/router.py легко расширяется: добавить `include_router(...)` при реализации query/ingest/status/feedback endpoints
 
 ---
+
+## Итерация 5 — 2026-03-01
+**Фича:** TASK-007 — aiogram Telegram bot: /start с выбором режима, /help, inline-клавиатуры
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/bot/main.py` — entrypoint бота (long polling) с `create_bot`, `create_dispatcher`, `run_bot`, `main`
+- `create_dispatcher()` регистрирует start_router, mode_router и LoggingMiddleware
+- `create_bot()` создаёт Bot с `DefaultBotProperties(parse_mode=HTML)`
+- `run_bot()` запускает long polling через `dp.start_polling()` с `allowed_updates`
+- `main()` — синхронный entrypoint для `python -m reviewmind.bot.main`
+- Создан `bot/keyboards.py` — 3 inline-клавиатуры:
+  - `mode_keyboard()` — [🔍 Авто-поиск] [🔗 Свои ссылки]
+  - `feedback_keyboard()` — [👍 Полезно] [👎 Не то] [📎 Источники]
+  - `subscribe_keyboard()` — [⭐ Безлимит за 299₽/мес] [Ждать до завтра]
+- Callback data constants: MODE_AUTO, MODE_LINKS, FEEDBACK_USEFUL, FEEDBACK_BAD, FEEDBACK_SOURCES, SUBSCRIBE_ACTION, SUBSCRIBE_WAIT
+- Создан `handlers/start.py`:
+  - `/start` → приветствие с упоминанием AI-системы + mode_keyboard
+  - `/help` → подробная справка (команды, режимы, поддерживаемые источники, формат ответа, спонсорский контент)
+- Создан `handlers/mode.py`:
+  - Callback handler для `mode:auto` и `mode:links` — edit_text с описанием режима + callback answer
+  - `/mode` → повторный показ клавиатуры выбора режима
+  - `MODE_NAMES` и `MODE_DESCRIPTIONS` для структурированных ответов
+- Создан `middlewares.py` — `LoggingMiddleware` (structlog) для логирования update_id, event_type, user_id
+- structlog настроен с JSON renderer, ISO timestamps, log level
+- 41 unit-тест в `tests/unit/test_bot/test_bot.py`: keyboards (11), start handler (11), mode handler (9), bot main (6), middlewares (4)
+- `ruff check .` — All checks passed
+- `pytest` — 128 passed (87 existing + 41 new)
+**Следующие шаги:**
+- TASK-008: E2E чат (зависит от TASK-005 ✅ + TASK-006 ✅ + TASK-007 ✅) — РАЗБЛОКИРОВАНА, завершает Stage 1
+- TASK-002: Docker Compose (зависит от TASK-001 ✅) — critical blocker для Stage 2
+- TASK-022: Системный промпт + LLM генерация (зависит от TASK-006 ✅)
+**Заметки для следующей итерации:**
+- TASK-007 ✅ разблокировала TASK-008 — теперь Stage 1 (Telegram ↔ LLM Chat) полностью разблокирован
+- aiogram routers — module-level singletons, при тестировании create_dispatcher() можно вызвать только один раз (router.parent_router уже задан)
+- Bot запускается через `python -m reviewmind.bot.main` или `asyncio.run(run_bot())`
+- Lazy import `settings` внутри `run_bot()` — не падает при import без .env
+- Для TASK-008 потребуется: handlers/query.py (текстовые сообщения), вызов LLMClient, typing indicator
+- TASK-002 (Docker) — по-прежнему critical blocker для TASK-009, TASK-010, TASK-011 (Stage 2)
+
+---
