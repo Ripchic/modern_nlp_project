@@ -187,3 +187,41 @@
 - TASK-002 (Docker) — по-прежнему critical blocker для TASK-009, TASK-010, TASK-011 (Stage 2)
 
 ---
+
+## Итерация 6 — 2026-03-01
+**Фича:** TASK-008 — E2E чат: Telegram → LLM → ответ (без RAG, прямой LLM)
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/services/query_service.py` — QueryService с методом `answer(user_message, chat_history?) → QueryResult`
+- QueryResult dataclass: answer, error, error_message, model, chat_history
+- Graceful error handling: LLMError → user-friendly fallback сообщение (без traceback)
+- Пустые/whitespace сообщения → fallback без вызова LLM
+- Async context manager support, lazy LLMClient creation
+- Системный промпт (временный, без RAG): ReviewMind AI-ассистент, правила поведения
+- Реализован `src/reviewmind/bot/handlers/query.py` — catch-all handler для текстовых сообщений
+- Typing indicator (`ChatAction.TYPING`) показывается во время генерации
+- Truncation для Telegram 4096-char limit
+- Ошибки LLM → пользовательское сообщение с извинением (не traceback)
+- Реализован `src/reviewmind/api/endpoints/query.py` — `POST /query` endpoint
+- Созданы Pydantic schemas: `QueryRequest` (message min_length=1, chat_history optional), `QueryResponse` (answer, error, model)
+- Обновлён `api/router.py` — подключён query_router с tag "query"
+- Обновлён `bot/main.py` — query_router подключён последним (catch-all после start/mode)
+- 41 unit-тест в `tests/unit/test_services/test_query_service.py`: QueryResult (3), QueryService init (4), answer (8), lifecycle (4), bot handler (5), dispatcher wiring (4), API schemas (4), API endpoint (6), API router wiring (2), full app (1)
+- `ruff check .` — All checks passed
+- `pytest` — 169 passed (128 existing + 41 new)
+**Следующие шаги:**
+- TASK-002: Docker Compose (зависит от TASK-001 ✅) — critical blocker для Stage 2
+- TASK-022: Системный промпт + LLM генерация структурированного ответа (зависит от TASK-006 ✅)
+- TASK-012: YouTube scraper (зависит от TASK-001 ✅, TASK-003 ✅)
+- TASK-013: Reddit scraper (зависит от TASK-001 ✅, TASK-003 ✅)
+- TASK-014: Web scraper (зависит от TASK-001 ✅)
+**Заметки для следующей итерации:**
+- TASK-008 ✅ завершает Stage 1 (Telegram ↔ LLM Chat) — все 4 задачи Stage 1 выполнены
+- QueryService — временная реализация, будет заменена RAGPipeline в TASK-024
+- handlers/query.py использует catch-all `@router.message()` — должен быть зарегистрирован ПОСЛЕДНИМ в dispatcher
+- aiogram routers — singletons, тесты wiring проверяют через inspect.getsource() вместо повторного create_dispatcher()
+- POST /query работает и через API (FastAPI), и через бот — оба канала используют один QueryService
+- TASK-002 (Docker) — по-прежнему critical blocker для TASK-009, TASK-010, TASK-011 (Stage 2)
+- Для Stage 3 (Scrapers) зависимости TASK-012..TASK-016 уже разблокированы
+
+---

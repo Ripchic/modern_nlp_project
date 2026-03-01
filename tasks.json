@@ -349,7 +349,8 @@
         "Шаг 5: Проверить, что при ошибке LLM пользователь получает извинение, а не traceback"
       ],
       "dependencies": ["TASK-005", "TASK-006", "TASK-007"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Реализован E2E чат: Telegram ↔ LLM (без RAG). Создан src/reviewmind/services/query_service.py — QueryService с методом answer(user_message, chat_history?) → QueryResult, graceful error handling (LLMError → user-friendly fallback), пустые сообщения → fallback, async context manager, lazy LLMClient creation. Создан src/reviewmind/bot/handlers/query.py — catch-all handler для текстовых сообщений: typing indicator (ChatAction.TYPING), вызов QueryService, truncation для Telegram 4096-char limit, ошибки не показывают traceback. Создан src/reviewmind/api/endpoints/query.py — POST /query endpoint, Pydantic schemas (QueryRequest с валидацией min_length=1, QueryResponse). Обновлён api/router.py — подключён query_router. Обновлён bot/main.py — query_router подключён последним (catch-all после start/mode). 41 unit-тест в tests/unit/test_services/test_query_service.py: QueryResult (3), QueryService init (4), answer (8), lifecycle (4), bot handler (5), dispatcher wiring (4), API schemas (4), API endpoint (6), API router wiring (2), full app (1). ruff check — 0 ошибок, pytest — 169/169 passed (128 existing + 41 new)."
     },
     {
       "id": "TASK-009",

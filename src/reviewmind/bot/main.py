@@ -12,6 +12,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from reviewmind.bot.handlers.mode import router as mode_router
+from reviewmind.bot.handlers.query import router as query_router
 from reviewmind.bot.handlers.start import router as start_router
 from reviewmind.bot.middlewares import LoggingMiddleware
 
@@ -45,9 +46,11 @@ def create_dispatcher() -> Dispatcher:
     # Register outer middleware for structured logging
     dp.update.outer_middleware(LoggingMiddleware())
 
-    # Register handlers — order matters: start/help first, then mode callbacks
+    # Register handlers — order matters: start/help first, then mode callbacks,
+    # then query (catch-all for text messages) last.
     dp.include_router(start_router)
     dp.include_router(mode_router)
+    dp.include_router(query_router)
 
     return dp
 
