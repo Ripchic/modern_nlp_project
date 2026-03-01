@@ -1,0 +1,1381 @@
+{
+  "project": "ReviewMind — AI-агрегатор обзоров для принятия решений о покупке",
+  "version": "1.0",
+  "created_at": "2026-03-01",
+
+  "agent_instructions": {
+    "before_start": [
+      "Прочитай этот файл и git log --oneline -20",
+      "Выбери ОДНУ задачу со статусом pending и наивысшим приоритетом",
+      "Проверь, что все dependencies этой задачи имеют статус done"
+    ],
+    "during_work": [
+      "Работай только над выбранной задачей",
+      "Делай коммиты после каждого логического изменения",
+      "Не трогай код, не связанный с текущей задачей"
+    ],
+    "before_finish": [
+      "Выполни ВСЕ test_steps из задачи",
+      "Меняй status на done ТОЛЬКО после успешного прохождения всех тестов",
+      "Напиши summary в progress.md",
+      "ЗАПРЕЩЕНО удалять или редактировать задачи — только менять status"
+    ]
+  },
+
+  "folder_structure": {
+    "description": "Целевая структура проекта, создаваемая инкрементально по мере выполнения задач",
+    "tree": {
+      "docker-compose.yml": "Оркестрация всех сервисов (api, bot, worker, beat, flower, qdrant, postgres, redis)",
+      "Dockerfile": "Multi-stage build для Python-приложения",
+      "pyproject.toml": "Зависимости и настройки проекта (ruff, pytest)",
+      "alembic.ini": "Конфигурация Alembic миграций",
+      ".env.example": "Шаблон переменных окружения",
+      ".github/workflows/": {
+        "ci.yml": "Lint (ruff) + unit tests (pytest) на PR",
+        "cd.yml": "Buildx multi-arch → GHCR → SSH deploy на merge в main"
+      },
+      "alembic/": {
+        "env.py": "Async Alembic environment",
+        "versions/": "Файлы миграций"
+      },
+      "src/reviewmind/": {
+        "__init__.py": "",
+        "config.py": "pydantic-settings: все настройки из .env",
+        "main.py": "FastAPI app factory + lifespan",
+        "api/": {
+          "__init__.py": "",
+          "router.py": "Главный роутер, подключает все endpoints",
+          "schemas.py": "Pydantic request/response модели",
+          "dependencies.py": "DI: сервисы, DB-сессии",
+          "endpoints/": {
+            "query.py": "POST /query",
+            "ingest.py": "POST /ingest",
+            "feedback.py": "POST /feedback",
+            "health.py": "GET /health",
+            "status.py": "GET /status/{job_id}"
+          }
+        },
+        "bot/": {
+          "__init__.py": "",
+          "main.py": "Entrypoint бота (long polling)",
+          "handlers/": {
+            "start.py": "/start + выбор режима",
+            "query.py": "Обработка текстовых запросов",
+            "links.py": "Приём и обработка URL",
+            "mode.py": "/mode переключение",
+            "payment.py": "Telegram Stars оплата",
+            "feedback.py": "👍/👎 обработка",
+            "admin.py": "Админ-команды",
+            "gdpr.py": "/delete_my_data"
+          },
+          "keyboards.py": "Inline-клавиатуры",
+          "middlewares.py": "Rate limit, auth middleware"
+        },
+        "core/": {
+          "__init__.py": "",
+          "rag.py": "RAG pipeline оркестратор",
+          "embeddings.py": "Embedding service (text-embedding-3-small)",
+          "llm.py": "OpenAI client wrapper (configurable base_url)",
+          "reranker.py": "Reranking logic (curated ×1.3, sponsored ×0.7)",
+          "prompts.py": "Системные промпты"
+        },
+        "scrapers/": {
+          "__init__.py": "",
+          "base.py": "Абстрактный базовый класс парсера",
+          "youtube.py": "YouTube transcript parser",
+          "reddit.py": "Reddit parser (PRAW)",
+          "web.py": "Web parser (trafilatura)",
+          "tavily.py": "Tavily API fallback"
+        },
+        "ingestion/": {
+          "__init__.py": "",
+          "pipeline.py": "Оркестратор: clean → chunk → embed → upsert",
+          "cleaner.py": "Очистка текста + нормализация",
+          "sponsor.py": "Детекция спонсорского контента (regex)",
+          "chunker.py": "Text chunking (400-600 tokens, 50 overlap)",
+          "url_detector.py": "Определение типа URL"
+        },
+        "db/": {
+          "__init__.py": "",
+          "models.py": "SQLAlchemy ORM модели (users, user_limits, subscriptions, sources, jobs, query_logs)",
+          "session.py": "Async session factory (asyncpg)",
+          "repositories/": {
+            "users.py": "CRUD для users",
+            "limits.py": "CRUD для user_limits",
+            "subscriptions.py": "CRUD для subscriptions",
+            "sources.py": "CRUD для sources",
+            "jobs.py": "CRUD для jobs",
+            "query_logs.py": "CRUD для query_logs"
+          }
+        },
+        "vectorstore/": {
+          "__init__.py": "",
+          "client.py": "Qdrant client wrapper",
+          "collections.py": "Инициализация и управление коллекциями",
+          "search.py": "Поиск + merge результатов из двух коллекций"
+        },
+        "cache/": {
+          "__init__.py": "",
+          "redis.py": "Redis session manager (mode, history, chunks, TTL)"
+        },
+        "workers/": {
+          "__init__.py": "",
+          "celery_app.py": "Celery app factory",
+          "tasks.py": "Определения Celery задач",
+          "beat_schedule.py": "Расписание периодических задач"
+        },
+        "services/": {
+          "__init__.py": "",
+          "query_service.py": "Оркестрация query flow",
+          "ingest_service.py": "Оркестрация ingestion flow",
+          "payment_service.py": "Telegram Stars логика",
+          "limit_service.py": "Управление лимитами пользователей",
+          "language.py": "langdetect wrapper"
+        }
+      },
+      "scripts/": {
+        "seed_curated_kb.py": "Загрузка кураторской базы знаний",
+        "init_qdrant.py": "Инициализация Qdrant коллекций",
+        "seed_test_data.py": "Загрузка тестовых данных для верификации RAG"
+      },
+      "tests/": {
+        "conftest.py": "Фикстуры pytest",
+        "unit/": {
+          "test_scrapers/": "Тесты парсеров",
+          "test_ingestion/": "Тесты пайплайна обработки",
+          "test_core/": "Тесты RAG, embeddings, reranker",
+          "test_services/": "Тесты бизнес-логики"
+        },
+        "integration/": {
+          "test_rag_pipeline.py": "E2E тест RAG-пайплайна",
+          "test_endpoints.py": "Тесты API endpoints",
+          "test_bot.py": "Тесты Telegram bot handlers"
+        }
+      }
+    }
+  },
+
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "category": "infrastructure",
+      "priority": "critical",
+      "stage": "Stage 0: Foundation",
+      "description": "Создание скелета проекта: структура папок, pyproject.toml с зависимостями, базовые __init__.py файлы",
+      "details": "Создать полную структуру директорий согласно folder_structure. В pyproject.toml указать все зависимости: fastapi, uvicorn, aiogram, openai, qdrant-client, sqlalchemy[asyncio], asyncpg, alembic, redis, celery, flower, praw, youtube-transcript-api, trafilatura, tavily-python, langchain-text-splitters, langdetect, structlog, slowapi, pydantic-settings, httpx. Dev-зависимости: pytest, pytest-asyncio, ruff, pytest-cov. Настроить ruff в pyproject.toml.",
+      "acceptance_criteria": [
+        "Структура директорий создана согласно folder_structure",
+        "pyproject.toml содержит все зависимости с версиями",
+        "ruff настроен (line-length=120, правила: E, F, I, W)",
+        "Все __init__.py файлы созданы",
+        "pip install -e . проходит без ошибок"
+      ],
+      "test_steps": [
+        "Шаг 1: Запустить pip install -e '.[dev]' — установка без ошибок",
+        "Шаг 2: Запустить ruff check src/ — 0 ошибок",
+        "Шаг 3: Проверить наличие всех директорий из folder_structure",
+        "Шаг 4: python -c 'import reviewmind' — импорт без ошибок"
+      ],
+      "dependencies": [],
+      "status": "done",
+      "completed_note": "Создан полный скелет проекта: 14 подпакетов, 50+ модулей, pyproject.toml с 21 зависимостью + 4 dev, ruff настроен (E,F,I,W, line-length=120), все тесты проходят (3/3), uv pip install -e '.[dev]' — 121 пакет установлен."
+    },
+    {
+      "id": "TASK-002",
+      "category": "infrastructure",
+      "priority": "critical",
+      "stage": "Stage 0: Foundation",
+      "description": "Docker Compose: конфигурация всех 8 сервисов (api, bot, worker, beat, flower, qdrant, postgres, redis)",
+      "details": "Создать Dockerfile (multi-stage build: builder + runtime) и docker-compose.yml. Сервисы: api (FastAPI, port 8000 internal), bot (aiogram long polling), worker (Celery), beat (Celery Beat), flower (Celery Flower, port 5555 internal), qdrant (port 6333 internal), postgres (port 5432 internal), redis (port 6379 internal). Все в изолированной Docker-сети. Volumes для postgres и qdrant data.",
+      "acceptance_criteria": [
+        "Dockerfile собирается без ошибок (multi-stage: builder + runtime)",
+        "docker-compose.yml описывает все 8 сервисов",
+        "Все сервисы в одной Docker-сети (reviewmind-network)",
+        "Volumes для postgres_data и qdrant_data",
+        "docker compose config проходит валидацию",
+        "Healthcheck определён для postgres, redis, qdrant"
+      ],
+      "test_steps": [
+        "Шаг 1: docker compose config — валидация без ошибок",
+        "Шаг 2: docker compose build — сборка без ошибок",
+        "Шаг 3: docker compose up -d postgres redis qdrant — три инфра-сервиса стартуют",
+        "Шаг 4: docker compose ps — все запущенные сервисы healthy",
+        "Шаг 5: docker compose down -v — чистое завершение"
+      ],
+      "dependencies": ["TASK-001"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-003",
+      "category": "infrastructure",
+      "priority": "critical",
+      "stage": "Stage 0: Foundation",
+      "description": "Конфигурация окружения: .env.example + модуль config.py (pydantic-settings)",
+      "details": "Создать .env.example со всеми переменными (TELEGRAM_BOT_TOKEN, ADMIN_USER_IDS, OPENAI_API_KEY, OPENAI_BASE_URL, YOUTUBE_API_KEY, REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, REDDIT_USER_AGENT, TAVILY_API_KEY, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, DATABASE_URL, REDIS_URL, QDRANT_URL). Реализовать src/reviewmind/config.py на pydantic-settings с валидацией типов, дефолтами и парсингом ADMIN_USER_IDS как list[int]. Добавить .env в .gitignore.",
+      "acceptance_criteria": [
+        ".env.example содержит все переменные из PRD секции 17",
+        "config.py использует pydantic-settings BaseSettings",
+        "ADMIN_USER_IDS парсится как list[int] из comma-separated строки",
+        "OPENAI_BASE_URL имеет дефолт для GitHub Models",
+        ".env в .gitignore",
+        "Валидация: отсутствие обязательных переменных вызывает понятную ошибку"
+      ],
+      "test_steps": [
+        "Шаг 1: Скопировать .env.example в .env, заполнить тестовыми значениями",
+        "Шаг 2: python -c 'from reviewmind.config import settings; print(settings.model_dump())' — вывод всех настроек",
+        "Шаг 3: Убрать TELEGRAM_BOT_TOKEN из .env → python вызывает ValidationError",
+        "Шаг 4: Проверить, что ADMIN_USER_IDS='123,456' парсится в [123, 456]"
+      ],
+      "dependencies": ["TASK-001"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-004",
+      "category": "infrastructure",
+      "priority": "high",
+      "stage": "Stage 0: Foundation",
+      "description": "GitHub Actions: CI (lint + tests на PR) и CD (multi-arch build + deploy на merge в main)",
+      "details": "Создать .github/workflows/ci.yml: на push/PR в main — ruff check, pytest. Создать .github/workflows/cd.yml: на merge в main — buildx multi-arch (linux/amd64 + linux/arm64), push в GHCR, SSH deploy (docker compose pull && docker compose up -d). Использовать GitHub Secrets для credentials.",
+      "acceptance_criteria": [
+        "ci.yml: запускается на PR, выполняет ruff check и pytest",
+        "cd.yml: запускается на merge в main, собирает multi-arch образ",
+        "cd.yml: пушит образ в ghcr.io",
+        "cd.yml: выполняет SSH deploy на production",
+        "Используются GitHub Secrets, не хардкод credentials"
+      ],
+      "test_steps": [
+        "Шаг 1: Создать тестовый PR → CI workflow запускается",
+        "Шаг 2: Проверить, что ruff check и pytest выполняются в CI",
+        "Шаг 3: Merge PR в main → CD workflow запускается",
+        "Шаг 4: Проверить логи CD: buildx, push to GHCR, SSH deploy"
+      ],
+      "dependencies": ["TASK-001", "TASK-002"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-005",
+      "category": "functional",
+      "priority": "critical",
+      "stage": "Stage 1: Telegram ↔ LLM Chat",
+      "description": "FastAPI приложение: app factory, lifespan, /health endpoint, structlog логирование",
+      "details": "Реализовать src/reviewmind/main.py с FastAPI app factory (create_app), lifespan для подключения/отключения ресурсов (DB, Redis, Qdrant). Создать GET /health endpoint, возвращающий статус qdrant, postgres, redis (bool). Настроить structlog для JSON-логирования в stdout. Создать api/router.py для подключения всех эндпоинтов.",
+      "acceptance_criteria": [
+        "FastAPI приложение создаётся через create_app() factory",
+        "lifespan корректно инициализирует и закрывает ресурсы",
+        "GET /health возвращает {status: 'ok', qdrant: bool, postgres: bool, redis: bool}",
+        "structlog настроен, логи выводятся в JSON-формате в stdout",
+        "uvicorn запускает приложение на порту 8000"
+      ],
+      "test_steps": [
+        "Шаг 1: uvicorn reviewmind.main:app --port 8000 — сервер стартует",
+        "Шаг 2: curl http://localhost:8000/health — ответ 200 с JSON",
+        "Шаг 3: Проверить stdout — логи в JSON формате (structlog)",
+        "Шаг 4: curl http://localhost:8000/docs — Swagger UI доступен"
+      ],
+      "dependencies": ["TASK-001", "TASK-003"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-006",
+      "category": "functional",
+      "priority": "critical",
+      "stage": "Stage 1: Telegram ↔ LLM Chat",
+      "description": "OpenAI client wrapper: совместимый с GitHub Models и OpenAI API, настраиваемый base_url",
+      "details": "Создать src/reviewmind/core/llm.py — async wrapper вокруг openai.AsyncOpenAI. Настраиваемый через config: api_key, base_url. Методы: generate(system_prompt, user_message, temperature, max_tokens) → str, с обработкой ошибок (retry, timeout). Модель по умолчанию: gpt-4o-mini. Переключение GitHub Models ↔ OpenAI через замену OPENAI_BASE_URL в .env.",
+      "acceptance_criteria": [
+        "LLMClient создаётся с параметрами из config (api_key, base_url)",
+        "Метод generate() возвращает строку ответа от LLM",
+        "Обработка ошибок: RateLimitError, APIError, Timeout — с retry",
+        "Работает и с GitHub Models API, и с OpenAI API (только смена base_url)",
+        "Температура и max_tokens настраиваемы (defaults: 0.3, 1000)"
+      ],
+      "test_steps": [
+        "Шаг 1: Настроить .env с GitHub Models credentials",
+        "Шаг 2: python -c 'from reviewmind.core.llm import LLMClient; import asyncio; c = LLMClient(); print(asyncio.run(c.generate(\"You are helpful\", \"Say hello\")))' — получить ответ",
+        "Шаг 3: Сменить OPENAI_BASE_URL на https://api.openai.com/v1 и OPENAI_API_KEY — тот же код работает",
+        "Шаг 4: Отключить интернет → generate() выбрасывает понятное исключение"
+      ],
+      "dependencies": ["TASK-003"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-007",
+      "category": "ui",
+      "priority": "critical",
+      "stage": "Stage 1: Telegram ↔ LLM Chat",
+      "description": "aiogram Telegram bot: /start с выбором режима, /help, inline-клавиатуры",
+      "details": "Создать src/reviewmind/bot/main.py — entrypoint бота (long polling). Реализовать handlers/start.py: /start → приветственное сообщение + inline-клавиатура [🔍 Авто-поиск] [🔗 Свои ссылки]. handlers/mode.py: обработка callback для выбора режима. Создать keyboards.py с inline-клавиатурами. /help → справка о возможностях бота. Бот должен сообщать при первом запуске, что является AI-системой.",
+      "acceptance_criteria": [
+        "Бот запускается в режиме long polling",
+        "/start выводит приветствие + кнопки [🔍 Авто-поиск] [🔗 Свои ссылки]",
+        "/help выводит справку о возможностях",
+        "Выбор режима через inline-кнопки работает (callback handler)",
+        "Бот сообщает на старте, что является AI-системой",
+        "keyboards.py содержит все inline-клавиатуры"
+      ],
+      "test_steps": [
+        "Шаг 1: Запустить бота: python -m reviewmind.bot.main",
+        "Шаг 2: В Telegram отправить /start → получить приветствие с кнопками",
+        "Шаг 3: Нажать [🔍 Авто-поиск] → бот подтверждает выбор режима",
+        "Шаг 4: Отправить /help → получить справку",
+        "Шаг 5: Проверить, что приветствие содержит упоминание AI-системы"
+      ],
+      "dependencies": ["TASK-003"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-008",
+      "category": "integration",
+      "priority": "critical",
+      "stage": "Stage 1: Telegram ↔ LLM Chat",
+      "description": "E2E чат: Telegram → FastAPI → LLM → ответ в Telegram (без RAG, прямой LLM)",
+      "details": "Связать бота с FastAPI. Бот отправляет пользовательское сообщение на API, API вызывает LLM (без RAG на этом этапе, просто прямой вызов), возвращает ответ боту. Реализовать handlers/query.py для обработки текстовых сообщений. Это временная логика — позже заменяется RAG-пайплайном. Добавить typing indicator (bot.send_chat_action).",
+      "acceptance_criteria": [
+        "Пользователь отправляет сообщение в Telegram → получает ответ от LLM",
+        "Время ответа < 5 секунд",
+        "Показывается typing indicator во время генерации",
+        "Ошибки LLM обрабатываются gracefully (сообщение пользователю)",
+        "Smoke-тест: 5 разных вопросов → 5 релевантных ответов"
+      ],
+      "test_steps": [
+        "Шаг 1: Запустить FastAPI (uvicorn) и бота параллельно",
+        "Шаг 2: В Telegram отправить 'Привет, что ты умеешь?' → получить осмысленный ответ",
+        "Шаг 3: Отправить вопрос о товаре → получить ответ (пока без RAG, просто LLM)",
+        "Шаг 4: Проверить, что typing indicator показывается",
+        "Шаг 5: Проверить, что при ошибке LLM пользователь получает извинение, а не traceback"
+      ],
+      "dependencies": ["TASK-005", "TASK-006", "TASK-007"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-009",
+      "category": "infrastructure",
+      "priority": "critical",
+      "stage": "Stage 2: Data Layer",
+      "description": "PostgreSQL: SQLAlchemy async модели + Alembic начальная миграция (все 6 таблиц)",
+      "details": "Создать src/reviewmind/db/models.py с SQLAlchemy ORM моделями: users, user_limits, subscriptions, sources, jobs, query_logs — точно по спецификации из PRD секция 6.1. Создать db/session.py с async session factory (asyncpg). Настроить alembic.ini и alembic/env.py для async работы. Создать начальную миграцию. Создать базовые repositories (CRUD) для каждой таблицы.",
+      "acceptance_criteria": [
+        "Все 6 таблиц определены в models.py согласно PRD секция 6.1",
+        "Async session factory работает через asyncpg",
+        "Alembic настроен для async миграций",
+        "Начальная миграция создана и применяется без ошибок",
+        "Repositories: базовый CRUD (create, get_by_id, update) для users, user_limits, sources, jobs",
+        "Foreign key constraints и indexes корректны"
+      ],
+      "test_steps": [
+        "Шаг 1: docker compose up -d postgres",
+        "Шаг 2: alembic upgrade head — миграция применяется без ошибок",
+        "Шаг 3: Подключиться к БД и проверить структуру: \\dt — все 6 таблиц",
+        "Шаг 4: alembic downgrade -1 && alembic upgrade head — откат и повторное применение",
+        "Шаг 5: Запустить unit-тесты repositories — CRUD операции проходят"
+      ],
+      "dependencies": ["TASK-002", "TASK-003"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-010",
+      "category": "infrastructure",
+      "priority": "critical",
+      "stage": "Stage 2: Data Layer",
+      "description": "Qdrant: инициализация коллекций auto_crawled и curated_kb (1536 dims, cosine)",
+      "details": "Создать src/reviewmind/vectorstore/client.py — async Qdrant client wrapper. Создать vectorstore/collections.py — функции создания коллекций auto_crawled и curated_kb с правильной конфигурацией: 1536 dims, cosine distance, payload indexes по product_query, source_type, is_curated, is_sponsored. Создать scripts/init_qdrant.py для инициализации.",
+      "acceptance_criteria": [
+        "Qdrant client wrapper создаётся из config (QDRANT_URL)",
+        "Коллекция auto_crawled: 1536 dims, cosine, payload indexes",
+        "Коллекция curated_kb: 1536 dims, cosine, payload indexes",
+        "scripts/init_qdrant.py создаёт обе коллекции идемпотентно (не падает при повторном запуске)",
+        "Payload schema соответствует PRD секция 6.2"
+      ],
+      "test_steps": [
+        "Шаг 1: docker compose up -d qdrant",
+        "Шаг 2: python scripts/init_qdrant.py — коллекции созданы",
+        "Шаг 3: python scripts/init_qdrant.py — повторный запуск без ошибок (идемпотентность)",
+        "Шаг 4: curl http://localhost:6333/collections — обе коллекции в списке",
+        "Шаг 5: Проверить параметры коллекций: size=1536, distance=cosine"
+      ],
+      "dependencies": ["TASK-002", "TASK-003"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-011",
+      "category": "functional",
+      "priority": "high",
+      "stage": "Stage 2: Data Layer",
+      "description": "Redis: session manager (mode, history, chunks с TTL 30 минут)",
+      "details": "Создать src/reviewmind/cache/redis.py — async Redis client. Реализовать SessionManager: set_mode(user_id, mode), get_mode(user_id), add_to_history(user_id, message_json), get_history(user_id) → list[dict] (последние 5), store_chunk_ids(user_id, chunk_ids), get_chunk_ids(user_id). Все ключи с TTL=30 минут. Формат ключей: session:{user_id}:mode, session:{user_id}:history, session:{user_id}:chunks.",
+      "acceptance_criteria": [
+        "Redis client создаётся из config (REDIS_URL)",
+        "set_mode / get_mode сохраняет/читает режим пользователя",
+        "add_to_history хранит последние 5 сообщений (FIFO)",
+        "Все ключи имеют TTL=30 минут",
+        "Формат ключей соответствует PRD секция 6.3",
+        "store_chunk_ids / get_chunk_ids для режима ссылок"
+      ],
+      "test_steps": [
+        "Шаг 1: docker compose up -d redis",
+        "Шаг 2: Запустить unit-тест: set_mode(123, 'auto') → get_mode(123) == 'auto'",
+        "Шаг 3: Добавить 7 сообщений → get_history возвращает только последние 5",
+        "Шаг 4: Проверить TTL ключей в redis-cli: TTL session:123:mode — близко к 1800",
+        "Шаг 5: Подождать TTL expiry (или SET с коротким TTL) → ключ удаляется"
+      ],
+      "dependencies": ["TASK-002", "TASK-003"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-012",
+      "category": "functional",
+      "priority": "high",
+      "stage": "Stage 3: Scrapers",
+      "description": "YouTube transcript parser: получение субтитров через youtube-transcript-api",
+      "details": "Создать src/reviewmind/scrapers/youtube.py. Класс YouTubeScraper: extract_video_id(url) → str, get_transcript(video_id, languages=['ru','en']) → str. Обработка ошибок: NoTranscriptFound, VideoUnavailable, TranscriptsDisabled. Фильтрация: видео с транскриптом < 500 слов → skip с логированием. Возвращает чистый текст без таймстемпов.",
+      "acceptance_criteria": [
+        "extract_video_id корректно парсит youtube.com/watch?v=..., youtu.be/..., youtube.com/shorts/...",
+        "get_transcript возвращает чистый текст без таймстемпов",
+        "Поддержка языков: ru, en (приоритет)",
+        "Обработка ошибок: NoTranscriptFound → None с логом",
+        "Фильтрация: транскрипт < 500 слов → skip",
+        "Unit-тесты покрывают все сценарии"
+      ],
+      "test_steps": [
+        "Шаг 1: Запустить тест с реальным YouTube URL (популярный обзор) → получить транскрипт",
+        "Шаг 2: Тест с URL без субтитров → graceful None, не exception",
+        "Шаг 3: Тест с невалидным URL → ValueError",
+        "Шаг 4: Проверить, что таймстемпы удалены из результата",
+        "Шаг 5: pytest tests/unit/test_scrapers/test_youtube.py — все тесты зелёные"
+      ],
+      "dependencies": ["TASK-001", "TASK-003"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-013",
+      "category": "functional",
+      "priority": "high",
+      "stage": "Stage 3: Scrapers",
+      "description": "Reddit parser: получение постов и комментариев через PRAW",
+      "details": "Создать src/reviewmind/scrapers/reddit.py. Класс RedditScraper: parse_url(url) → dict (title, selftext, top comments). search_subreddit(query, subreddit='all', limit=10) → list[dict]. Использовать PRAW с credentials из config. Rate limit respect. Top-level + первый уровень комментариев (limit 20). Фильтрация: удалённые/deleted посты → skip.",
+      "acceptance_criteria": [
+        "parse_url: корректно извлекает пост + top-20 комментариев",
+        "search_subreddit: ищет по запросу, возвращает релевантные посты",
+        "PRAW credentials из config",
+        "Удалённые посты/комментарии ([deleted], [removed]) фильтруются",
+        "Rate limits PRAW соблюдаются",
+        "Unit-тесты с мокированным PRAW"
+      ],
+      "test_steps": [
+        "Шаг 1: Тест parse_url с реальным Reddit URL → получить пост + комментарии",
+        "Шаг 2: Тест search_subreddit('best headphones 2026') → список постов",
+        "Шаг 3: Тест с невалидным URL → graceful обработка",
+        "Шаг 4: Проверить, что [deleted] комментарии отфильтрованы",
+        "Шаг 5: pytest tests/unit/test_scrapers/test_reddit.py — все тесты зелёные"
+      ],
+      "dependencies": ["TASK-001", "TASK-003"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-014",
+      "category": "functional",
+      "priority": "high",
+      "stage": "Stage 3: Scrapers",
+      "description": "Web page parser: извлечение основного текста через trafilatura",
+      "details": "Создать src/reviewmind/scrapers/web.py. Класс WebScraper: parse_url(url) → str | None. Использовать trafilatura для извлечения чистого текста. Обработка: paywall → None с уведомлением, timeout (30 сек), пустой результат → None. Извлечение мета-данных: title, author, date (если доступны).",
+      "acceptance_criteria": [
+        "parse_url извлекает основной текст страницы без HTML, рекламы, навигации",
+        "Paywall/пустой результат → возвращает None с логом",
+        "Timeout 30 секунд на запрос",
+        "Мета-данные: title, author, date извлекаются если доступны",
+        "Работает с rtings.com, wirecutter.com и аналогичными сайтами"
+      ],
+      "test_steps": [
+        "Шаг 1: Тест с URL обзора на rtings.com → получить чистый текст",
+        "Шаг 2: Тест с URL за paywall → None, без exception",
+        "Шаг 3: Тест с невалидным URL → None с логированием",
+        "Шаг 4: Проверить, что HTML-теги отсутствуют в результате",
+        "Шаг 5: pytest tests/unit/test_scrapers/test_web.py — все тесты зелёные"
+      ],
+      "dependencies": ["TASK-001"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-015",
+      "category": "functional",
+      "priority": "high",
+      "stage": "Stage 3: Scrapers",
+      "description": "Очистка текста + нормализация + детекция спонсорского контента",
+      "details": "Создать src/reviewmind/ingestion/cleaner.py: clean_text(raw_text) → str — удаление рекламных вставок, лишних пробелов, HTML-тегов, таймстемпов, нормализация юникода. Создать src/reviewmind/ingestion/sponsor.py: detect_sponsor(text) → bool — regex-эвристики для спонсорских маркеров ('sponsored by', 'this video is sponsored', 'промокод', 'скидка по ссылке', etc.).",
+      "acceptance_criteria": [
+        "clean_text удаляет HTML-теги, лишние пробелы, таймстемпы",
+        "clean_text нормализует юникод (NFKC)",
+        "detect_sponsor определяет спонсорские маркеры на русском и английском",
+        "Regex-паттерны покрывают: 'sponsored by', 'this video is sponsored', 'промокод', 'скидка по ссылке', 'благодарим спонсора'",
+        "False positive rate < 10% на тестовых данных",
+        "Unit-тесты с примерами спонсорского и неспонсорского контента"
+      ],
+      "test_steps": [
+        "Шаг 1: clean_text('<p>Hello  \\t world</p>') → 'Hello world'",
+        "Шаг 2: detect_sponsor('This video is sponsored by NordVPN') → True",
+        "Шаг 3: detect_sponsor('Honest review of headphones') → False",
+        "Шаг 4: detect_sponsor('Промокод TECH10 по ссылке в описании') → True",
+        "Шаг 5: pytest tests/unit/test_ingestion/ — все тесты зелёные"
+      ],
+      "dependencies": ["TASK-001"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-016",
+      "category": "functional",
+      "priority": "high",
+      "stage": "Stage 3: Scrapers",
+      "description": "Text chunking: RecursiveCharacterTextSplitter (400-600 tokens, 50 token overlap)",
+      "details": "Создать src/reviewmind/ingestion/chunker.py. Использовать LangChain RecursiveCharacterTextSplitter. Настройки: chunk_size 400-600 tokens (~1500-2400 символов), overlap 50 tokens (~200 символов). Метод: chunk_text(text, metadata) → list[dict] с chunk_index и метаданными. Каждый чанк содержит: text, chunk_index, source metadata.",
+      "acceptance_criteria": [
+        "Чанки размером 400-600 tokens с 50 token overlap",
+        "RecursiveCharacterTextSplitter из LangChain используется",
+        "Каждый чанк содержит: text, chunk_index, переданные metadata",
+        "Пустой текст → пустой список (не exception)",
+        "Текст < 1 чанка → список из 1 элемента",
+        "Разделение по абзацам и предложениям (не по словам)"
+      ],
+      "test_steps": [
+        "Шаг 1: chunk_text длинного текста (5000 слов) → несколько чанков по 400-600 tokens",
+        "Шаг 2: Проверить overlap: конец чанка N совпадает с началом чанка N+1",
+        "Шаг 3: chunk_text('') → [] без ошибок",
+        "Шаг 4: chunk_text(короткий текст 100 слов) → [1 чанк]",
+        "Шаг 5: Проверить chunk_index: 0, 1, 2... последовательно"
+      ],
+      "dependencies": ["TASK-001"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-017",
+      "category": "functional",
+      "priority": "critical",
+      "stage": "Stage 4: RAG Pipeline",
+      "description": "Embedding service: text-embedding-3-small (1536 dims) через OpenAI API",
+      "details": "Создать src/reviewmind/core/embeddings.py. Класс EmbeddingService: embed_text(text) → list[float] (1536 dims), embed_batch(texts, batch_size=100) → list[list[float]]. Использовать OpenAI API с тем же base_url / api_key из config. Модель: text-embedding-3-small. Обработка rate limits, batching для эффективности.",
+      "acceptance_criteria": [
+        "embed_text возвращает вектор 1536 dims",
+        "embed_batch обрабатывает список текстов, возвращает список векторов",
+        "Батчинг: не более 100 текстов за один API-запрос",
+        "Rate limit handling: retry с exponential backoff",
+        "Совместимость с GitHub Models API и OpenAI API"
+      ],
+      "test_steps": [
+        "Шаг 1: embed_text('Test query') → вектор длиной 1536",
+        "Шаг 2: embed_batch(['text1', 'text2', 'text3']) → 3 вектора по 1536",
+        "Шаг 3: Два вызова embed_text с одинаковым текстом → одинаковые векторы",
+        "Шаг 4: embed_text('') → обработка без crash (пустая строка)",
+        "Шаг 5: Замерить latency для batch из 50 текстов — < 5 секунд"
+      ],
+      "dependencies": ["TASK-006", "TASK-010"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-018",
+      "category": "functional",
+      "priority": "critical",
+      "stage": "Stage 4: RAG Pipeline",
+      "description": "Qdrant upsert с дедупликацией (cosine similarity > 0.95 → skip)",
+      "details": "Создать/расширить src/reviewmind/vectorstore/client.py. Метод upsert_chunks(collection, chunks_with_vectors, payloads). Перед upsert: проверить cosine similarity с существующими точками; если > 0.95 для того же source_url → skip (дедупликация). Payload: source_id, source_url, source_type, product_query, chunk_index, language, is_sponsored, is_curated, author, date, text, session_id.",
+      "acceptance_criteria": [
+        "upsert_chunks записывает вектора с payload в Qdrant",
+        "Дедупликация: если cosine similarity > 0.95 для того же source_url → skip",
+        "Payload содержит все поля из PRD секция 6.2",
+        "Batch upsert для эффективности (не по одному)",
+        "Идемпотентность: повторный upsert тех же данных не создаёт дубликатов"
+      ],
+      "test_steps": [
+        "Шаг 1: upsert_chunks с 5 чанками → все записаны в Qdrant",
+        "Шаг 2: Повторный upsert тех же 5 чанков → 0 новых записей (дедупликация)",
+        "Шаг 3: upsert_chunks с новыми чанками от другого source_url → записаны",
+        "Шаг 4: Проверить payload полей в Qdrant dashboard / API",
+        "Шаг 5: Проверить, что source_url используется при дедупликации"
+      ],
+      "dependencies": ["TASK-017"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-019",
+      "category": "integration",
+      "priority": "critical",
+      "stage": "Stage 4: RAG Pipeline",
+      "description": "Ingestion pipeline интеграция: parse → clean → sponsor detect → chunk → embed → upsert + metadata в PostgreSQL",
+      "details": "Создать src/reviewmind/ingestion/pipeline.py. Класс IngestionPipeline: ingest_url(url, product_query, session_id?) → IngestionResult. Оркестрация: определить тип URL → вызвать парсер → clean → detect sponsor → chunk → embed → upsert в Qdrant → сохранить metadata source в PostgreSQL (sources таблица). Обработка ошибок: если URL недоступен → уведомление, продолжить остальные.",
+      "acceptance_criteria": [
+        "ingest_url обрабатывает полный цикл для YouTube, Reddit и web URL",
+        "Source metadata сохраняется в PostgreSQL (sources таблица)",
+        "Чанки с эмбеддингами записываются в Qdrant (auto_crawled)",
+        "Ошибка парсинга одного URL не блокирует обработку остальных",
+        "Возвращает IngestionResult: success_count, failed_urls, chunks_count",
+        "is_sponsored флаг корректно проставляется в payload"
+      ],
+      "test_steps": [
+        "Шаг 1: ingest_url с YouTube URL → source в PostgreSQL + чанки в Qdrant",
+        "Шаг 2: ingest_url с Reddit URL → аналогично",
+        "Шаг 3: ingest_url с web URL (rtings.com) → аналогично",
+        "Шаг 4: ingest_url с невалидным URL → graceful None, остальные продолжают",
+        "Шаг 5: Проверить source запись в PostgreSQL: source_url, source_type, is_sponsored"
+      ],
+      "dependencies": ["TASK-012", "TASK-013", "TASK-014", "TASK-015", "TASK-016", "TASK-017", "TASK-018", "TASK-009"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-020",
+      "category": "functional",
+      "priority": "critical",
+      "stage": "Stage 4: RAG Pipeline",
+      "description": "Гибридный поиск по Qdrant: curated_kb (приоритет) + auto_crawled, pre-filter по product_query",
+      "details": "Создать src/reviewmind/vectorstore/search.py. Метод hybrid_search(query_vector, product_query?, top_k=5) → list[SearchResult]. Параллельный поиск по curated_kb (top_k=5) и auto_crawled (top_k=5). Pre-filter по product_query payload если указан. Каждый SearchResult содержит: text, score, metadata (source_type, is_curated, is_sponsored, source_url).",
+      "acceptance_criteria": [
+        "Поиск одновременно по curated_kb и auto_crawled",
+        "Pre-filter по product_query работает (payload filter)",
+        "Возвращает top-K результатов из каждой коллекции",
+        "SearchResult содержит: text, score, все metadata",
+        "При пустой коллекции — возвращает результаты из другой (не падает)",
+        "Параллельное выполнение запросов (asyncio.gather)"
+      ],
+      "test_steps": [
+        "Шаг 1: Предварительно загрузить данные в обе коллекции (через TASK-019)",
+        "Шаг 2: hybrid_search по загруженному product → результаты из обеих коллекций",
+        "Шаг 3: hybrid_search с product_query filter → только релевантные чанки",
+        "Шаг 4: hybrid_search при пустой curated_kb → результаты только из auto_crawled",
+        "Шаг 5: Замерить latency — < 500ms для 10 результатов"
+      ],
+      "dependencies": ["TASK-010", "TASK-017"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-021",
+      "category": "functional",
+      "priority": "critical",
+      "stage": "Stage 4: RAG Pipeline",
+      "description": "Reranking: curated ×1.3 boost, sponsored ×0.7 downweight, merge и top-K отбор",
+      "details": "Создать src/reviewmind/core/reranker.py. Метод rerank(search_results: list[SearchResult], top_k=8) → list[SearchResult]. Логика: curated chunks score ×1.3, sponsored chunks score ×0.7. Merge результаты из обеих коллекций, сортировка по adjusted score, отбор top_k. Возвращает merged и отсортированный список.",
+      "acceptance_criteria": [
+        "Curated чанки получают score boost ×1.3",
+        "Sponsored чанки получают downweight ×0.7",
+        "Результаты из двух коллекций корректно мержатся",
+        "Top-K отбор после reranking (default k=8)",
+        "Одинаковые чанки из разных коллекций дедуплицируются",
+        "При отсутствии curated результатов — работает только с auto_crawled"
+      ],
+      "test_steps": [
+        "Шаг 1: Rerank с curated (score=0.8) и auto (score=0.85) → curated выше (0.8×1.3=1.04 > 0.85)",
+        "Шаг 2: Rerank со sponsored (score=0.9) → понижается (0.9×0.7=0.63)",
+        "Шаг 3: Rerank с 15 результатами, top_k=8 → ровно 8 в ответе",
+        "Шаг 4: Rerank с пустым списком → пустой список (не exception)",
+        "Шаг 5: Unit-тесты покрывают edge cases"
+      ],
+      "dependencies": ["TASK-020"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-022",
+      "category": "functional",
+      "priority": "critical",
+      "stage": "Stage 4: RAG Pipeline",
+      "description": "Системный промпт + LLM генерация структурированного ответа (Плюсы/Минусы/Спорные/Вывод)",
+      "details": "Создать src/reviewmind/core/prompts.py с системным промптом из PRD секция 7. Расширить LLMClient (или создать RAG-specific генератор): generate_analysis(chunks, chat_history, user_query, language) → str. Формат ответа: [✅ Плюсы] [❌ Минусы] [⚖️ Спорные моменты] [🏆 Вывод]. Параметры: temperature=0.3, max_tokens=1000, top_p=0.9. Источники с [sponsored] помечаются в ответе.",
+      "acceptance_criteria": [
+        "Системный промпт соответствует PRD секция 7",
+        "Ответ структурирован: ✅ Плюсы, ❌ Минусы, ⚖️ Спорные моменты, 🏆 Вывод",
+        "Параметры генерации: temperature=0.3, max_tokens=1000, top_p=0.9",
+        "Спонсорские источники помечены в ответе",
+        "Количество источников + бейдж 📚 указаны в конце",
+        "Ответ на языке пользователя",
+        "LLM не выдумывает факты вне контекста (ограничение в промпте)"
+      ],
+      "test_steps": [
+        "Шаг 1: generate_analysis с 5 чанками о наушниках → структурированный ответ",
+        "Шаг 2: Проверить наличие всех 4 секций (Плюсы, Минусы, Спорные, Вывод)",
+        "Шаг 3: Включить sponsored чанк → в ответе есть упоминание спонсорства",
+        "Шаг 4: Включить curated чанк → бейдж 📚 в конце",
+        "Шаг 5: Отправить запрос на русском → ответ на русском; на английском → на английском"
+      ],
+      "dependencies": ["TASK-006"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-023",
+      "category": "functional",
+      "priority": "medium",
+      "stage": "Stage 4: RAG Pipeline",
+      "description": "Автоопределение языка запроса (langdetect) + ответ на языке пользователя",
+      "details": "Создать src/reviewmind/services/language.py. Функция detect_language(text) → str ('ru', 'en', etc.). Использовать библиотеку langdetect. Интегрировать с промптом: передавать язык в LLM для ответа на нём. Fallback: если определение невозможно → 'ru' (приоритетный рынок).",
+      "acceptance_criteria": [
+        "detect_language корректно определяет русский и английский",
+        "Fallback на 'ru' при неопределённом языке",
+        "Интеграция с системным промптом (передача языка)",
+        "Короткие запросы (1-2 слова) обрабатываются без crash",
+        "Поддержка Unicode"
+      ],
+      "test_steps": [
+        "Шаг 1: detect_language('Стоит ли покупать iPhone?') → 'ru'",
+        "Шаг 2: detect_language('Is Dyson V15 worth it?') → 'en'",
+        "Шаг 3: detect_language('OK') → fallback 'ru'",
+        "Шаг 4: detect_language('') → fallback 'ru' без exception",
+        "Шаг 5: pytest tests/unit/test_services/test_language.py — зелёные"
+      ],
+      "dependencies": ["TASK-022"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-024",
+      "category": "integration",
+      "priority": "critical",
+      "stage": "Stage 4: RAG Pipeline",
+      "description": "Полный RAG pipeline: embed query → search → rerank → build context → generate answer",
+      "details": "Создать src/reviewmind/core/rag.py. Класс RAGPipeline: query(user_query, chat_history?, product_query?, session_id?) → RAGResponse. Оркестрация: (1) embed query, (2) hybrid search curated+auto, (3) rerank, (4) check confidence (≥3 чанков с score > 0.75), (5) build context (up to 8 чанков + metadata + history), (6) generate via LLM. RAGResponse: answer, sources, used_curated, confidence_met, chunks_count.",
+      "acceptance_criteria": [
+        "query() выполняет полный RAG цикл end-to-end",
+        "Confidence check: ≥3 чанков с score > 0.75 → генерация",
+        "Confidence not met → возвращает флаг confidence_met=false",
+        "Контекст содержит до 8 чанков + chat_history",
+        "RAGResponse содержит: answer, sources, used_curated, confidence_met, chunks_count",
+        "Chat history учитывается в генерации (если передан)"
+      ],
+      "test_steps": [
+        "Шаг 1: Загрузить seed-данные о товаре в Qdrant",
+        "Шаг 2: query('Sony WH-1000XM5 стоит ли покупать?') → структурированный ответ",
+        "Шаг 3: Проверить, что sources содержит реальные URL",
+        "Шаг 4: query по товару без данных → confidence_met=false",
+        "Шаг 5: query с chat_history → ответ учитывает контекст диалога"
+      ],
+      "dependencies": ["TASK-020", "TASK-021", "TASK-022"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-025",
+      "category": "functional",
+      "priority": "high",
+      "stage": "Stage 4: RAG Pipeline",
+      "description": "Seed-данные для тестирования + ручная верификация качества RAG (20 запросов)",
+      "details": "Создать scripts/seed_test_data.py: парсит 3-5 реальных обзоров по популярным товарам (наушники, смартфон), проводит через ingestion pipeline, загружает в Qdrant auto_crawled. Подготовить 20 тестовых запросов и ожидаемые ответы. Запустить RAG pipeline для каждого запроса и оценить качество.",
+      "acceptance_criteria": [
+        "Seed script загружает данные минимум по 2 товарам в Qdrant",
+        "20 тестовых запросов подготовлены",
+        "RAG-ответы содержат реальные факты из загруженных источников",
+        "RAG-ответы не содержат галлюцинаций (информации не из контекста)",
+        "Top-5 чанков релевантны запросу в ≥80% случаев"
+      ],
+      "test_steps": [
+        "Шаг 1: python scripts/seed_test_data.py — seed-данные загружены",
+        "Шаг 2: Запустить 20 тестовых запросов через RAG pipeline",
+        "Шаг 3: Оценить каждый ответ: релевантность, структура, отсутствие галлюцинаций",
+        "Шаг 4: Записать результаты верификации в progress.md",
+        "Шаг 5: Процент качественных ответов ≥ 80%"
+      ],
+      "dependencies": ["TASK-019", "TASK-024"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-026",
+      "category": "functional",
+      "priority": "high",
+      "stage": "Stage 5: Manual Mode",
+      "description": "URL type detection: определение типа ссылки (YouTube, Reddit, web) и маршрутизация к парсеру",
+      "details": "Создать src/reviewmind/ingestion/url_detector.py. Функция detect_url_type(url) → URLType ('youtube' | 'reddit' | 'web'). Regex-паттерны: youtube.com, youtu.be, youtube.com/shorts → 'youtube'; reddit.com, redd.it → 'reddit'; всё остальное → 'web'. Валидация URL (httpx head request опционально). Функция route_to_scraper(url) → Scraper instance.",
+      "acceptance_criteria": [
+        "YouTube URLs (youtube.com/watch, youtu.be, /shorts/) → 'youtube'",
+        "Reddit URLs (reddit.com, redd.it) → 'reddit'",
+        "Все остальные валидные HTTP URL → 'web'",
+        "Невалидные URL → ValueError с понятным сообщением",
+        "route_to_scraper возвращает правильный Scraper instance"
+      ],
+      "test_steps": [
+        "Шаг 1: detect_url_type('https://youtube.com/watch?v=xxx') → 'youtube'",
+        "Шаг 2: detect_url_type('https://youtu.be/xxx') → 'youtube'",
+        "Шаг 3: detect_url_type('https://reddit.com/r/headphones/...') → 'reddit'",
+        "Шаг 4: detect_url_type('https://rtings.com/...') → 'web'",
+        "Шаг 5: detect_url_type('not-a-url') → ValueError"
+      ],
+      "dependencies": ["TASK-012", "TASK-013", "TASK-014"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-027",
+      "category": "functional",
+      "priority": "critical",
+      "stage": "Stage 5: Manual Mode",
+      "description": "POST /query endpoint: полный RAG-запрос с проверкой лимитов и логированием",
+      "details": "Создать src/reviewmind/api/endpoints/query.py. POST /query endpoint: body {user_id, session_id, query, mode, urls?}. Логика: проверить тип запроса (auto/manual), вызвать RAG pipeline, залогировать в query_logs. Response: {answer, sources, job_id?, used_curated, used_tavily, response_time_ms}. Pydantic schemas в api/schemas.py.",
+      "acceptance_criteria": [
+        "POST /query принимает body согласно PRD секция 8",
+        "Response содержит: answer, sources, used_curated, response_time_ms",
+        "Запрос логируется в query_logs (PostgreSQL)",
+        "Pydantic validation для request/response",
+        "response_time_ms корректно замеряется",
+        "В auto-режиме при недостатке данных возвращает job_id"
+      ],
+      "test_steps": [
+        "Шаг 1: POST /query с mode=manual и seed-данными → ответ с answer и sources",
+        "Шаг 2: Проверить query_logs в PostgreSQL — запись создана",
+        "Шаг 3: POST /query с невалидным body → 422 с описанием ошибки",
+        "Шаг 4: Замерить response_time_ms — соответствует реальному времени",
+        "Шаг 5: Swagger UI: POST /query с примером — работает"
+      ],
+      "dependencies": ["TASK-005", "TASK-024", "TASK-009"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-028",
+      "category": "functional",
+      "priority": "high",
+      "stage": "Stage 5: Manual Mode",
+      "description": "POST /ingest endpoint: приём URL, парсинг, эмбеддинг, upsert в Qdrant",
+      "details": "Создать src/reviewmind/api/endpoints/ingest.py. POST /ingest: body {user_id, session_id, urls: [string]}. Для каждого URL: определить тип → парсить → ingestion pipeline. MVP: синхронный парсинг. Response: {results: [{url, status, error?}], chunks_count}. При ошибке одного URL — остальные обрабатываются.",
+      "acceptance_criteria": [
+        "POST /ingest принимает список URL",
+        "Каждый URL обрабатывается: parse → clean → chunk → embed → upsert",
+        "Ошибка одного URL не блокирует остальные",
+        "Response содержит статус для каждого URL отдельно",
+        "chunks_count показывает общее количество загруженных чанков",
+        "При недоступном URL: {url, status: 'failed', error: 'не удалось загрузить'}"
+      ],
+      "test_steps": [
+        "Шаг 1: POST /ingest с 1 YouTube URL → status=success, chunks_count > 0",
+        "Шаг 2: POST /ingest с 3 URL (YouTube + Reddit + web) → все обработаны",
+        "Шаг 3: POST /ingest с 1 рабочим + 1 сломанным URL → рабочий обработан, сломанный failed",
+        "Шаг 4: Проверить Qdrant — чанки записаны в auto_crawled",
+        "Шаг 5: Проверить PostgreSQL sources — записи созданы"
+      ],
+      "dependencies": ["TASK-005", "TASK-019", "TASK-026"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-029",
+      "category": "integration",
+      "priority": "high",
+      "stage": "Stage 5: Manual Mode",
+      "description": "Bot: режим 'Свои ссылки' — приём URL, парсинг, RAG-ответ",
+      "details": "Создать src/reviewmind/bot/handlers/links.py. Flow: пользователь выбирает [🔗 Свои ссылки] → отправляет URL → бот вызывает POST /ingest → затем POST /query → отправляет ответ с кнопками [👍] [👎] [📎 Источники]. Обработка: множественные URL в одном сообщении, уведомление при ошибке парсинга конкретного URL.",
+      "acceptance_criteria": [
+        "Пользователь отправляет URL → бот парсит и отвечает анализом",
+        "Поддержка нескольких URL в одном сообщении (по одному на строку)",
+        "При ошибке парсинга URL → уведомление 'Не удалось загрузить: {url}'",
+        "Ответ содержит структурированный анализ с кнопками [👍] [👎] [📎]",
+        "Минимум 1 успешный URL достаточен для генерации ответа",
+        "Повторный вопрос по тем же ссылкам → мгновенный ответ (из кэша Qdrant)"
+      ],
+      "test_steps": [
+        "Шаг 1: Выбрать [🔗 Свои ссылки] → отправить YouTube URL → получить анализ",
+        "Шаг 2: Отправить 3 URL (YouTube + Reddit + web) → получить объединённый анализ",
+        "Шаг 3: Отправить нерабочий URL → уведомление об ошибке",
+        "Шаг 4: Задать уточняющий вопрос → ответ из уже загруженных данных",
+        "Шаг 5: Проверить кнопки [👍] [👎] [📎 Источники] под ответом"
+      ],
+      "dependencies": ["TASK-007", "TASK-027", "TASK-028", "TASK-011"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-030",
+      "category": "ui",
+      "priority": "medium",
+      "stage": "Stage 5: Manual Mode",
+      "description": "Команда /mode: переключение авто/ссылки без сброса сессии",
+      "details": "Расширить src/reviewmind/bot/handlers/mode.py. /mode → inline-клавиатура [🔍 Авто] [🔗 Ссылки]. При выборе: обновить режим в Redis (SessionManager.set_mode), НЕ сбрасывать chat_history. Подтверждение: 'Режим изменён на {mode}'.",
+      "acceptance_criteria": [
+        "/mode показывает текущий режим и кнопки переключения",
+        "Переключение обновляет mode в Redis",
+        "Chat history НЕ сбрасывается при переключении",
+        "Подтверждение переключения режима",
+        "Текущий режим визуально выделен"
+      ],
+      "test_steps": [
+        "Шаг 1: /mode → видны кнопки [🔍 Авто] [🔗 Ссылки]",
+        "Шаг 2: Нажать [🔍 Авто] → 'Режим изменён на Авто-поиск'",
+        "Шаг 3: Задать вопрос → ранее загруженные данные сессии доступны",
+        "Шаг 4: /mode → нажать [🔗 Ссылки] → режим изменён",
+        "Шаг 5: Проверить Redis: session:{user_id}:mode обновлён, session:{user_id}:history сохранён"
+      ],
+      "dependencies": ["TASK-007", "TASK-011"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-031",
+      "category": "infrastructure",
+      "priority": "high",
+      "stage": "Stage 6: Celery Async",
+      "description": "Celery app factory + Redis broker + worker конфигурация + Flower",
+      "details": "Создать src/reviewmind/workers/celery_app.py: Celery app factory с Redis broker (REDIS_URL из config). Настройки: serializer=json, task_acks_late=True, worker_prefetch_multiplier=1. Docker Compose: worker сервис запускает celery -A reviewmind.workers.celery_app worker, flower сервис. Flower доступен через SSH tunnel (порт 5555).",
+      "acceptance_criteria": [
+        "Celery app создаётся с Redis broker",
+        "Worker запускается через Docker Compose",
+        "Flower UI доступен на порту 5555",
+        "Конфигурация: json serializer, task_acks_late, prefetch=1",
+        "Worker принимает и выполняет тестовую задачу"
+      ],
+      "test_steps": [
+        "Шаг 1: docker compose up -d worker redis → worker стартует и подключается к broker",
+        "Шаг 2: docker compose up -d flower → Flower UI доступен на localhost:5555",
+        "Шаг 3: Отправить тестовую задачу через celery shell → выполняется, видна в Flower",
+        "Шаг 4: docker compose logs worker → логи без ошибок",
+        "Шаг 5: Проверить reconnect: перезапуск redis → worker переподключается"
+      ],
+      "dependencies": ["TASK-002", "TASK-003"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-032",
+      "category": "functional",
+      "priority": "high",
+      "stage": "Stage 6: Celery Async",
+      "description": "Celery задача фонового сбора данных + GET /status/{job_id} endpoint",
+      "details": "Создать src/reviewmind/workers/tasks.py: задача ingest_sources_task(user_id, product_query, urls?) — вызывает ingestion pipeline для списка URL или auto-search результатов. Записывает job в PostgreSQL (jobs таблица). Создать GET /status/{job_id} endpoint: возвращает {job_id, status, progress?, result?}.",
+      "acceptance_criteria": [
+        "Celery задача ingest_sources_task выполняет полный ingestion",
+        "Job записывается в PostgreSQL с celery_task_id",
+        "GET /status/{job_id} возвращает текущий статус задачи",
+        "Статусы: pending → running → done | failed",
+        "completed_at заполняется при завершении"
+      ],
+      "test_steps": [
+        "Шаг 1: Поставить задачу в очередь → job создан в PostgreSQL со статусом 'pending'",
+        "Шаг 2: GET /status/{job_id} → status='running' (пока worker работает)",
+        "Шаг 3: Дождаться завершения → GET /status → status='done'",
+        "Шаг 4: Проверить, что чанки записаны в Qdrant",
+        "Шаг 5: Повторный запуск по тем же URL → дедупликация в Qdrant"
+      ],
+      "dependencies": ["TASK-031", "TASK-019", "TASK-005", "TASK-009"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-033",
+      "category": "integration",
+      "priority": "high",
+      "stage": "Stage 6: Celery Async",
+      "description": "Push-уведомление в Telegram по завершении фоновой задачи",
+      "details": "После завершения Celery задачи: (1) получить fresh чанки из Qdrant, (2) выполнить RAG query, (3) отправить ответ пользователю в Telegram через bot.send_message. Уведомления: при начале — '⏳ Ищу данные (~3 мин)...', при завершении — полный анализ с кнопками [👍] [👎] [📎].",
+      "acceptance_criteria": [
+        "При постановке задачи: пользователь получает '⏳ Ищу данные (~3 мин)...'",
+        "При завершении: пользователь получает полный RAG-анализ",
+        "Ответ содержит кнопки [👍] [👎] [📎 Источники]",
+        "Push-уведомление приходит в течение 5 минут",
+        "При ошибке задачи: пользователь получает сообщение с извинением"
+      ],
+      "test_steps": [
+        "Шаг 1: Отправить запрос по новому товару → '⏳ Ищу данные (~3 мин)...'",
+        "Шаг 2: Дождаться push-уведомления → полный анализ с источниками",
+        "Шаг 3: Проверить кнопки под ответом",
+        "Шаг 4: Симулировать ошибку задачи → сообщение с извинением",
+        "Шаг 5: Замерить время от запроса до push → ≤ 5 минут"
+      ],
+      "dependencies": ["TASK-032", "TASK-007", "TASK-024"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-034",
+      "category": "functional",
+      "priority": "high",
+      "stage": "Stage 6: Celery Async",
+      "description": "Task retry (3 попытки) + алерт в admin Telegram-чат при финальном падении",
+      "details": "Настроить retry для Celery задач: max_retries=3, countdown экспоненциальный (60, 300, 900 сек). При 3 неудачных попытках: (1) обновить job status='failed' в PostgreSQL, (2) отправить алерт в admin Telegram-чат (ADMIN_USER_IDS), (3) отправить извинение пользователю.",
+      "acceptance_criteria": [
+        "Task retry: 3 попытки с экспоненциальным backoff",
+        "При финальном fallback: job.status='failed' в PostgreSQL",
+        "Алерт в admin-чат с деталями ошибки (task_id, error message)",
+        "Пользователь получает сообщение с извинением",
+        "Retry не создаёт дубликатов данных в Qdrant"
+      ],
+      "test_steps": [
+        "Шаг 1: Симулировать ошибку парсинга → задача ретраится",
+        "Шаг 2: Проверить логи: 3 попытки с нарастающим интервалом",
+        "Шаг 3: После 3 fallback: admin получает алерт в Telegram",
+        "Шаг 4: Пользователь получает извинение",
+        "Шаг 5: Проверить PostgreSQL: job.status='failed', completed_at заполнен"
+      ],
+      "dependencies": ["TASK-032", "TASK-003"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-035",
+      "category": "infrastructure",
+      "priority": "medium",
+      "stage": "Stage 6: Celery Async",
+      "description": "Celery Beat: расписание периодических задач (обновление кэша, сброс лимитов)",
+      "details": "Создать src/reviewmind/workers/beat_schedule.py. Задачи: (1) daily_reset_limits — каждый день 00:00 UTC, сброс user_limits.requests_used, (2) refresh_top_queries — каждые 30 дней, обновление top-50 запросов в auto_crawled. Docker Compose: beat сервис запускает celery -A reviewmind.workers.celery_app beat.",
+      "acceptance_criteria": [
+        "Celery Beat сервис стартует в Docker Compose",
+        "daily_reset_limits задача планируется на 00:00 UTC",
+        "refresh_top_queries задача планируется на каждые 30 дней",
+        "Beat schedule определён в beat_schedule.py",
+        "Задачи выполняются по расписанию"
+      ],
+      "test_steps": [
+        "Шаг 1: docker compose up -d beat → сервис стартует",
+        "Шаг 2: Проверить логи beat: scheduled tasks registered",
+        "Шаг 3: Вручную вызвать daily_reset_limits → user_limits обнуляются",
+        "Шаг 4: Проверить Flower: периодические задачи видны в расписании",
+        "Шаг 5: docker compose logs beat — нет ошибок"
+      ],
+      "dependencies": ["TASK-031"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-036",
+      "category": "functional",
+      "priority": "medium",
+      "stage": "Stage 7: Monetization",
+      "description": "Лимиты запросов: 3 req/day бесплатно, счётчик в PostgreSQL user_limits",
+      "details": "Создать src/reviewmind/services/limit_service.py. Логика: check_limit(user_id) → bool. При каждом запросе: increment requests_used в user_limits для текущей даты. При requests_used >= 3 (free) → отклонить с сообщением 'Вы использовали 3/3 бесплатных запросов' + кнопка [⭐ Подписка]. Админы и premium — без лимита.",
+      "acceptance_criteria": [
+        "Free-пользователь: 3 запроса в сутки, 4-й отклоняется",
+        "Premium-пользователь: безлимитные запросы",
+        "Сообщение при достижении лимита содержит кнопку подписки",
+        "Счётчик хранится в user_limits (user_id + date)",
+        "Новый день (UTC) — счётчик сбрасывается",
+        "check_limit интегрирован в POST /query middleware"
+      ],
+      "test_steps": [
+        "Шаг 1: Отправить 3 запроса → все обработаны",
+        "Шаг 2: Отправить 4-й запрос → отклонён с сообщением о лимите",
+        "Шаг 3: Проверить кнопку [⭐ Подписка] в сообщении",
+        "Шаг 4: Установить subscription='premium' → 4-й запрос проходит",
+        "Шаг 5: Проверить user_limits в PostgreSQL: requests_used=3"
+      ],
+      "dependencies": ["TASK-009", "TASK-027"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-037",
+      "category": "functional",
+      "priority": "medium",
+      "stage": "Stage 7: Monetization",
+      "description": "Telegram Stars: интеграция оплаты подписки через Telegram Payments API (XTR)",
+      "details": "Создать src/reviewmind/bot/handlers/payment.py и src/reviewmind/services/payment_service.py. /subscribe → Invoice через Telegram Payments API с валютой XTR (Telegram Stars). Pre-checkout handler. Successful payment handler: создать/обновить запись в subscriptions (status='active', expires_at=NOW()+30 дней), обновить users.subscription='premium'.",
+      "acceptance_criteria": [
+        "/subscribe отправляет Invoice с Telegram Stars",
+        "Pre-checkout query обрабатывается корректно",
+        "Successful payment: subscription активируется немедленно",
+        "Запись в subscriptions таблице: status='active', expires_at корректна",
+        "users.subscription обновляется на 'premium'",
+        "Дублирующая оплата не создаёт дубль (telegram_payment_charge_id UNIQUE)"
+      ],
+      "test_steps": [
+        "Шаг 1: /subscribe → получить Invoice в Telegram",
+        "Шаг 2: Оплатить через Telegram Stars → подтверждение 'Подписка активирована!'",
+        "Шаг 3: Проверить PostgreSQL: subscriptions запись создана, users.subscription='premium'",
+        "Шаг 4: Отправить > 3 запросов → лимит не срабатывает",
+        "Шаг 5: Повторная оплата с тем же charge_id → ошибки нет (UNIQUE constraint)"
+      ],
+      "dependencies": ["TASK-007", "TASK-009"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-038",
+      "category": "security",
+      "priority": "medium",
+      "stage": "Stage 7: Monetization",
+      "description": "Admin whitelist: ADMIN_USER_IDS из .env обходят лимиты запросов",
+      "details": "Расширить limit_service.py: проверять user_id в config.ADMIN_USER_IDS перед check_limit. Если admin → bypass лимита, users.is_admin=True. Создать middleware для бота: при первом сообщении от admin — auto-create users запись с is_admin=True.",
+      "acceptance_criteria": [
+        "ADMIN_USER_IDS из .env парсятся как list[int]",
+        "Админы не ограничены лимитом запросов",
+        "Проверка admin выполняется до check_limit",
+        "При первом сообщении от admin: user создаётся с is_admin=True",
+        "Удаление user_id из ADMIN_USER_IDS → лимит начинает действовать"
+      ],
+      "test_steps": [
+        "Шаг 1: Добавить user_id в ADMIN_USER_IDS",
+        "Шаг 2: Отправить > 3 запросов → все обработаны (лимит не действует)",
+        "Шаг 3: Проверить PostgreSQL: users.is_admin=True",
+        "Шаг 4: Убрать user_id из ADMIN_USER_IDS → 4-й запрос отклоняется",
+        "Шаг 5: Админ видит метку в ответе бота (опционально)"
+      ],
+      "dependencies": ["TASK-036", "TASK-003"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-039",
+      "category": "functional",
+      "priority": "medium",
+      "stage": "Stage 7: Monetization",
+      "description": "Ежесуточный сброс лимитов (Celery Beat задача, 00:00 UTC)",
+      "details": "Реализовать Celery задачу daily_reset_limits в workers/tasks.py: INSERT INTO user_limits (user_id, date, requests_used) VALUES ... ON CONFLICT DO NOTHING. Или: не сбрасывать явно, а просто использовать текущую дату как ключ (user_id + date). В этом случае задача не нужна — счётчик автоматически обновляется для нового дня.",
+      "acceptance_criteria": [
+        "Новый день (UTC) → пользователь снова имеет 3 бесплатных запроса",
+        "Старые записи user_limits не удаляются (для аналитики)",
+        "Переход через полночь UTC корректно обрабатывается",
+        "Premium-пользователи не затрагиваются"
+      ],
+      "test_steps": [
+        "Шаг 1: Исчерпать лимит (3 запроса) → 4-й отклоняется",
+        "Шаг 2: Сменить дату в тестовом окружении на следующий день",
+        "Шаг 3: Отправить запрос → обработан (новый день, новый лимит)",
+        "Шаг 4: Проверить user_limits: две записи для двух разных дат",
+        "Шаг 5: У premium пользователя лимит не действует ни в какой день"
+      ],
+      "dependencies": ["TASK-035", "TASK-036"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-040",
+      "category": "functional",
+      "priority": "medium",
+      "stage": "Stage 8: Extra Features",
+      "description": "Curated KB seed script: загрузка кураторских материалов по 7 категориям гаджетов",
+      "details": "Создать scripts/seed_curated_kb.py. Категории: smartphones, headphones, laptops, smartwatches, tablets, speakers, smart_tvs. Источники: Wirecutter, RTINGS, 4PDA. Скрипт: (1) парсит URL из curated_sources.json, (2) обрабатывает через ingestion pipeline с is_curated=True, (3) upsert в Qdrant curated_kb коллекцию. Payload: category, updated_at, is_curated=true.",
+      "acceptance_criteria": [
+        "Скрипт загружает данные по всем 7 категориям",
+        "Данные записываются в Qdrant curated_kb (не auto_crawled)",
+        "payload содержит: category, updated_at, is_curated=true",
+        "Дедупликация при повторном запуске",
+        "Материалы не старше 1 года (проверка по date)",
+        "Бейдж 📚 появляется в ответе при использовании curated данных"
+      ],
+      "test_steps": [
+        "Шаг 1: python scripts/seed_curated_kb.py → данные загружены",
+        "Шаг 2: Проверить Qdrant curated_kb: коллекция не пуста",
+        "Шаг 3: Запрос по seed-категории → ответ с бейджем 📚",
+        "Шаг 4: Повторный запуск скрипта → дубликатов нет",
+        "Шаг 5: Проверить payload: category, updated_at, is_curated=true"
+      ],
+      "dependencies": ["TASK-019", "TASK-010"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-041",
+      "category": "functional",
+      "priority": "medium",
+      "stage": "Stage 8: Extra Features",
+      "description": "Tavily API fallback: веб-поиск при недостатке данных (< 3 чанков с confidence > 0.75)",
+      "details": "Создать src/reviewmind/scrapers/tavily.py. Класс TavilyScraper: search(query, max_results=5) → list[TavilyResult]. Интеграция в RAG pipeline (core/rag.py): если confidence_met=false → вызвать Tavily → добавить результаты как чанки в контекст → пометить used_tavily=true в ответе. Пометить source_type='tavily' в Qdrant payload.",
+      "acceptance_criteria": [
+        "Tavily client подключается через TAVILY_API_KEY из config",
+        "search() возвращает чистый текст (не HTML) + URL источника",
+        "Fallback срабатывает при < 3 уверенных чанков",
+        "Tavily результаты добавляются в контекст LLM",
+        "used_tavily=true в ответе при использовании",
+        "source_type='tavily' в Qdrant payload"
+      ],
+      "test_steps": [
+        "Шаг 1: TavilyScraper().search('best headphones 2026') → результаты",
+        "Шаг 2: RAG query по товару без данных → Tavily fallback → ответ с used_tavily=true",
+        "Шаг 3: RAG query по товару с данными → Tavily НЕ вызывается",
+        "Шаг 4: Проверить Qdrant: source_type='tavily' для fallback чанков",
+        "Шаг 5: Отключить TAVILY_API_KEY → graceful degradation, ответ без Tavily"
+      ],
+      "dependencies": ["TASK-024", "TASK-003"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-042",
+      "category": "security",
+      "priority": "medium",
+      "stage": "Stage 8: Extra Features",
+      "description": "Rate limiting: slowapi middleware (10 req/min per user_id)",
+      "details": "Интегрировать slowapi в FastAPI (src/reviewmind/api/dependencies.py или middleware). Лимит: 10 запросов в минуту на user_id. При превышении: HTTP 429 Too Many Requests с сообщением и Retry-After header. Настройка через config. Admins не ограничены.",
+      "acceptance_criteria": [
+        "slowapi middleware интегрирован в FastAPI",
+        "Лимит: 10 запросов/мин на user_id",
+        "HTTP 429 при превышении с Retry-After header",
+        "Admins не ограничены rate limiting",
+        "Лимит настраивается через config",
+        "Логирование rate limit events"
+      ],
+      "test_steps": [
+        "Шаг 1: Отправить 10 запросов за 30 секунд → все обработаны",
+        "Шаг 2: Отправить 11-й запрос → HTTP 429",
+        "Шаг 3: Подождать 1 минуту → следующий запрос проходит",
+        "Шаг 4: Admin отправляет 15 запросов → все проходят",
+        "Шаг 5: Проверить Retry-After header в 429 ответе"
+      ],
+      "dependencies": ["TASK-005"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-043",
+      "category": "functional",
+      "priority": "high",
+      "stage": "Stage 9: Auto Mode",
+      "description": "Извлечение названия товара из естественно-языкового запроса",
+      "details": "Создать логику в src/reviewmind/services/query_service.py или отдельный модуль. Метод extract_product(query) → str | None. Подходы: (1) LLM-extraction через gpt-4o-mini с промптом 'Извлеки название товара из запроса', (2) regex для явных паттернов. Примеры: 'Стоит ли покупать Sony WH-1000XM5?' → 'Sony WH-1000XM5'.",
+      "acceptance_criteria": [
+        "Извлекает название товара из естественного языка (ru, en)",
+        "Обрабатывает вариации: 'стоит ли покупать X', 'X vs Y', 'обзор X', 'X review'",
+        "При отсутствии товара → None (запрос вне тематики)",
+        "Работает для сравнительных запросов: 'iPhone 16 vs Samsung S25' → оба названия"
+      ],
+      "test_steps": [
+        "Шаг 1: extract_product('Sony WH-1000XM5 стоит ли покупать?') → 'Sony WH-1000XM5'",
+        "Шаг 2: extract_product('Is Dyson V15 worth buying?') → 'Dyson V15'",
+        "Шаг 3: extract_product('Привет, как дела?') → None",
+        "Шаг 4: extract_product('iPhone 16 vs Samsung S25') → ['iPhone 16', 'Samsung S25']",
+        "Шаг 5: Тест 10 разных формулировок → ≥ 80% корректных извлечений"
+      ],
+      "dependencies": ["TASK-006"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-044",
+      "category": "functional",
+      "priority": "high",
+      "stage": "Stage 9: Auto Mode",
+      "description": "Auto-search: поиск обзоров на YouTube (Data API v3) и Reddit (PRAW search)",
+      "details": "Расширить scrapers/youtube.py: метод search_videos(query, max_results=10) → list[VideoInfo] через YouTube Data API v3. Расширить scrapers/reddit.py: search_posts(query, subreddits=['BuyItForLife','gadgets','headphones'], limit=10) → list[PostInfo]. Оба метода: фильтрация по релевантности, дате (не старше 1 года).",
+      "acceptance_criteria": [
+        "YouTube search: возвращает top-10 релевантных видео по запросу",
+        "Reddit search: возвращает top-10 релевантных постов",
+        "Фильтрация по дате: не старше 1 года",
+        "YouTube: уважает quota (10K/день), не делает избыточных запросов",
+        "Reddit: уважает rate limits PRAW",
+        "Результаты содержат URL для последующего парсинга"
+      ],
+      "test_steps": [
+        "Шаг 1: search_videos('Sony WH-1000XM5 review') → список видео с video_id",
+        "Шаг 2: search_posts('best noise cancelling headphones') → список постов",
+        "Шаг 3: Проверить, что все результаты не старше 1 года",
+        "Шаг 4: Проверить, что URL из результатов корректные и парсабельные",
+        "Шаг 5: Тест с нишевым товаром → может вернуть < 10 результатов (не error)"
+      ],
+      "dependencies": ["TASK-012", "TASK-013", "TASK-003"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-045",
+      "category": "integration",
+      "priority": "high",
+      "stage": "Stage 9: Auto Mode",
+      "description": "Авто-режим: полный pipeline (извлечь товар → найти источники → ingestion → RAG → ответ)",
+      "details": "Реализовать полный авто-режим в bot/handlers/query.py и services/query_service.py. Flow: (1) extract product, (2) check Qdrant cache, (3) if cached → instant RAG, (4) if not → Tavily quick answer + Celery background job (YouTube + Reddit search → ingest), (5) push final answer. Интегрировать с Celery задачами и push-уведомлениями.",
+      "acceptance_criteria": [
+        "Пользователь называет товар → бот автоматически находит и анализирует",
+        "Из кэша: ответ < 3 секунд",
+        "Без кэша: быстрый Tavily ответ + '⏳ Ищу данные (~3 мин)...'",
+        "Финальный push-ответ в течение 5 минут",
+        "Ответ содержит структуру: Плюсы/Минусы/Спорные/Вывод",
+        "При достаточных curated данных → бейдж 📚"
+      ],
+      "test_steps": [
+        "Шаг 1: Запрос по товару из seed-базы → мгновенный ответ < 3 сек",
+        "Шаг 2: Запрос по новому товару → '⏳ Ищу данные...' → push-ответ",
+        "Шаг 3: Повторный запрос по тому же товару → мгновенный ответ (кэш)",
+        "Шаг 4: Проверить структуру ответа: ✅ ❌ ⚖️ 🏆",
+        "Шаг 5: Проверить время push-ответа ≤ 5 минут"
+      ],
+      "dependencies": ["TASK-043", "TASK-044", "TASK-032", "TASK-024", "TASK-033", "TASK-041"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-046",
+      "category": "functional",
+      "priority": "medium",
+      "stage": "Cross-cutting Features",
+      "description": "Multi-turn диалог: хранение последних 5 сообщений в Redis, передача как chat_history в LLM",
+      "details": "Расширить SessionManager (cache/redis.py): add_to_history сохраняет пары {role, content}. Интегрировать с RAG pipeline: при query передавать chat_history из Redis. LLM системный промпт включает ИСТОРИЯ ДИАЛОГА. Сессия истекает через 30 минут неактивности (TTL Redis).",
+      "acceptance_criteria": [
+        "История последних 5 сообщений хранится в Redis",
+        "chat_history передаётся в LLM промпт",
+        "Уточняющий вопрос учитывает предыдущий контекст",
+        "Сессия истекает через 30 минут (TTL)",
+        "/mode не сбрасывает историю"
+      ],
+      "test_steps": [
+        "Шаг 1: Задать вопрос о товаре → получить ответ",
+        "Шаг 2: Задать уточняющий вопрос ('а как насчёт батареи?') → ответ с контекстом",
+        "Шаг 3: Проверить Redis: session:{user_id}:history содержит 2 записи",
+        "Шаг 4: Подождать 30 минут (или установить короткий TTL) → история стёрта",
+        "Шаг 5: /mode → история НЕ сбрасывается"
+      ],
+      "dependencies": ["TASK-011", "TASK-024"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-047",
+      "category": "functional",
+      "priority": "low",
+      "stage": "Cross-cutting Features",
+      "description": "Сравнение товаров: 'X vs Y' → параллельный RAG + таблица сравнения",
+      "details": "Расширить query_service.py: detect_comparison(query) → bool. При сравнении: (1) extract оба товара, (2) параллельный RAG query для каждого, (3) LLM генерирует таблицу сравнения. Промпт: 'Сравни два товара на основе контекста, представь в виде таблицы'. Обработка: если данных по одному товару нет → указать это.",
+      "acceptance_criteria": [
+        "Запрос 'iPhone 16 vs Samsung S25' → распознаётся как сравнение",
+        "Параллельный RAG для каждого товара (asyncio.gather)",
+        "Ответ содержит таблицу сравнения (Markdown/text table)",
+        "При нехватке данных по одному товару → указано в ответе",
+        "Общий вывод/рекомендация в конце"
+      ],
+      "test_steps": [
+        "Шаг 1: 'iPhone 16 vs Samsung S25' → таблица сравнения",
+        "Шаг 2: 'Sony XM5 or AirPods Max?' → также распознано как сравнение",
+        "Шаг 3: Сравнение с товаром без данных → 'Недостаточно данных по {X}'",
+        "Шаг 4: Обычный запрос (не сравнение) → стандартный RAG ответ",
+        "Шаг 5: Проверить, что время ответа разумное (< 10 сек для двух RAG)"
+      ],
+      "dependencies": ["TASK-024", "TASK-043"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-048",
+      "category": "ui",
+      "priority": "medium",
+      "stage": "Cross-cutting Features",
+      "description": "Система обратной связи: кнопки 👍/👎, POST /feedback, сохранение в query_logs",
+      "details": "Создать src/reviewmind/bot/handlers/feedback.py: обработка callback query для 👍 (rating=1) и 👎 (rating=-1). Создать src/reviewmind/api/endpoints/feedback.py: POST /feedback {query_log_id, rating}. Обновить query_logs.rating. Подтверждение пользователю: 'Спасибо за отзыв!' Inline-кнопки под каждым RAG-ответом.",
+      "acceptance_criteria": [
+        "Кнопки [👍 Полезно] [👎 Не то] под каждым RAG-ответом",
+        "Нажатие кнопки → rating сохраняется в query_logs",
+        "POST /feedback endpoint работает",
+        "Подтверждение после нажатия: 'Спасибо за отзыв!'",
+        "Повторное нажатие не создаёт дубль (update, не insert)"
+      ],
+      "test_steps": [
+        "Шаг 1: Получить RAG-ответ → кнопки [👍] [👎] видны",
+        "Шаг 2: Нажать 👍 → 'Спасибо за отзыв!'",
+        "Шаг 3: Проверить query_logs: rating=1",
+        "Шаг 4: Нажать 👎 → rating обновляется на -1",
+        "Шаг 5: POST /feedback с невалидным query_log_id → 404"
+      ],
+      "dependencies": ["TASK-007", "TASK-027", "TASK-009"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-049",
+      "category": "security",
+      "priority": "medium",
+      "stage": "Cross-cutting Features",
+      "description": "/delete_my_data: каскадное удаление всех данных пользователя (GDPR compliance)",
+      "details": "Создать src/reviewmind/bot/handlers/gdpr.py: /delete_my_data → подтверждение 'Вы уверены? Это удалит ВСЕ ваши данные.' → кнопки [Да, удалить] [Отмена]. При подтверждении: каскадное удаление из query_logs, user_limits, subscriptions, users. Удаление сессии из Redis. Подтверждение: 'Все данные удалены.'",
+      "acceptance_criteria": [
+        "/delete_my_data запрашивает подтверждение",
+        "При подтверждении: каскадное удаление из всех таблиц",
+        "Redis сессия удаляется",
+        "Подтверждение: 'Все ваши данные удалены'",
+        "При отмене: данные не затрагиваются",
+        "После удаления: пользователь может начать заново (/start)"
+      ],
+      "test_steps": [
+        "Шаг 1: /delete_my_data → 'Вы уверены?' + кнопки",
+        "Шаг 2: Нажать [Отмена] → данные сохранены",
+        "Шаг 3: /delete_my_data → [Да, удалить] → 'Все данные удалены'",
+        "Шаг 4: Проверить PostgreSQL: пользователь и связанные записи удалены",
+        "Шаг 5: /start → пользователь создаётся заново"
+      ],
+      "dependencies": ["TASK-007", "TASK-009", "TASK-011"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-050",
+      "category": "ui",
+      "priority": "medium",
+      "stage": "Cross-cutting Features",
+      "description": "Кнопка 📎 Источники: вывод списка источников с бейджами 📚 (curated) и ⚠️ (sponsored)",
+      "details": "Создать callback handler для кнопки [📎 Источники]. При нажатии: отобразить пронумерованный список источников из query_logs.sources_used (JSONB). Формат: '1. 📚 Wirecutter — url', '2. YouTube — url', '3. ⚠️ [sponsored] TechChannel — url'. Если источников нет — 'Источники не найдены'.",
+      "acceptance_criteria": [
+        "Кнопка [📎 Источники] под каждым RAG-ответом",
+        "Нажатие → список источников с URL",
+        "Curated источники помечены 📚",
+        "Sponsored источники помечены ⚠️ [sponsored]",
+        "Нумерованный список (1. 2. 3. ...)",
+        "При отсутствии источников — соответствующее сообщение"
+      ],
+      "test_steps": [
+        "Шаг 1: Получить RAG-ответ → кнопка [📎 Источники] видна",
+        "Шаг 2: Нажать [📎 Источники] → список с URL",
+        "Шаг 3: Проверить бейдж 📚 для curated источников",
+        "Шаг 4: Проверить бейдж ⚠️ для sponsored источников",
+        "Шаг 5: URL кликабельны (Telegram auto-linkify)"
+      ],
+      "dependencies": ["TASK-027", "TASK-007"],
+      "status": "pending"
+    }
+  ]
+}

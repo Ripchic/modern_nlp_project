@@ -1,0 +1,57 @@
+# Progress Log — Interview Trainer Bot
+
+## Формат записей
+Каждая итерация добавляет запись в формате:
+```
+## Итерация N — [Дата]
+**Фича:** [Название]
+**Статус:** [Завершено / В процессе / Заблокировано]
+**Что сделано:**
+- ...
+**Следующие шаги:**
+- ...
+**Заметки для следующей итерации:**
+- ...
+```
+
+---
+
+## Итерация 0 — Инициализация
+**Фича:** Настройка проекта
+**Статус:** Ожидает начала
+**Что сделано:**
+- Создан PRD документ
+- Определён технический стек
+**Следующие шаги:**
+- Инициализировать проект с uv
+- Настроить структуру папок
+- Добавить базовые зависимости
+**Заметки для следующей итерации:**
+- Начать с Phase 1: MVP Core
+- Приоритет: базовая структура проекта и конфигурация
+
+---
+
+## Итерация 1 — 2026-03-01
+**Фича:** TASK-001 — Создание скелета проекта
+**Статус:** Завершено
+**Что сделано:**
+- Создана полная структура директорий (14 подпакетов): api, bot, core, scrapers, ingestion, db, vectorstore, cache, workers, services + tests
+- pyproject.toml с 21 зависимостью (fastapi, aiogram, openai, qdrant-client, sqlalchemy, etc.) + 4 dev (pytest, ruff, pytest-cov, pytest-asyncio)
+- ruff настроен: line-length=120, правила E, F, I, W, target-version py311
+- 50+ placeholder-модулей с комментариями о будущем TASK
+- Все __init__.py файлы созданы
+- Тестовый файл test_structure.py: 3 теста (import, subpackages, directory existence)
+- `uv pip install -e '.[dev]'` — 121 пакет установлен без ошибок
+- `ruff check .` — All checks passed
+- `pytest` — 3 passed
+**Следующие шаги:**
+- TASK-002: Docker Compose (зависит от TASK-001 ✅)
+- TASK-003: Конфигурация .env + config.py (зависит от TASK-001 ✅)
+- TASK-004: GitHub Actions CI/CD (зависит от TASK-001 ✅ + TASK-002)
+**Заметки для следующей итерации:**
+- TASK-003 (config.py) разблокирует TASK-005..TASK-007 — рекомендуется как следующая задача
+- .venv создан через `uv venv`, активируется через `source .venv/bin/activate`
+- Hatch build backend: `hatchling.build` (не hatchling.backends)
+
+---
