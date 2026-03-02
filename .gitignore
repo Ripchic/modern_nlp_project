@@ -210,3 +210,9 @@ __marimo__/
 # Custom censoring rules
 FULL_README.md
 saas_sample/
+
+tasks.json
+progress.txt
+progress.md
+
+PRD-ReviewMind.md
