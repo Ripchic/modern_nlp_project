@@ -555,7 +555,8 @@
         "Шаг 5: Проверить chunk_index: 0, 1, 2... последовательно"
       ],
       "dependencies": ["TASK-001"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Реализован src/reviewmind/ingestion/chunker.py — text chunking через LangChain RecursiveCharacterTextSplitter. Константы: CHUNK_SIZE_TOKENS=500, CHUNK_SIZE_CHARS=2000, CHUNK_OVERLAP_TOKENS=50, CHUNK_OVERLAP_CHARS=200, CHARS_PER_TOKEN=4. DEFAULT_SEPARATORS: 9 уровней (\\n\\n → \\n → '. ' → '! ' → '? ' → '; ' → ', ' → ' ' → ''). Chunk dataclass (frozen): text, chunk_index, metadata + to_dict(). Функция chunk_text(text, metadata?, chunk_size?, chunk_overlap?, separators?) → list[Chunk]: пустой/whitespace текст → [], короткий текст → [1 chunk], длинный текст → множество чанков с overlap, metadata копируется (не мутируется), chunk_index добавляется в metadata. Функция chunk_text_dicts() — convenience wrapper, возвращает list[dict]. _build_splitter() — фабрика RecursiveCharacterTextSplitter с strip_whitespace=True, keep_separator=True. Обновлён ingestion/__init__.py — экспорт chunk_text, chunk_text_dicts, Chunk, все константы. 62 unit-теста в tests/unit/test_ingestion/test_chunker.py: TestConstants (8), TestChunk (7), TestBuildSplitter (4), TestChunkTextEmpty (4), TestChunkTextShort (5), TestChunkTextLong (7), TestChunkTextMetadata (5), TestChunkTextCustomParams (4), TestChunkTextDicts (5), TestChunkTextRussian (3), TestIngestionExports (5), TestIntegrationScenarios (5, включая clean→chunk pipeline). ruff check — 0 ошибок, pytest — 1176 passed (1114 existing + 62 new), 6 pre-existing failures в test_config.py (docker-URLs, не связаны с TASK-016)."
     },
     {
       "id": "TASK-017",

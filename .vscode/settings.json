@@ -3,6 +3,7 @@
         "/^python -c \"\nimport trafilatura\n# Check the Document class\nd = trafilatura\\.settings\\.Document\nprint\\(\\[x for x in dir\\(d\\) if not x\\.startswith\\('_'\\)\\]\\)\n\" 2>&1$/": {
             "approve": true,
             "matchCommandLine": true
-        }
+        },
+        "uv": true
     }
 }

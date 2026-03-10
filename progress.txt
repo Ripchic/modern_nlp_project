@@ -754,3 +754,31 @@
 - `[^\S\n]+` regex для горизонтального whitespace — не трогает newlines
 
 ---
+
+## Итерация 16 — 2026-03-10
+**Фича:** TASK-016 — Text chunking: RecursiveCharacterTextSplitter (400-600 tokens, 50 overlap)
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/ingestion/chunker.py` с LangChain `RecursiveCharacterTextSplitter`
+- Chunk dataclass (frozen): text, chunk_index, metadata + to_dict()
+- Константы: CHUNK_SIZE_TOKENS=500 (~2000 chars), CHUNK_OVERLAP_TOKENS=50 (~200 chars), CHARS_PER_TOKEN=4
+- 9 уровней сепараторов: \n\n → \n → '. ' → '! ' → '? ' → '; ' → ', ' → ' ' → ''
+- `chunk_text(text, metadata?)` → list[Chunk]: пустой текст → [], короткий → [1 chunk], длинный → overlap chunks
+- `chunk_text_dicts()` — convenience wrapper возвращающий list[dict]
+- Metadata копируется без мутации оригинала, chunk_index автодобавляется
+- Обновлён `ingestion/__init__.py` — экспорт chunk_text, chunk_text_dicts, Chunk, все константы
+- 62 unit-теста в `tests/unit/test_ingestion/test_chunker.py`
+- `ruff check .` — All checks passed
+- `pytest` — 1176 passed (1114 existing + 62 new), 6 pre-existing failures в test_config.py
+**Следующие шаги:**
+- TASK-018: Qdrant upsert с дедупликацией (deps: TASK-017 ✅) — РАЗБЛОКИРОВАН, critical
+- TASK-027: POST /query endpoint (deps: TASK-005 ✅, TASK-024 ✅, TASK-009 ✅) — РАЗБЛОКИРОВАН, critical
+- TASK-019: Ingestion pipeline — осталось: TASK-018 (Qdrant upsert) — TASK-016 ✅ done
+**Заметки для следующей итерации:**
+- TASK-016 ✅ разблокирует TASK-019 (вместе с TASK-018)
+- chunk_text возвращает Chunk dataclass, chunk_text_dicts — plain dicts (для Qdrant payload)
+- ~4 chars/token — консервативная оценка для мультиязычного текста
+- keep_separator=True в RecursiveCharacterTextSplitter — сепараторы сохраняются в тексте чанка
+- Chunk.metadata содержит копию исходных metadata + chunk_index
+
+---
