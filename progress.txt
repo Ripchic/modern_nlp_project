@@ -651,3 +651,45 @@
 - Оба множителя применяются кумулятивно: если чанк одновременно curated И sponsored → score × 1.3 × 0.7
 
 ---
+
+## Итерация 14 — 2026-03-10
+**Фича:** TASK-024 — Полный RAG pipeline: embed query → search → rerank → build context → generate answer
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/core/rag.py` — полный RAG pipeline оркестратор
+- Класс `RAGPipeline` с параметрами: AsyncQdrantClient, опциональные EmbeddingService и LLMClient (lazy creation)
+- Метод `query(user_query, chat_history?, product_query?, session_id?) → RAGResponse`
+- 6 шагов pipeline:
+  1. Embed query через `EmbeddingService.embed_text`
+  2. Hybrid search curated_kb + auto_crawled через `hybrid_search` с product_query pre-filter
+  3. Rerank через `rerank()` с curated ×1.3 / sponsored ×0.7
+  4. Confidence check — ≥3 чанков с score > 0.75
+  5. Build context — конвертация SearchResult → ChunkContext (до 8 чанков), deduplicated sources
+  6. Generate answer через `LLMClient.generate_analysis` с RAG параметрами
+- `RAGResponse` dataclass: answer, sources, used_curated, confidence_met, chunks_count, chunks_found, used_sponsored, error
+- Graceful error handling: EmbeddingError → empty answer + error, search exception → empty + error, LLMError → metadata сохраняется + error
+- Хелперы: `_search_results_to_chunk_contexts()`, `_extract_sources()`, `_check_confidence()`
+- Async context manager + `close()` (закрывает только owned сервисы)
+- Константы: CONFIDENCE_MIN_CHUNKS=3, CONFIDENCE_SCORE_THRESHOLD=0.75, MAX_CONTEXT_CHUNKS=8, DEFAULT_SEARCH_TOP_K=5
+- 56 unit-тестов в `tests/unit/test_core/test_rag.py`:
+  - TestConstants (4), TestRAGResponse (4), TestSearchResultsToChunkContexts (6),
+  - TestExtractSources (5), TestCheckConfidence (7), TestRAGPipelineInit (4),
+  - TestRAGPipelineLazyProperties (3), TestRAGPipelineQuery (10),
+  - TestRAGPipelineErrors (3), TestRAGPipelineLifecycle (5),
+  - TestRAGPipelineIntegration (5)
+**Результаты проверок:**
+- `ruff check .` — All checks passed!
+- `pytest` — 885 passed, 6 pre-existing failures в test_config.py
+**Следующие шаги:**
+- TASK-018: Qdrant upsert с дедупликацией (deps: TASK-017 ✅) — РАЗБЛОКИРОВАН, critical
+- TASK-014: Web parser (deps: TASK-001 ✅) — РАЗБЛОКИРОВАН, high
+- TASK-015: Очистка текста + спонсорский контент (deps: TASK-001 ✅) — РАЗБЛОКИРОВАН, high
+- TASK-016: Text chunking (deps: TASK-001 ✅) — РАЗБЛОКИРОВАН, high
+- TASK-027: POST /query endpoint (deps: TASK-005 ✅, TASK-024 ✅, TASK-009 ✅) — РАЗБЛОКИРОВАН, critical
+**Заметки для следующей итерации:**
+- TASK-024 ✅ разблокировала TASK-025 (seed data), TASK-027 (POST /query endpoint), TASK-041 (Tavily fallback), TASK-046 (multi-turn), TASK-047 (comparison)
+- TASK-027 — critical и теперь полностью разблокирован, рекомендуется как следующая задача
+- RAGPipeline._owns_embedding / _owns_llm определяет, кто отвечает за close() сервисов
+- _check_confidence требует строго > 0.75 (не >=), это важно для edge cases в тестах
+
+---
