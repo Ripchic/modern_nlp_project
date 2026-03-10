@@ -615,3 +615,39 @@
 - TASK-014 + TASK-015 + TASK-016 + TASK-018 блокируют TASK-019 (ingestion pipeline)
 
 ---
+
+## Итерация 12 — 2026-03-10
+**Фича:** TASK-021 — Reranking: curated ×1.3 boost, sponsored ×0.7 downweight, merge и top-K отбор
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/core/reranker.py` — модуль reranking для search results
+- Константы: `CURATED_BOOST=1.3`, `SPONSORED_DOWNWEIGHT=0.7`, `DEFAULT_RERANK_TOP_K=8`
+- Хелпер `_compute_adjusted_score(result)` — кумулятивное применение множителей curated и sponsored
+- Хелпер `_deduplicate_by_source(results)` — дедупликация по (source_url, chunk_index), сохраняет higher score
+- Функция `rerank(search_results, top_k=8) → list[SearchResult]`:
+  - Вычисляет adjusted scores без мутации оригинальных данных (dataclasses.replace)
+  - Дедуплицирует по source_url + chunk_index
+  - Сортирует по adjusted score descending
+  - Обрезает до top_k
+- Логирование через structlog (input_count, after_dedup, output_count, curated/sponsored counts)
+- 46 unit-тестов в `tests/unit/test_core/test_reranker.py`:
+  - TestConstants (5), TestComputeAdjustedScore (8), TestDeduplicateBySource (6),
+  - TestRerank (15), TestNoCuratedResults (1), TestNoAutoResults (1),
+  - TestEdgeCases (5), TestIntegrationScenarios (5)
+- Все PRD test steps проверены: curated(0.8)×1.3=1.04>auto(0.85), sponsored(0.9)×0.7=0.63, 15→8 trim, empty→empty
+**Результаты проверок:**
+- `ruff check .` — All checks passed!
+- `pytest` — 829 passed, 6 pre-existing failures в test_config.py
+**Следующие шаги:**
+- TASK-024: Full RAG pipeline (deps: TASK-020 ✅, TASK-021 ✅, TASK-022 ✅) — РАЗБЛОКИРОВАН, critical
+- TASK-018: Qdrant upsert с дедупликацией (deps: TASK-017 ✅) — РАЗБЛОКИРОВАН, critical
+- TASK-014: Web parser (deps: TASK-001 ✅) — РАЗБЛОКИРОВАН, high
+- TASK-015: Очистка текста + спонсорский контент (deps: TASK-001 ✅) — РАЗБЛОКИРОВАН, high
+- TASK-016: Text chunking (deps: TASK-001 ✅) — РАЗБЛОКИРОВАН, high
+**Заметки для следующей итерации:**
+- TASK-021 ✅ разблокировала TASK-024 (Full RAG pipeline) — все зависимости выполнены (TASK-020 ✅, TASK-021 ✅, TASK-022 ✅)
+- TASK-024 — самая приоритетная следующая задача (critical, все deps done)
+- reranker использует `dataclasses.replace()` для создания копий SearchResult с adjusted score, оригиналы не мутируются
+- Оба множителя применяются кумулятивно: если чанк одновременно curated И sponsored → score × 1.3 × 0.7
+
+---

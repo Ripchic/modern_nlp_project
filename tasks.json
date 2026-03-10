@@ -679,7 +679,8 @@
         "Шаг 5: Unit-тесты покрывают edge cases"
       ],
       "dependencies": ["TASK-020"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Реализован src/reviewmind/core/reranker.py — модуль reranking для search results. Константы: CURATED_BOOST=1.3, SPONSORED_DOWNWEIGHT=0.7, DEFAULT_RERANK_TOP_K=8. Хелперы: _compute_adjusted_score(result) — кумулятивное применение curated ×1.3 и sponsored ×0.7 множителей; _deduplicate_by_source(results) — дедупликация по (source_url, chunk_index), сохраняет higher adjusted score. Функция rerank(search_results, top_k=8) → list[SearchResult]: (1) вычисляет adjusted scores без мутации оригинальных данных (dataclasses.replace), (2) дедуплицирует по source_url+chunk_index, (3) сортирует по adjusted score descending, (4) обрезает до top_k. Логирование через structlog. 46 unit-тестов в tests/unit/test_core/test_reranker.py: TestConstants (5), TestComputeAdjustedScore (8), TestDeduplicateBySource (6), TestRerank (15), TestNoCuratedResults (1), TestNoAutoResults (1), TestEdgeCases (5), TestIntegrationScenarios (5). Все PRD test steps проверены: curated(0.8)×1.3=1.04>auto(0.85), sponsored(0.9)×0.7=0.63, 15→8 trim, empty→empty, edge cases. ruff check — 0 ошибок, pytest — 829 passed (783 existing + 46 new), 6 pre-existing failures в test_config.py (docker-URLs, не связаны с TASK-021)."
     },
     {
       "id": "TASK-022",
