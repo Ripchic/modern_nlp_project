@@ -530,10 +530,10 @@
         "Шаг 5: pytest tests/unit/test_ingestion/ — все тесты зелёные"
       ],
       "dependencies": ["TASK-001"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Реализован src/reviewmind/ingestion/cleaner.py — clean_text(raw_text, remove_urls?, remove_emails?) → str. 15 шагов очистки: Unicode NFKC normalisation, HTML entity decode, HTML tag/comment removal, invisible char removal, bracket artefact removal ([Music] etc.), timestamp removal, markdown image removal, markdown link→text conversion, URL/email removal (optional), nav/ad fragment removal, repeated punctuation collapse, horizontal whitespace collapse, multi-newline collapse (3+→2), per-line strip, min length check (MIN_CLEAN_LENGTH=50). Реализован src/reviewmind/ingestion/sponsor.py — detect_sponsor(text, threshold?) → bool, detect_sponsor_detailed(text, threshold?) → SponsorDetectionResult(is_sponsored, matched_patterns, confidence). 13 EN regex паттернов ('sponsored by', 'brought to you by', 'promo code', 'affiliate link', '#ad', 'paid partnership', 'special offer' etc.) + 13 RU regex паттернов ('спонсор', 'реклама', 'рекламная интеграция', 'промокод', 'скидка по ссылке', 'ссылка в описании', 'партнёрский', 'заказной обзор' etc.). Confidence score (0–1, saturates at 4 distinct matches). Обновлён ingestion/__init__.py — экспорт clean_text, detect_sponsor, detect_sponsor_detailed, MIN_CLEAN_LENGTH, ALL_PATTERNS, SponsorDetectionResult. 130 unit-тестов: TestCleanerConstants (2), TestHtmlRemoval (5), TestTimestampRemoval (8 parametrized), TestBracketArtefacts (10 parametrized), TestUrlRemoval (4 parametrized), TestEmailRemoval (2), TestInvisibleChars (3), TestWhitespaceCollapse (3), TestMarkdown (2), TestNavFragments (5 parametrized), TestRepeatedPunctuation (3), TestCleanText (21), TestSponsorPatterns (3), TestDetectSponsorEnglish (17), TestDetectSponsorRussian (13), TestDetectSponsorEdgeCases (6), TestDetectSponsorDetailed (6), TestSponsorDetectionResult (2), TestFindMatches (2), TestIngestionExports (6), TestIntegrationScenarios (6). False positive rate = 0% на 10 тестовых примерах (< 10% required). ruff check — 0 ошибок, pytest — 1114 passed (984 existing + 130 new), 6 pre-existing failures в test_config.py (docker-URLs, не связаны с TASK-015)."
     },
     {
-      "id": "TASK-016",
       "category": "functional",
       "priority": "high",
       "stage": "Stage 3: Scrapers",

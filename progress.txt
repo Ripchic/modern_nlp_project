@@ -724,3 +724,33 @@
 - _clean_text: regex `[^\S\n]+` заменяет горизонтальный whitespace, сохраняя newlines
 
 ---
+
+## Итерация 16 — 2026-03-10
+**Фича:** TASK-015 — Очистка текста + нормализация + детекция спонсорского контента
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/ingestion/cleaner.py` — clean_text(raw_text) → str
+  - 15 шагов очистки: Unicode NFKC, HTML entity decode, HTML tag/comment removal, invisible char removal, bracket artefact removal ([Music] etc.), timestamp removal, markdown image/link handling, URL/email removal (optional), nav/ad fragment removal, punctuation collapse, whitespace normalisation, multi-newline collapse, per-line strip, min length check (50 chars)
+- Реализован `src/reviewmind/ingestion/sponsor.py` — detect_sponsor(text) → bool, detect_sponsor_detailed(text) → SponsorDetectionResult
+  - 13 EN regex паттернов: 'sponsored by', 'brought to you by', 'promo code', 'affiliate link', '#ad', 'paid partnership', 'special offer', etc.
+  - 13 RU regex паттернов: 'спонсор', 'реклама', 'рекламная интеграция', 'промокод', 'скидка по ссылке', 'ссылка в описании', 'партнёрский', 'заказной обзор', etc.
+  - SponsorDetectionResult: is_sponsored, matched_patterns, confidence (0–1)
+  - Threshold parameter: можно потребовать N совпадений для sponsored
+- Обновлён `ingestion/__init__.py` — экспорт clean_text, detect_sponsor, detect_sponsor_detailed, MIN_CLEAN_LENGTH, ALL_PATTERNS, SponsorDetectionResult
+- 130 unit-тестов в tests/unit/test_ingestion/test_cleaner_sponsor.py
+- False positive rate = 0% на 10 тестовых примерах (< 10% required)
+- `ruff check .` — All checks passed
+- `pytest` — 1114 passed (984 existing + 130 new), 6 pre-existing failures в test_config.py
+**Следующие шаги:**
+- TASK-018: Qdrant upsert с дедупликацией (deps: TASK-017 ✅) — РАЗБЛОКИРОВАН, critical
+- TASK-016: Text chunking (deps: TASK-001 ✅) — РАЗБЛОКИРОВАН, high
+- TASK-027: POST /query endpoint (deps: TASK-005 ✅, TASK-024 ✅, TASK-009 ✅) — РАЗБЛОКИРОВАН, critical
+- TASK-019: Ingestion pipeline — осталось: TASK-016 (chunker), TASK-018 (Qdrant upsert)
+**Заметки для следующей итерации:**
+- Для TASK-019 (ingestion pipeline) осталось: TASK-016 (chunker), TASK-018 (Qdrant upsert) — обе TASK-015 ✅ dependency resolved
+- clean_text: MIN_CLEAN_LENGTH=50 символов — если текст короче после очистки, возвращается пустая строка
+- detect_sponsor: threshold=1 по умолчанию (одного совпадения достаточно)
+- Regex паттерны case-insensitive, покрывают EN и RU
+- `[^\S\n]+` regex для горизонтального whitespace — не трогает newlines
+
+---
