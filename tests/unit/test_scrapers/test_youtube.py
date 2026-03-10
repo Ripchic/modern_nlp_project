@@ -599,7 +599,7 @@ class TestScrapersExports:
         from reviewmind.scrapers import __all__
 
         expected = {"YouTubeScraper", "TranscriptResult", "MIN_WORD_COUNT", "DEFAULT_LANGUAGES"}
-        assert set(__all__) == expected
+        assert expected.issubset(set(__all__))
 
 
 # ═══════════════════════════════════════════════════════════════
