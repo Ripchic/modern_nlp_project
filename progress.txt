@@ -814,3 +814,43 @@
 - `_check_duplicates` использует `score_threshold` в query_points — Qdrant сам фильтрует по порогу
 
 ---
+
+## Итерация 19 — 2026-03-11
+**Фича:** TASK-019 — Ingestion pipeline интеграция: parse → clean → sponsor detect → chunk → embed → upsert + metadata в PostgreSQL
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/ingestion/pipeline.py` — полный ingestion pipeline оркестратор
+- `IngestionPipeline` класс: принимает `AsyncQdrantClient`, опциональную `AsyncSession` (PostgreSQL) и `EmbeddingService` (lazy creation)
+- `ingest_url(url, product_query, session_id?, is_curated?)` → `SourceIngestionResult` — 8-шаговый pipeline:
+  1. `detect_url_type` — regex-классификация YouTube/Reddit/Web
+  2. `_scrape` — вызов соответствующего парсера (YouTubeScraper/RedditScraper/WebScraper)
+  3. `clean_text` — Unicode нормализация, HTML удаление, 15-шаговая очистка
+  4. `detect_sponsor_detailed` — 26 regex паттернов для спонсорского контента
+  5. `chunk_text` — RecursiveCharacterTextSplitter (500 tokens, 50 overlap)
+  6. `embed_batch` — text-embedding-3-small (1536 dims) с retry
+  7. `upsert_chunks` — запись в Qdrant auto_crawled с cosine dedup >0.95
+  8. Persist source metadata в PostgreSQL (sources таблица) через SourceRepository
+- `ingest_urls(urls, product_query)` → `IngestionResult` — ошибка одного URL не блокирует остальные
+- `SourceIngestionResult` dataclass: url, success, source_type, chunks_count, is_sponsored, error, source_id
+- `IngestionResult` dataclass: success_count, failed_count, chunks_count, failed_urls, results
+- `detect_url_type()` — inline URL classifier (youtube/reddit/web)
+- Lazy scraper init, async context manager + close()
+- DB failure non-fatal (chunks already in Qdrant)
+- Обновлён `ingestion/__init__.py` — экспорт IngestionPipeline, IngestionResult, SourceIngestionResult, detect_url_type
+- 72 unit-теста в `tests/unit/test_ingestion/test_pipeline.py`
+- `ruff check .` — All checks passed
+- `pytest` — 1310 passed (1238 existing + 72 new), 6 pre-existing failures в test_config.py
+**Следующие шаги:**
+- TASK-025: Seed-данные для тестирования RAG (20 запросов) — deps: TASK-019 ✅, TASK-024 ✅ — **РАЗБЛОКИРОВАН**, high
+- TASK-028: POST /ingest endpoint — deps: TASK-005 ✅, TASK-019 ✅, TASK-026 (pending) — частично разблокирован
+- TASK-032: Celery задача ingestion — deps: TASK-031 (pending), TASK-019 ✅ — частично разблокирован
+- TASK-027: POST /query endpoint — deps met — critical, РАЗБЛОКИРОВАН
+- TASK-026: URL type detection — deps met — high, РАЗБЛОКИРОВАН
+- TASK-023: Language detection — deps met — medium
+**Заметки для следующей итерации:**
+- TASK-019 ✅ разблокировала TASK-025, частично разблокировала TASK-028 и TASK-032
+- `detect_url_type()` реализован inline в pipeline.py — TASK-026 расширит его c `route_to_scraper()`
+- DB persistence опциональна (db_session может быть None) — удобно для worker tasks без FastAPI
+- `is_curated=True` параметр позволяет использовать pipeline для curated_kb (TASK-040)
+
+---
