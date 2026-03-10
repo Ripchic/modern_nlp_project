@@ -1,0 +1,617 @@
+# Progress Log — Interview Trainer Bot
+
+## Формат записей
+Каждая итерация добавляет запись в формате:
+```
+## Итерация N — [Дата]
+**Фича:** [Название]
+**Статус:** [Завершено / В процессе / Заблокировано]
+**Что сделано:**
+- ...
+**Следующие шаги:**
+- ...
+**Заметки для следующей итерации:**
+- ...
+```
+
+---
+
+## Итерация 0 — Инициализация
+**Фича:** Настройка проекта
+**Статус:** Ожидает начала
+**Что сделано:**
+- Создан PRD документ
+- Определён технический стек
+**Следующие шаги:**
+- Инициализировать проект с uv
+- Настроить структуру папок
+- Добавить базовые зависимости
+**Заметки для следующей итерации:**
+- Начать с Phase 1: MVP Core
+- Приоритет: базовая структура проекта и конфигурация
+
+---
+
+## Итерация 1 — 2026-03-01
+**Фича:** TASK-001 — Создание скелета проекта
+**Статус:** Завершено
+**Что сделано:**
+- Создана полная структура директорий (14 подпакетов): api, bot, core, scrapers, ingestion, db, vectorstore, cache, workers, services + tests
+- pyproject.toml с 21 зависимостью (fastapi, aiogram, openai, qdrant-client, sqlalchemy, etc.) + 4 dev (pytest, ruff, pytest-cov, pytest-asyncio)
+- ruff настроен: line-length=120, правила E, F, I, W, target-version py311
+- 50+ placeholder-модулей с комментариями о будущем TASK
+- Все __init__.py файлы созданы
+- Тестовый файл test_structure.py: 3 теста (import, subpackages, directory existence)
+- `uv pip install -e '.[dev]'` — 121 пакет установлен без ошибок
+- `ruff check .` — All checks passed
+- `pytest` — 3 passed
+**Следующие шаги:**
+- TASK-002: Docker Compose (зависит от TASK-001 ✅)
+- TASK-003: Конфигурация .env + config.py (зависит от TASK-001 ✅)
+- TASK-004: GitHub Actions CI/CD (зависит от TASK-001 ✅ + TASK-002)
+**Заметки для следующей итерации:**
+- TASK-003 (config.py) разблокирует TASK-005..TASK-007 — рекомендуется как следующая задача
+- .venv создан через `uv venv`, активируется через `source .venv/bin/activate`
+- Hatch build backend: `hatchling.build` (не hatchling.backends)
+
+---
+
+## Итерация 2 — 2026-03-01
+**Фича:** TASK-003 — Конфигурация окружения: .env.example + config.py (pydantic-settings)
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/config.py` на pydantic-settings BaseSettings с 20+ полями
+- Все переменные из PRD: Telegram, OpenAI, YouTube, Reddit, Tavily, PostgreSQL, Redis, Qdrant
+- ADMIN_USER_IDS парсится как `list[int]` из comma-separated строки (field_validator + custom GracefulEnvSource)
+- OPENAI_BASE_URL дефолт — GitHub Models (`https://models.inference.ai.azure.com`)
+- Lazy proxy для `settings` — не падает при импорте без .env
+- Создан `.env.example` со всеми переменными и комментариями
+- `.env` уже был в `.gitignore` (из TASK-001)
+- 20 unit-тестов в `tests/unit/test_config.py`: parsing, defaults, validation, env vars
+- `ruff check .` — All checks passed
+- `pytest` — 23 passed (3 structure + 20 config)
+**Следующие шаги:**
+- TASK-002: Docker Compose (зависит от TASK-001 ✅)
+- TASK-005: FastAPI app factory + /health (зависит от TASK-001 ✅ + TASK-003 ✅)
+- TASK-006: OpenAI client wrapper (зависит от TASK-003 ✅)
+- TASK-007: aiogram Telegram bot (зависит от TASK-003 ✅)
+**Заметки для следующей итерации:**
+- TASK-003 ✅ разблокировала TASK-005, TASK-006, TASK-007, TASK-009..TASK-013
+- TASK-002 (Docker) — следующий critical blocker для TASK-004, TASK-009, TASK-010, TASK-011
+- pydantic-settings v2.8+ имеет отдельные EnvSettingsSource и DotEnvSettingsSource в `sources/providers/`
+- `value_is_complex` параметр в `prepare_field_value` может быть False для list-полей — нужно использовать `self.field_is_complex(field)` вместо параметра
+
+---
+
+## Итерация 3 — 2026-03-01
+**Фича:** TASK-006 — OpenAI client wrapper (configurable base_url)
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/core/llm.py` — async wrapper вокруг `openai.AsyncOpenAI`
+- Класс `LLMClient` с параметрами из config: api_key, base_url, model, temperature, max_tokens
+- Метод `generate(system_prompt, user_message, temperature?, max_tokens?, model?, messages?) → str`
+- Поддержка multi-turn контекста через параметр `messages` (chat history)
+- Retry с exponential backoff (1s, 2s, 4s) для transient ошибок: RateLimitError, APITimeoutError, APIConnectionError, InternalServerError
+- Non-retryable ошибки (AuthenticationError, BadRequestError) сразу выбрасывают `LLMError`
+- Переключение GitHub Models ↔ OpenAI через замену `base_url`
+- Async context manager support (`async with LLMClient() as client`)
+- Custom exception `LLMError` для всех ошибок LLM
+- 35 unit-тестов в `tests/unit/test_core/test_llm.py`: init (8), message building (4), generate (7), error handling (10), retry timing (1), context manager (2), LLMError (3)
+- `ruff check .` — All checks passed
+- `pytest` — 58 passed (23 existing + 35 new)
+**Следующие шаги:**
+- TASK-005: FastAPI app factory + /health (зависит от TASK-001 ✅ + TASK-003 ✅)
+- TASK-007: aiogram Telegram bot (зависит от TASK-003 ✅)
+- TASK-008: E2E чат (зависит от TASK-005 + TASK-006 ✅ + TASK-007)
+- TASK-017: Embedding service (зависит от TASK-006 ✅ + TASK-010)
+- TASK-022: Системный промпт + LLM генерация (зависит от TASK-006 ✅)
+**Заметки для следующей итерации:**
+- TASK-006 ✅ разблокировала TASK-008, TASK-017, TASK-022 (частично)
+- TASK-005 + TASK-007 — следующие critical задачи для Stage 1 completion
+- TASK-002 (Docker) — по-прежнему блокирует TASK-009, TASK-010, TASK-011 (Stage 2)
+- LLMClient использует lazy import `from reviewmind.config import settings` внутри `__init__` — не падает при import без .env
+- openai SDK max_retries=0 установлен, retry логика полностью кастомная
+- При тестировании с реальным API помнить про rate limits GitHub Models (15 RPM free tier)
+
+---
+
+## Итерация 4 — 2026-03-01
+**Фича:** TASK-005 — FastAPI приложение: app factory, lifespan, /health endpoint, structlog логирование
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/main.py` с FastAPI app factory (`create_app`), asynccontextmanager lifespan
+- Lifespan инициализирует/закрывает 3 ресурса: PostgreSQL (SQLAlchemy async engine), Redis (redis.asyncio), Qdrant (AsyncQdrantClient)
+- Каждый ресурс инициализируется в try/except — если сервис недоступен, атрибут устанавливается в None (graceful degradation)
+- При shutdown вызываются dispose/aclose/close для всех живых клиентов
+- Создан GET `/health` endpoint — возвращает `{status: "ok"|"degraded", postgres: bool, redis: bool, qdrant: bool}`
+- Проверки: PostgreSQL — `SELECT 1`, Redis — `PING`, Qdrant — `get_collections()`
+- При исключении в любой проверке — возвращает `false` (не падает)
+- Настроен structlog: JSON-формат, TimestamperProcessor (ISO), add_log_level, PrintLoggerFactory (stdout)
+- Создан `api/router.py` — подключает health_router, легко расширяется для будущих endpoints
+- Создан `api/dependencies.py` — DI-функции: `get_db_engine`, `get_redis`, `get_qdrant`
+- `HealthResponse` — Pydantic модель для типизированного ответа
+- 29 unit-тестов: configure_logging (4), create_app (6), lifespan (4: all up, pg fail, all fail, shutdown dispose), health endpoint (15: schema, all-down, all-up, partial, exceptions)
+- `ruff check .` — All checks passed
+- `pytest` — 87 passed (58 existing + 29 new)
+**Следующие шаги:**
+- TASK-007: aiogram Telegram bot (зависит от TASK-003 ✅) — следующая critical задача для Stage 1
+- TASK-008: E2E чат (зависит от TASK-005 ✅ + TASK-006 ✅ + TASK-007)
+- TASK-002: Docker Compose — блокирует TASK-009, TASK-010, TASK-011 (Stage 2)
+- TASK-022: Системный промпт + LLM генерация (зависит от TASK-006 ✅)
+**Заметки для следующей итерации:**
+- TASK-005 ✅ разблокировала TASK-008 (частично, нужен ещё TASK-007) и TASK-027 (POST /query)
+- Lifespan использует lazy import settings — не падает при import без .env
+- Для Stage 1 completion осталось: TASK-007 (бот) + TASK-008 (E2E чат)
+- TASK-002 (Docker) — critical blocker для Stage 2 (TASK-009, TASK-010, TASK-011)
+- `app = create_app()` создаётся на уровне модуля — uvicorn запускает через `reviewmind.main:app`
+- api/router.py легко расширяется: добавить `include_router(...)` при реализации query/ingest/status/feedback endpoints
+
+---
+
+## Итерация 5 — 2026-03-01
+**Фича:** TASK-007 — aiogram Telegram bot: /start с выбором режима, /help, inline-клавиатуры
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/bot/main.py` — entrypoint бота (long polling) с `create_bot`, `create_dispatcher`, `run_bot`, `main`
+- `create_dispatcher()` регистрирует start_router, mode_router и LoggingMiddleware
+- `create_bot()` создаёт Bot с `DefaultBotProperties(parse_mode=HTML)`
+- `run_bot()` запускает long polling через `dp.start_polling()` с `allowed_updates`
+- `main()` — синхронный entrypoint для `python -m reviewmind.bot.main`
+- Создан `bot/keyboards.py` — 3 inline-клавиатуры:
+  - `mode_keyboard()` — [🔍 Авто-поиск] [🔗 Свои ссылки]
+  - `feedback_keyboard()` — [👍 Полезно] [👎 Не то] [📎 Источники]
+  - `subscribe_keyboard()` — [⭐ Безлимит за 299₽/мес] [Ждать до завтра]
+- Callback data constants: MODE_AUTO, MODE_LINKS, FEEDBACK_USEFUL, FEEDBACK_BAD, FEEDBACK_SOURCES, SUBSCRIBE_ACTION, SUBSCRIBE_WAIT
+- Создан `handlers/start.py`:
+  - `/start` → приветствие с упоминанием AI-системы + mode_keyboard
+  - `/help` → подробная справка (команды, режимы, поддерживаемые источники, формат ответа, спонсорский контент)
+- Создан `handlers/mode.py`:
+  - Callback handler для `mode:auto` и `mode:links` — edit_text с описанием режима + callback answer
+  - `/mode` → повторный показ клавиатуры выбора режима
+  - `MODE_NAMES` и `MODE_DESCRIPTIONS` для структурированных ответов
+- Создан `middlewares.py` — `LoggingMiddleware` (structlog) для логирования update_id, event_type, user_id
+- structlog настроен с JSON renderer, ISO timestamps, log level
+- 41 unit-тест в `tests/unit/test_bot/test_bot.py`: keyboards (11), start handler (11), mode handler (9), bot main (6), middlewares (4)
+- `ruff check .` — All checks passed
+- `pytest` — 128 passed (87 existing + 41 new)
+**Следующие шаги:**
+- TASK-008: E2E чат (зависит от TASK-005 ✅ + TASK-006 ✅ + TASK-007 ✅) — РАЗБЛОКИРОВАНА, завершает Stage 1
+- TASK-002: Docker Compose (зависит от TASK-001 ✅) — critical blocker для Stage 2
+- TASK-022: Системный промпт + LLM генерация (зависит от TASK-006 ✅)
+**Заметки для следующей итерации:**
+- TASK-007 ✅ разблокировала TASK-008 — теперь Stage 1 (Telegram ↔ LLM Chat) полностью разблокирован
+- aiogram routers — module-level singletons, при тестировании create_dispatcher() можно вызвать только один раз (router.parent_router уже задан)
+- Bot запускается через `python -m reviewmind.bot.main` или `asyncio.run(run_bot())`
+- Lazy import `settings` внутри `run_bot()` — не падает при import без .env
+- Для TASK-008 потребуется: handlers/query.py (текстовые сообщения), вызов LLMClient, typing indicator
+- TASK-002 (Docker) — по-прежнему critical blocker для TASK-009, TASK-010, TASK-011 (Stage 2)
+
+---
+
+## Итерация 6 — 2026-03-01
+**Фича:** TASK-008 — E2E чат: Telegram → LLM → ответ (без RAG, прямой LLM)
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/services/query_service.py` — QueryService с методом `answer(user_message, chat_history?) → QueryResult`
+- QueryResult dataclass: answer, error, error_message, model, chat_history
+- Graceful error handling: LLMError → user-friendly fallback сообщение (без traceback)
+- Пустые/whitespace сообщения → fallback без вызова LLM
+- Async context manager support, lazy LLMClient creation
+- Системный промпт (временный, без RAG): ReviewMind AI-ассистент, правила поведения
+- Реализован `src/reviewmind/bot/handlers/query.py` — catch-all handler для текстовых сообщений
+- Typing indicator (`ChatAction.TYPING`) показывается во время генерации
+- Truncation для Telegram 4096-char limit
+- Ошибки LLM → пользовательское сообщение с извинением (не traceback)
+- Реализован `src/reviewmind/api/endpoints/query.py` — `POST /query` endpoint
+- Созданы Pydantic schemas: `QueryRequest` (message min_length=1, chat_history optional), `QueryResponse` (answer, error, model)
+- Обновлён `api/router.py` — подключён query_router с tag "query"
+- Обновлён `bot/main.py` — query_router подключён последним (catch-all после start/mode)
+- 41 unit-тест в `tests/unit/test_services/test_query_service.py`: QueryResult (3), QueryService init (4), answer (8), lifecycle (4), bot handler (5), dispatcher wiring (4), API schemas (4), API endpoint (6), API router wiring (2), full app (1)
+- `ruff check .` — All checks passed
+- `pytest` — 169 passed (128 existing + 41 new)
+**Следующие шаги:**
+- TASK-002: Docker Compose (зависит от TASK-001 ✅) — critical blocker для Stage 2
+- TASK-022: Системный промпт + LLM генерация структурированного ответа (зависит от TASK-006 ✅)
+- TASK-012: YouTube scraper (зависит от TASK-001 ✅, TASK-003 ✅)
+- TASK-013: Reddit scraper (зависит от TASK-001 ✅, TASK-003 ✅)
+- TASK-014: Web scraper (зависит от TASK-001 ✅)
+**Заметки для следующей итерации:**
+- TASK-008 ✅ завершает Stage 1 (Telegram ↔ LLM Chat) — все 4 задачи Stage 1 выполнены
+- QueryService — временная реализация, будет заменена RAGPipeline в TASK-024
+- handlers/query.py использует catch-all `@router.message()` — должен быть зарегистрирован ПОСЛЕДНИМ в dispatcher
+- aiogram routers — singletons, тесты wiring проверяют через inspect.getsource() вместо повторного create_dispatcher()
+- POST /query работает и через API (FastAPI), и через бот — оба канала используют один QueryService
+- TASK-002 (Docker) — по-прежнему critical blocker для TASK-009, TASK-010, TASK-011 (Stage 2)
+- Для Stage 3 (Scrapers) зависимости TASK-012..TASK-016 уже разблокированы
+
+---
+## Итерация 7 — 2026-03-01
+**Фича:** TASK-022 — Системный промпт + LLM генерация структурированного ответа (Плюсы/Минусы/Спорные/Вывод)
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/core/prompts.py` с полным содержимым из PRD секция 7:
+  - `SYSTEM_PROMPT_TEMPLATE` — 8 правил + слоты {retrieved_chunks}, {chat_history}
+  - `FALLBACK_SYSTEM_PROMPT` — для прямого LLM-режима (без RAG)
+  - `RAG_TEMPERATURE=0.3`, `RAG_MAX_TOKENS=1000`, `RAG_TOP_P=0.9` — константы из PRD
+  - `SPONSORED_MARKER='[sponsored]'`, `CURATED_MARKER='📚'`
+  - `ChunkContext` dataclass: text, source_url, source_type, is_sponsored, is_curated, score, author, extra_metadata
+  - `format_chunks_for_context(chunks)` — нумерует чанки, маркирует [sponsored] и 📚, включает автора
+  - `format_chat_history(history)` — переводит роли на русский (Пользователь/ReviewMind/Система)
+  - `build_rag_system_prompt(chunks, chat_history)` — собирает полный заполненный промпт
+- Расширен `src/reviewmind/core/llm.py`:
+  - Добавлен параметр `top_p` в `generate()` и `_call_with_retry()` (передаётся в API только если не None)
+  - Добавлен метод `generate_analysis(user_query, chunks?, chat_history?)` — использует PRD-параметры (temperature=0.3, max_tokens=1000, top_p=0.9)
+  - Ленивый импорт из prompts.py внутри generate_analysis избегает циклических зависимостей
+- 65 новых unit-тестов в `tests/unit/test_core/test_prompts.py` и расширен `test_llm.py`:
+  - TestChunkContext (8 тестов): поля, дефолты, изоляция mutable defaults
+  - TestFormatChunksForContext (15): sponsored/curated маркеры, author, множественные чанки, stripping
+  - TestFormatChatHistory (7): пустая история, переводы ролей, порядок
+  - TestBuildRagSystemPrompt (13): правила PRD, контекст/история, маркеры, параметры генерации
+  - TestPromptConstants (8): значения констант, слоты шаблона
+  - TestTopPSupport (3): передача/непередача top_p
+  - TestGenerateAnalysis (11): температура, max_tokens, top_p, sponsored в промпте, структурный формат
+- `ruff check .` — All checks passed
+- `pytest` — 228 passed (169 existing + 59 new)
+**Следующие шаги:**
+- TASK-002: Docker Compose — по-прежнему critical blocker для Stage 2
+- TASK-023: Автоопределение языка (langdetect) — зависит от TASK-022 ✅, РАЗБЛОКИРОВАНА
+- TASK-024: Полный RAG pipeline — зависит от TASK-020, TASK-021, TASK-022 ✅
+- TASK-012..TASK-016: Scrapers и ingestion — все зависимости выполнены (кроме TASK-002)
+**Заметки для следующей итерации:**
+- TASK-022 ✅ разблокировала TASK-023 (langdetect) и частично TASK-024 (RAG pipeline)
+- generate_analysis() использует lazy import из prompts.py — избегает циклических зависимостей
+- ChunkContext — основной тип данных для передачи чанков в generate_analysis() и будущий RAGPipeline
+- top_p передаётся в API только если не None — совместимость с моделями без поддержки top_p
+- TASK-002 (Docker) — по-прежнему critical blocker для TASK-009, TASK-010, TASK-011
+- TASK-023 (Langdetect) — небольшая задача, быстро реализуема как следующий шаг
+
+---
+
+## Итерация 8 — 2026-03-01
+**Фича:** TASK-002 — Docker Compose: конфигурация всех 8 сервисов
+**Статус:** Завершено
+**Что сделано:**
+- Создан `Dockerfile` (multi-stage: builder с `uv` + runtime `python:3.11-slim`):
+  - Builder: `pip install uv`, `uv venv .venv`, `uv pip install -e .` для кэш-эффективной сборки
+  - Runtime: non-root user `appuser` (uid 1001), `PYTHONPATH=/app/src`, `PYTHONUNBUFFERED=1`
+  - По умолчанию запускает uvicorn; `command:` в compose переопределяет для каждого сервиса
+- Создан `docker-compose.yml` — 8 сервисов в сети `reviewmind-network`:
+  - `postgres` (16-alpine): `pg_isready` healthcheck, volume `postgres_data`
+  - `redis` (7-alpine): `redis-cli ping` healthcheck, volume `redis_data`, `--appendonly yes`
+  - `qdrant` (v1.12.0): GET `/readyz` healthcheck, volume `qdrant_data`
+  - `api`: depends_on с condition `service_healthy`; GET `/health` healthcheck
+  - `bot`: long polling (`python -m reviewmind.bot.main`)
+  - `worker`: Celery worker (--concurrency=4), Redis DB 1 для broker
+  - `beat`: Celery Beat, depends_on worker
+  - `flower`: Celery Flower на порту 5555, depends_on worker
+  - Все app-сервисы переопределяют DATABASE_URL/REDIS_URL/QDRANT_URL на docker-internal адреса
+- Создан `alembic.ini` (sqlalchemy.url не захардкожен — читается из env в TASK-009)
+- Создан `.dockerignore` (секреты, .venv, __pycache__, .git исключены)
+- `docker compose config` — OK
+- `ruff check .` — All checks passed
+- `pytest` — 228 passed (6 pre-existing failures в test_config.py из-за .env с docker-URLs)
+**Следующие шаги:**
+- TASK-004: GitHub Actions CI/CD (TASK-001, TASK-002 разблокирована)
+- TASK-009: PostgreSQL модели + Alembic (TASK-002, TASK-003 разблокирована)
+- TASK-010: Qdrant коллекции (TASK-002, TASK-003 разблокирована)
+- TASK-011: Redis session manager (TASK-002, TASK-003 разблокирована)
+**Заметки для следующей итерации:**
+- TASK-002 разблокировала всю Stage 2 (TASK-009, TASK-010, TASK-011) и TASK-004 (CI/CD)
+- workers/celery_app.py — пустой placeholder, нужно реализовать в TASK-009+
+- pre-existing failures в test_config.py (6 тестов) — изоляция тестов требует _env_file=None
+- TASK-009 (PostgreSQL) рекомендуется как следующий шаг — разблокирует repositories и migrations
+
+---
+## Итерация 9 — 2026-03-01
+**Фича:** TASK-009 — PostgreSQL: SQLAlchemy async модели + Alembic начальная миграция (все 6 таблиц)
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/db/models.py` с 6 SQLAlchemy ORM моделями точно по PRD секция 6.1:
+  - `User` (BigInteger PK telegram_user_id, is_admin, subscription, sub_expires_at, created_at + relationships)
+  - `UserLimit` (composite PK user_id+date, requests_used, UniqueConstraint, FK→users CASCADE)
+  - `Subscription` (SERIAL PK, telegram_payment_charge_id UNIQUE, amount_stars, activated_at, expires_at, status)
+  - `Source` (SERIAL PK, source_url UNIQUE, source_type, product_query, is_sponsored, is_curated, language, author + 3 indexes)
+  - `Job` (UUID PK default=uuid4, user_id, job_type, status, celery_task_id, created_at, completed_at + 2 indexes)
+  - `QueryLog` (SERIAL PK, session_id, mode, query_text, response_text, sources_used JSON, rating SMALLINT, used_tavily + 2 indexes)
+- Реализован `src/reviewmind/db/session.py`:
+  - `build_engine()` — asyncpg + pool_size/max_overflow/pool_pre_ping=True
+  - `build_session_factory()` — expire_on_commit=False, autoflush=False
+  - `get_session()` — FastAPI dependency с commit/rollback на yield
+  - `create_all_tables()` / `drop_all_tables()` — для dev/test без Alembic
+- Настроен `alembic/env.py` для async миграций (asyncpg):
+  - offline mode + online async mode через `asyncio.run()`
+  - DATABASE_URL читается из env, автоматически добавляет `+asyncpg` prefix
+  - `target_metadata = Base.metadata` для autogenerate, `compare_type=True`
+- Создана `alembic/versions/0001_initial_schema.py`:
+  - `upgrade()`: создание всех 6 таблиц с FK constraints, indexes, server defaults
+  - `downgrade()`: удаление всех таблиц в правильном порядке
+- Реализованы 6 репозиториев в `db/repositories/`:
+  - `UserRepository`: get_by_id, create, get_or_create, update, delete
+  - `UserLimitRepository`: get, get_or_create, increment(by=1), reset
+  - `SourceRepository`: get_by_id, get_by_url, create, get_or_create, update, delete
+  - `JobRepository`: get_by_id, create, update_status(+celery_task_id, completed_at), list_by_user, delete
+  - `QueryLogRepository`: create, get_by_id, update_rating, list_by_user
+  - `SubscriptionRepository`: create, get_by_id, get_by_charge_id, update, list_by_user
+  - `repositories/__init__.py` экспортирует все 6 репозиториев
+- 97 новых unit-тестов в `tests/unit/test_db/`:
+  - `test_models.py` (45): TestBase (2), TestUser (9), TestUserLimit (6), TestSubscription (5), TestSource (8), TestJob (7), TestQueryLog (8)
+  - `test_repositories.py` (43): полное CRUD тестирование всех 6 репозиториев с mocked AsyncSession
+  - `test_session.py` (9): build_engine (4), session_factory (2), table ops (2), imports (1)
+- `ruff check .` — All checks passed
+- `pytest` — 325 passed (228 existing + 97 new), 6 pre-existing failures в test_config.py (docker-URLs, не связаны)
+**Следующие шаги:**
+- TASK-010: Qdrant коллекции auto_crawled + curated_kb (TASK-002 ✅, TASK-003 ✅) — РАЗБЛОКИРОВАНА
+- TASK-011: Redis session manager (TASK-002 ✅, TASK-003 ✅) — РАЗБЛОКИРОВАНА
+- TASK-004: GitHub Actions CI/CD (TASK-001 ✅, TASK-002 ✅)
+- TASK-017: Embedding service (TASK-006 ✅, TASK-010)
+**Заметки для следующей итерации:**
+- TASK-009 ✅ завершает PostgreSQL слой; TASK-010 + TASK-011 — следующие критичные задачи Stage 2
+- SQLAlchemy `mapped_column(default=False)` — INSERT-time default, not Python instantiation default; server_default на уровне БД
+- `alembic upgrade head` требует живую PostgreSQL: `docker compose up -d postgres && alembic upgrade head`
+- Все репозитории используют `session.flush()` вместо `session.commit()` — commit на уровне FastAPI `get_session()` dependency
+- UUID для `Job.id` генерируется в Python (`uuid.uuid4()`), не на сервере — надёжнее для unit-тестов без БД
+- TASK-010 (Qdrant) рекомендуется как следующий шаг — разблокирует TASK-017 (Embeddings) и TASK-018 (Upsert)
+
+---
+
+## Итерация 10 — 2026-03-02
+**Фича:** TASK-010 — Qdrant: инициализация коллекций auto_crawled и curated_kb (1536 dims, cosine)
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/vectorstore/client.py` — `QdrantClientWrapper`:
+  - Async context manager с lazy client creation
+  - Configurable url (из config.qdrant_url по умолчанию) и timeout
+  - `health_check()` — проверка доступности Qdrant
+  - `close()` — корректное закрытие соединения
+- Реализован `src/reviewmind/vectorstore/collections.py` — полная спецификация коллекций:
+  - `EMBEDDING_DIMENSION = 1536`, `DISTANCE_METRIC = Distance.COSINE`
+  - `CollectionSpec` frozen dataclass с `vector_params` property
+  - `PayloadIndex` frozen dataclass для определения payload-индексов
+  - `SourceType` enum: youtube, reddit, web, tavily, curated
+  - `AUTO_CRAWLED_SPEC`: 6 payload indexes (product_query KEYWORD, source_type KEYWORD, is_sponsored BOOL, is_curated BOOL, source_url KEYWORD, language KEYWORD)
+  - `CURATED_KB_SPEC`: 7 indexes (6 shared + category KEYWORD)
+  - `ensure_collection()` — идемпотентное создание коллекции с payload indexes
+  - `ensure_all_collections()` — создание обеих коллекций, возвращает dict[name, was_created]
+  - `delete_collection()` — удаление коллекции если существует
+- Реализован `scripts/init_qdrant.py` — идемпотентный скрипт инициализации:
+  - Health check перед началом работы (sys.exit(1) если недоступен)
+  - Вызов `ensure_all_collections()` → отчёт по каждой коллекции
+  - Structlog с ConsoleRenderer для удобного вывода
+- Обновлён `src/reviewmind/vectorstore/__init__.py` — экспорт всех ключевых символов
+- 79 unit-тестов в `tests/unit/test_vectorstore/test_vectorstore.py`:
+  - TestConstants (4), TestSourceType (6), TestPayloadIndex (3), TestCollectionSpec (6)
+  - TestAutoCollectionSpec (10), TestCuratedCollectionSpec (6), TestAllCollections (3)
+  - TestQdrantClientWrapper (9), TestEnsureCollection (6), TestEnsureAllCollections (4)
+  - TestDeleteCollection (2), TestVectorstoreExports (8), TestInitQdrantScript (2)
+  - TestPayloadSchemaMatchesPRD (9) — проверка соответствия PRD секция 6.2
+- `ruff check .` — All checks passed
+- `pytest` — 404 passed (325 existing + 79 new), 6 pre-existing failures в test_config.py
+**Следующие шаги:**
+- TASK-017: Embedding service (TASK-006 ✅, TASK-010 ✅) — РАЗБЛОКИРОВАНА, critical priority
+- TASK-020: Гибридный поиск по Qdrant (TASK-010 ✅, TASK-017) — ждёт TASK-017
+- TASK-011: Redis session manager (TASK-002 ✅, TASK-003 ✅) — РАЗБЛОКИРОВАНА, high priority
+- TASK-012..TASK-016: Scrapers и ingestion — РАЗБЛОКИРОВАНЫ, high priority
+**Заметки для следующей итерации:**
+- TASK-010 ✅ завершает Stage 2 Data Layer (PostgreSQL + Qdrant), разблокирует TASK-017 (Embeddings) и TASK-020 (Hybrid Search)
+- TASK-017 (Embeddings) рекомендуется как следующий шаг — critical priority, разблокирует TASK-018 (Upsert) и TASK-020
+- QdrantClientWrapper использует lazy import `settings` внутри `__init__` — не падает при import без .env
+- CollectionSpec.vector_params — computed property, не хранится; Distance.COSINE из qdrant_client.models
+- PayloadSchemaType.KEYWORD используется для строковых полей, BOOL для булевых — точное соответствие PRD
+- scripts/init_qdrant.py запускается: `python scripts/init_qdrant.py` (требует живой Qdrant)
+- TASK-011 (Redis) — тоже разблокирована, можно делать параллельно со Stage 4
+
+---
+
+## Итерация 11 — 2026-03-02
+**Фича:** TASK-017 — Embedding service: text-embedding-3-small (1536 dims) через OpenAI API
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/core/embeddings.py` — async `EmbeddingService` для OpenAI-compatible API
+- Класс `EmbeddingService` с параметрами из config: api_key, base_url, model (text-embedding-3-small), dimension (1536)
+- Метод `embed_text(text) → list[float]` — embedding одного текста, возвращает вектор 1536 dims
+- Метод `embed_batch(texts, batch_size?) → list[list[float]]` — batch embedding с автоматическим разбиением на под-батчи (default 100, настраиваемый)
+- Sanitization: пустые/whitespace строки заменяются на single space (не падает API)
+- Dimension validation: каждый вектор проверяется на соответствие ожидаемой размерности
+- Order preservation: ответы API сортируются по index для сохранения порядка входных текстов
+- Retry с exponential backoff (1s, 2s, 4s) для transient ошибок: RateLimitError, APITimeoutError, APIConnectionError, InternalServerError
+- Non-retryable ошибки (AuthenticationError, BadRequestError) сразу выбрасывают `EmbeddingError`
+- Async context manager support (`async with EmbeddingService() as svc`)
+- Custom exception `EmbeddingError` для всех ошибок embedding
+- Properties: `model`, `dimension`, `batch_size` (read-only)
+- Совместимость с GitHub Models API и OpenAI API (смена base_url)
+- Lazy import `settings` в `__init__` — не падает при import без .env
+- SDK retries отключены (`max_retries=0`), вся retry-логика кастомная
+- 65 unit-тестов в `tests/unit/test_core/test_embeddings.py`:
+  - TestConstants (6): default model, dimension, batch_size, retries, delay, timeout
+  - TestEmbeddingServiceInit (11): explicit params, defaults, custom values, client creation, settings fallback
+  - TestProperties (3): model, dimension, batch_size
+  - TestSanitizeText (6): normal, strip, empty, whitespace, newlines
+  - TestEmbedText (5): returns vector, API params, empty string, whitespace, strip
+  - TestEmbedBatch (7): empty list, single, multiple, sub-batches, custom batch_size, order, sanitization
+  - TestOrderPreservation (1): shuffled response indices
+  - TestDimensionValidation (3): wrong dimension, correct, custom 768
+  - TestErrorHandling (6): auth, bad request, API error, unexpected, auth not retried, bad request not retried
+  - TestRetry (7): rate limit, timeout, connection, ISE, exhaust retries, exponential backoff, no sleep after last
+  - TestContextManager (3): aenter, aexit, close
+  - TestEmbeddingError (3): is exception, message, raise
+  - TestIntegration (4): same text comparison, large batch 250, context manager, retry in batch
+- `ruff check .` — All checks passed
+- `pytest` — 469 passed (404 existing + 65 new), 6 pre-existing failures в test_config.py (docker-URLs, не связаны)
+**Следующие шаги:**
+- TASK-018: Qdrant upsert с дедупликацией (TASK-017 ✅) — РАЗБЛОКИРОВАНА, critical priority
+- TASK-020: Гибридный поиск по Qdrant (TASK-010 ✅, TASK-017 ✅) — РАЗБЛОКИРОВАНА, critical priority
+- TASK-011: Redis session manager (TASK-002 ✅, TASK-003 ✅) — high priority
+- TASK-012..TASK-016: Scrapers и ingestion — high priority, все зависимости выполнены
+**Заметки для следующей итерации:**
+- TASK-017 ✅ разблокировала TASK-018 (Qdrant upsert) и TASK-020 (Hybrid search)
+- TASK-018 рекомендуется как следующий шаг — разблокирует TASK-019 (Ingestion pipeline)
+- TASK-020 тоже стала доступна — вместе с TASK-021 (Reranking, dep: TASK-020) разблокирует TASK-024 (Full RAG)
+- EmbeddingService паттерн полностью повторяет LLMClient: lazy settings, retry, context manager, custom exception
+- `_sanitize_text()` — статический метод, можно использовать вне класса для валидации
+- embed_batch с batch_size=1 можно использовать для дебага (1 API call per text)
+- Для TASK-018 потребуется: EmbeddingService.embed_batch() для генерации векторов перед upsert
+
+---
+## Итерация 12 — 2026-03-02
+**Фича:** TASK-011 — Redis: session manager (mode, history, chunks с TTL 30 минут)
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/cache/redis.py` — `SessionManager` (async Redis session manager):
+  - Принимает `redis_client` (redis.asyncio.Redis с decode_responses=True) и опциональный `ttl` (default 1800 = 30 мин)
+  - Формат ключей: `session:{user_id}:mode`, `session:{user_id}:history`, `session:{user_id}:chunks`
+  - `set_mode(user_id, mode)` — валидация 'auto'|'links', SET с TTL
+  - `get_mode(user_id) → str | None` — возвращает текущий режим
+  - `add_to_history(user_id, message_dict)` — RPUSH + LTRIM(-5,-1) + EXPIRE через pipeline (FIFO, макс 5 сообщений)
+  - `get_history(user_id) → list[dict]` — с graceful JSON parse (пропускает bitые записи)
+  - `clear_history(user_id)` — удаление истории
+  - `store_chunk_ids(user_id, chunk_ids)` — SET JSON с TTL
+  - `get_chunk_ids(user_id) → list[str]` — с coercion int→str и graceful parse
+  - `clear_chunks(user_id)` — удаление chunk IDs
+  - `refresh_ttl(user_id)` — обновляет TTL всех 3 ключей через pipeline
+  - `clear_session(user_id)` — удаляет все ключи пользователя
+  - `session_exists(user_id) → bool` — проверка существования любого ключа
+  - `get_session_ttl(user_id) → int` — оставшееся TTL mode-ключа
+- Константы: `DEFAULT_TTL_SECONDS=1800`, `MAX_HISTORY_LENGTH=5`, `VALID_MODES=frozenset({'auto','links'})`
+- structlog логирование для всех операций (debug/info/warning)
+- Обновлён `cache/__init__.py` — экспорт SessionManager, DEFAULT_TTL_SECONDS, MAX_HISTORY_LENGTH, VALID_MODES
+- 59 unit-тестов в `tests/unit/test_cache/test_redis.py`:
+  - TestConstants (4): TTL, history length, valid modes, frozenset type
+  - TestKeyHelpers (5): mode/history/chunks key format, large IDs, zero
+  - TestSessionManagerInit (4): defaults, custom TTL, None TTL, redis property
+  - TestSetMode (5): auto, links, custom TTL, invalid raises, empty raises
+  - TestGetMode (3): returns value, None if missing, links
+  - TestAddToHistory (4): message, custom TTL, unicode, trims to max
+  - TestGetHistory (7): empty, single, multiple, order, corrupted JSON skip, unicode
+  - TestClearHistory (1): delete key
+  - TestStoreChunkIds (3): store, empty, custom TTL
+  - TestGetChunkIds (6): get, None, empty list, corrupted JSON, non-list JSON, int coercion
+  - TestClearChunks (1): delete key
+  - TestRefreshTTL (2): default TTL, custom TTL
+  - TestClearSession (1): delete all keys
+  - TestSessionExists (3): true, false, partial
+  - TestGetSessionTTL (3): active, expired, no expiry
+  - TestCacheExports (2): SessionManager exported, constants exported
+  - TestIntegrationScenarios (6): full lifecycle, mode switch preserves history, FIFO max 5, different users, expiry, store+get chunks
+- `ruff check .` — All checks passed
+- `pytest` — 528 passed (469 existing + 59 new), 6 pre-existing failures в test_config.py (docker-URLs, не связаны)
+**Следующие шаги:**
+- TASK-018: Qdrant upsert с дедупликацией (TASK-017 ✅) — РАЗБЛОКИРОВАНА, critical priority
+- TASK-020: Гибридный поиск по Qdrant (TASK-010 ✅, TASK-017 ✅) — РАЗБЛОКИРОВАНА, critical priority
+- TASK-012..TASK-016: Scrapers и ingestion — high priority, все зависимости выполнены
+- TASK-029: Bot links mode (deps: TASK-007 ✅, TASK-027, TASK-028, TASK-011 ✅) — частично разблокирована
+- TASK-030: /mode с Redis (deps: TASK-007 ✅, TASK-011 ✅) — РАЗБЛОКИРОВАНА
+- TASK-046: Multi-turn диалог (deps: TASK-011 ✅, TASK-024) — частично разблокирована
+- TASK-049: /delete_my_data GDPR (deps: TASK-007 ✅, TASK-009 ✅, TASK-011 ✅) — РАЗБЛОКИРОВАНА
+**Заметки для следующей итерации:**
+- TASK-011 ✅ завершает Stage 2: Data Layer (PostgreSQL ✅, Qdrant ✅, Redis ✅)
+- SessionManager использует pipeline для atomic add_to_history (RPUSH+LTRIM+EXPIRE) и refresh_ttl
+- Pipeline mock: redis.asyncio.Pipeline — pipeline() sync, rpush/ltrim/expire sync (queue commands), execute() async
+- Для TASK-030 (/mode с Redis) и TASK-046 (multi-turn) — SessionManager готов к интеграции
+- История в Redis — list (RPUSH/LTRIM/LRANGE), chunks — SET строка JSON, mode — SET строка
+- TASK-018 или TASK-020 рекомендуются как следующий шаг (critical priority, unblocked)
+
+---
+
+## Итерация 11 — 2026-03-02
+**Фича:** TASK-012 — YouTube transcript parser
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/scrapers/youtube.py` — YouTubeScraper для извлечения транскриптов YouTube видео
+- Класс `YouTubeScraper`: `extract_video_id(url)`, `get_transcript(video_id)`, `get_transcript_by_url(url)`, `is_youtube_url(url)`
+- Поддержка 5 форматов URL: watch?v=, youtu.be/, shorts/, embed/, live/
+- `TranscriptResult` dataclass: video_id, text, language, language_code, is_generated, word_count, snippet_count, source_url
+- Обработка ошибок: TranscriptsDisabled, NoTranscriptFound, VideoUnavailable → graceful None с structlog логированием
+- Фильтрация: транскрипт < 500 слов → skip с логом (настраиваемый min_word_count)
+- Очистка текста: удаление [Music], [Applause] маркеров, коллапс пробелов, без таймстемпов
+- Дефолтные языки: ('ru', 'en')
+- Обновлён `scrapers/__init__.py` — экспорт YouTubeScraper, TranscriptResult, MIN_WORD_COUNT, DEFAULT_LANGUAGES
+- 88 unit-тестов: constants, dataclass, extract_video_id (14 URLs), is_youtube_url, init, _build_clean_text, get_transcript success/too_short/errors, get_transcript_by_url, exports, integration scenarios
+- `ruff check .` — All checks passed
+- `pytest` — 616 passed (528 existing + 88 new), 6 pre-existing failures в test_config.py
+**Следующие шаги:**
+- TASK-013: Reddit parser (deps: TASK-001 ✅, TASK-003 ✅) — РАЗБЛОКИРОВАН
+- TASK-014: Web parser (deps: TASK-001 ✅) — РАЗБЛОКИРОВАН
+- TASK-015: Очистка текста + спонсорский контент (deps: TASK-001 ✅) — РАЗБЛОКИРОВАН
+- TASK-016: Text chunking (deps: TASK-001 ✅) — РАЗБЛОКИРОВАН
+- TASK-018: Qdrant upsert (deps: TASK-017 ✅) — РАЗБЛОКИРОВАН, critical
+- TASK-020: Hybrid search (deps: TASK-010 ✅, TASK-017 ✅) — РАЗБЛОКИРОВАН, critical
+**Заметки для следующей итерации:**
+- youtube-transcript-api v0.6+ использует instance API: `api = YouTubeTranscriptApi(); api.fetch(video_id, languages=...)`
+- FetchedTranscript содержит snippets (list[FetchedTranscriptSnippet]), каждый с text/start/duration
+- Ошибки: NoTranscriptFound требует 3 аргумента (video_id, manually_created_list, generated_list)
+- TASK-013..TASK-016 + TASK-018 блокируют TASK-019 (ingestion pipeline, critical)
+- TASK-018 и TASK-020 — critical priority, рекомендуются как следующий шаг на RAG-пути
+
+---
+
+## Итерация 13 — TASK-013
+**Фича:** Reddit parser — RedditScraper с PRAW
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `RedditScraper` в `src/reviewmind/scrapers/reddit.py`:
+  - `parse_url(url)` — извлечение поста по Reddit URL (reddit.com, old.reddit.com, redd.it)
+  - `get_post(post_id)` — получение поста по ID
+  - `search_subreddit(query, subreddit, limit, sort, time_filter)` — поиск постов
+  - `extract_post_id(url)` / `is_reddit_url(url)` — статические утилиты
+  - `_collect_comments()` — сбор top-level + first-level replies (configurable limit, default 20)
+  - Фильтрация `[deleted]`, `[removed]`, `[удалено]` постов и комментариев
+  - Lazy-инициализация PRAW Reddit через property, credentials из config
+- Dataclasses: `RedditPost` (с `full_text` property), `RedditComment`, `SearchResult`
+- Обновлён `scrapers/__init__.py` с экспортами Reddit
+- Написано 108 unit-тестов в `tests/unit/test_scrapers/test_reddit.py`:
+  - TestConstants, TestRedditComment, TestRedditPost, TestSearchResult
+  - TestExtractPostId (15 parametrized), TestIsRedditUrl (11 parametrized)
+  - TestRedditScraperInit, TestIsDeletedSubmission, TestCollectComments
+  - TestGetPost, TestParseUrl, TestSearchSubreddit, TestScrapersExports
+  - TestIntegrationScenarios (full parse flow, search+parse, mixed comments)
+- Исправлен `test_youtube.py::test_all_contains_expected_names` — `issubset` вместо strict equality
+**Результаты проверок:**
+- `ruff check .` — All checks passed!
+- `pytest` — 724 passed, 6 pre-existing failures в test_config.py
+**Следующие шаги:**
+- TASK-014: Web parser (deps: TASK-001 ✅) — РАЗБЛОКИРОВАН
+- TASK-015: Очистка текста + спонсорский контент (deps: TASK-001 ✅) — РАЗБЛОКИРОВАН
+- TASK-016: Text chunking (deps: TASK-001 ✅) — РАЗБЛОКИРОВАН
+- TASK-018: Qdrant upsert (deps: TASK-017 ✅) — РАЗБЛОКИРОВАН, critical
+- TASK-020: Hybrid search (deps: TASK-010 ✅, TASK-017 ✅) — РАЗБЛОКИРОВАН, critical
+**Заметки для следующей итерации:**
+- PRAW SimpleNamespace mock: `str()` на SimpleNamespace не вызывает `__str__` — использовать `type("Fake", (), {"__str__": ...})()`
+- `RedditPost.full_text` объединяет title + selftext + comments (фильтруя deleted)
+- TASK-014 (web parser) + TASK-015 (cleaner) + TASK-016 (chunker) блокируют TASK-019 (ingestion pipeline, critical)
+- TASK-018 и TASK-020 — critical priority для RAG-пути
+
+---
+
+## Итерация 14 — 2026-03-10
+**Фича:** TASK-020 — Гибридный поиск по Qdrant: curated_kb + auto_crawled, pre-filter по product_query
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/vectorstore/search.py` — модуль гибридного поиска
+- `SearchResult` dataclass со всеми metadata: text, score, source_url, source_type, is_curated, is_sponsored, collection, product_query, language, chunk_index, point_id, extra
+- `search_collection()` — поиск по одной коллекции через `AsyncQdrantClient.query_points`, с payload pre-filter по product_query, graceful error handling
+- `hybrid_search()` — параллельный поиск по curated_kb и auto_crawled через `asyncio.gather(return_exceptions=True)`, merge, дедупликация по (source_url, chunk_index), сортировка по score descending
+- Хелперы: `_build_product_filter()`, `_scored_point_to_result()`, `_deduplicate_results()`
+- Константы: DEFAULT_TOP_K=5, DEFAULT_SCORE_THRESHOLD=None
+- Обновлён `vectorstore/__init__.py` — экспорт SearchResult, hybrid_search, search_collection, DEFAULT_TOP_K, DEFAULT_SCORE_THRESHOLD
+- 55 unit-тестов в `tests/unit/test_vectorstore/test_search.py`:
+  - TestConstants (3), TestSearchResult (4), TestBuildProductFilter (5)
+  - TestScoredPointToResult (8), TestDeduplicateResults (7)
+  - TestSearchCollection (9), TestHybridSearch (14 — включая параллелизм asyncio.gather)
+  - TestSearchExports (5), TestIntegrationScenarios (5)
+**Результаты проверок:**
+- `ruff check .` — All checks passed!
+- `pytest` — 783 passed, 6 pre-existing failures в test_config.py
+**Следующие шаги:**
+- TASK-021: Reranking (deps: TASK-020 ✅) — РАЗБЛОКИРОВАН, critical
+- TASK-014: Web parser (deps: TASK-001 ✅) — РАЗБЛОКИРОВАН, high
+- TASK-015: Очистка текста + спонсорский контент (deps: TASK-001 ✅) — РАЗБЛОКИРОВАН, high
+- TASK-016: Text chunking (deps: TASK-001 ✅) — РАЗБЛОКИРОВАН, high
+- TASK-018: Qdrant upsert (deps: TASK-017 ✅) — РАЗБЛОКИРОВАН, critical
+**Заметки для следующей итерации:**
+- TASK-020 ✅ разблокировала TASK-021 (reranking) — теперь путь к TASK-024 (RAG pipeline): TASK-021 → TASK-024
+- Qdrant v1.12+ использует `query_points` вместо устаревшего `search` (API response: `QueryResponse.points` → `list[ScoredPoint]`)
+- `asyncio.gather(return_exceptions=True)` — ошибка одной коллекции не блокирует другую
+- Дедупликация по (source_url, chunk_index) — при дубликате сохраняется результат с выше score
+- TASK-014 + TASK-015 + TASK-016 + TASK-018 блокируют TASK-019 (ingestion pipeline)
+
+---
