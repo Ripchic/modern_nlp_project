@@ -504,7 +504,8 @@
         "Шаг 5: pytest tests/unit/test_scrapers/test_web.py — все тесты зелёные"
       ],
       "dependencies": ["TASK-001"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Реализован src/reviewmind/scrapers/web.py — WebScraper для извлечения текста и метаданных из web-страниц через trafilatura. Класс WebScraper: parse_url(url) → WebPage | None (download + extraction), parse_html(html, url?) → WebPage | None (pre-downloaded HTML), is_web_url(url) → bool. WebPage dataclass: url, text, title, author, date, sitename, description, language, word_count, extra_metadata. Обработка ошибок: paywall → None с логом, timeout 30 сек (signal.SIGALRM на Unix), network error → None, пустой/короткий результат (< 200 chars) → None. Extraction через trafilatura.bare_extraction с favor_recall=True, with_metadata=True. Очистка текста: collapse whitespace, collapse multiple newlines (3+ → 2), strip. Настраиваемые параметры: timeout, min_text_length, favor_precision, favor_recall, include_comments, include_tables. Обновлён scrapers/__init__.py — экспорт WebScraper, WebPage, DEFAULT_TIMEOUT, MIN_TEXT_LENGTH. 99 unit-тестов в tests/unit/test_scrapers/test_web.py: TestConstants (4), TestWebPage (4), TestWebScraperInit (6), TestIsWebUrl (9 parametrized), TestValidateUrl (7), TestCleanText (8), TestGetText (6), TestGetAttr (8), TestParseUrlSuccess (5), TestParseUrlFailure (11), TestParseHtml (5), TestDownload (5), TestExtract (5), TestScrapersExports (5), TestIntegrationScenarios (7). Все acceptance criteria выполнены: rtings.com/wirecutter style reviews тестированы, paywall → None, timeout → None, metadata извлекается, русский контент поддерживается. ruff check — 0 ошибок, pytest — 984 passed (885 existing + 99 new), 6 pre-existing failures в test_config.py (docker-URLs, не связаны с TASK-014)."
     },
     {
       "id": "TASK-015",

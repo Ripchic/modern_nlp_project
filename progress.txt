@@ -693,3 +693,34 @@
 - _check_confidence требует строго > 0.75 (не >=), это важно для edge cases в тестах
 
 ---
+
+## Итерация 15 — 2026-03-10
+**Фича:** TASK-014 — Web page parser: извлечение основного текста через trafilatura
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/scrapers/web.py` — WebScraper для извлечения текста и метаданных из web-страниц
+- Класс WebScraper: `parse_url(url)` → WebPage | None, `parse_html(html, url?)` → WebPage | None, `is_web_url(url)` → bool
+- WebPage dataclass: url, text, title, author, date, sitename, description, language, word_count, extra_metadata
+- Extraction через `trafilatura.bare_extraction` с favor_recall=True, with_metadata=True
+- Обработка ошибок: paywall → None, timeout 30 сек (signal.SIGALRM на Unix), network error → None, пустой/короткий текст (< 200 chars) → None
+- Очистка текста: collapse whitespace, collapse multiple newlines (3+ → 2), strip
+- Настраиваемые параметры: timeout, min_text_length, favor_precision, favor_recall, include_comments, include_tables
+- Обновлён `scrapers/__init__.py` — экспорт WebScraper, WebPage, DEFAULT_TIMEOUT, MIN_TEXT_LENGTH
+- 99 unit-тестов: TestConstants (4), TestWebPage (4), TestWebScraperInit (6), TestIsWebUrl (9), TestValidateUrl (7), TestCleanText (8), TestGetText (6), TestGetAttr (8), TestParseUrlSuccess (5), TestParseUrlFailure (11), TestParseHtml (5), TestDownload (5), TestExtract (5), TestScrapersExports (5), TestIntegrationScenarios (7)
+- `ruff check .` — All checks passed
+- `pytest` — 984 passed (885 existing + 99 new), 6 pre-existing failures в test_config.py
+**Следующие шаги:**
+- TASK-018: Qdrant upsert с дедупликацией (deps: TASK-017 ✅) — РАЗБЛОКИРОВАН, critical
+- TASK-015: Очистка текста + спонсорский контент (deps: TASK-001 ✅) — РАЗБЛОКИРОВАН, high
+- TASK-016: Text chunking (deps: TASK-001 ✅) — РАЗБЛОКИРОВАН, high
+- TASK-027: POST /query endpoint (deps: TASK-005 ✅, TASK-024 ✅, TASK-009 ✅) — РАЗБЛОКИРОВАН, critical
+- TASK-014 ✅ разблокировала: TASK-019 (ingestion pipeline, ещё нужны TASK-015, TASK-016, TASK-018), TASK-026 (URL type detection, ещё нужен TASK-013 ✅ — уже готов)
+**Заметки для следующей итерации:**
+- Все 3 скрапера готовы: YouTube ✅ (TASK-012), Reddit ✅ (TASK-013), Web ✅ (TASK-014)
+- Для TASK-019 (ingestion pipeline) осталось: TASK-015 (cleaner/sponsor), TASK-016 (chunker), TASK-018 (Qdrant upsert)
+- trafilatura.bare_extraction возвращает Document object (не dict) с .text, .title, .author и т.д.
+- trafilatura.fetch_url может вернуть None для paywall/404/network errors — нужно обрабатывать gracefully
+- WebScraper использует signal.SIGALRM для timeout — работает только на Unix (macOS/Linux)
+- _clean_text: regex `[^\S\n]+` заменяет горизонтальный whitespace, сохраняя newlines
+
+---
