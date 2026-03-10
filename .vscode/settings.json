@@ -4,6 +4,10 @@
             "approve": true,
             "matchCommandLine": true
         },
-        "uv": true
+        "uv": true,
+        "/^python -c \"from qdrant_client\\.models import PointStruct; print\\('PointStruct OK'\\)\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
     }
 }

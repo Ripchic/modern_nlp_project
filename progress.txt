@@ -782,3 +782,35 @@
 - Chunk.metadata содержит копию исходных metadata + chunk_index
 
 ---
+
+## Итерация 18 — 2026-03-11
+**Фича:** TASK-018 — Qdrant upsert с дедупликацией (cosine similarity > 0.95 → skip)
+**Статус:** Завершено
+**Что сделано:**
+- Расширен `src/reviewmind/vectorstore/client.py` — добавлен полный модуль upsert с дедупликацией
+- `ChunkPayload` dataclass: 12 полей по PRD §6.2 (text, source_url, source_type, product_query, chunk_index, language, is_sponsored, is_curated, source_id, author, date, session_id) + `to_dict()`
+- `UpsertResult` dataclass: total, inserted, skipped, skipped_indices
+- `generate_point_id(source_url, chunk_index)` — детерминистический UUID5 для естественной идемпотентности
+- `_check_duplicates()` — поиск в Qdrant с фильтром по source_url + score_threshold, graceful error (ошибка → proceed)
+- `upsert_chunks(client, collection, vectors, payloads, dedup_threshold=0.95, batch_size=64, skip_dedup=False)`:
+  - Для каждого чанка: cosine similarity > 0.95 для того же source_url → skip
+  - Batch upsert через `client.upsert()` с `PointStruct`
+  - Batch splitting по batch_size (default 64)
+  - `skip_dedup=True` для быстрого seed-импорта (без проверок)
+- Константы: `DEDUP_SIMILARITY_THRESHOLD=0.95`, `DEFAULT_UPSERT_BATCH_SIZE=64`
+- Обновлён `vectorstore/__init__.py` — экспорт всех новых символов
+- 62 unit-теста в `tests/unit/test_vectorstore/test_upsert.py`
+- `ruff check .` — All checks passed
+- `pytest` — 1238 passed (1176 existing + 62 new), 6 pre-existing failures в test_config.py
+**Следующие шаги:**
+- TASK-019: Ingestion pipeline (deps: все scrapers ✅, chunker ✅, embeddings ✅, **TASK-018 ✅**, TASK-009 ✅) — **РАЗБЛОКИРОВАН**, critical
+- TASK-027: POST /query endpoint (deps: TASK-005 ✅, TASK-024 ✅, TASK-009 ✅) — РАЗБЛОКИРОВАН, critical
+- TASK-004: GitHub Actions CI/CD (deps met) — high
+**Заметки для следующей итерации:**
+- TASK-018 ✅ разблокировала TASK-019 — это финальный blocker ingestion pipeline
+- `generate_point_id` использует `uuid5` с namespace UUID → повторный upsert перезаписывает точку (не дублирует)
+- `skip_dedup=True` рекомендуется для seed_curated_kb.py и первичной загрузки
+- Dedup check graceful: ошибка запроса → proceed with upsert (не блокирует)
+- `_check_duplicates` использует `score_threshold` в query_points — Qdrant сам фильтрует по порогу
+
+---

@@ -605,7 +605,8 @@
         "Шаг 5: Проверить, что source_url используется при дедупликации"
       ],
       "dependencies": ["TASK-017"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Реализован src/reviewmind/vectorstore/client.py — расширен модулем upsert с дедупликацией. ChunkPayload dataclass: 12 полей точно по PRD §6.2 (text, source_url, source_type, product_query, chunk_index, language, is_sponsored, is_curated, source_id, author, date, session_id) + to_dict(). UpsertResult dataclass: total, inserted, skipped, skipped_indices. generate_point_id(source_url, chunk_index) — детерминистический UUID5 для идемпотентности. _check_duplicates() — поиск в Qdrant с фильтром по source_url + score_threshold, graceful error handling (ошибка проверки → proceed). upsert_chunks(client, collection, vectors, payloads, dedup_threshold=0.95, batch_size=64, skip_dedup=False) → UpsertResult: (1) для каждого чанка проверяет cosine similarity > 0.95 для того же source_url → skip, (2) batch upsert через client.upsert() с PointStruct, (3) batch splitting по batch_size. Константы: DEDUP_SIMILARITY_THRESHOLD=0.95, DEFAULT_UPSERT_BATCH_SIZE=64. Обновлён vectorstore/__init__.py — экспорт ChunkPayload, UpsertResult, upsert_chunks, generate_point_id, DEDUP_SIMILARITY_THRESHOLD, DEFAULT_UPSERT_BATCH_SIZE. 62 unit-теста в tests/unit/test_vectorstore/test_upsert.py: TestConstants (5), TestChunkPayload (6), TestUpsertResult (3), TestGeneratePointId (6), TestCheckDuplicates (7), TestUpsertChunksSuccess (6), TestUpsertChunksDedup (6), TestUpsertChunksBatching (4), TestUpsertChunksErrors (4), TestUpsertPayloadCoverage (3), TestVectorstoreUpsertExports (7), TestIntegrationScenarios (5). ruff check — 0 ошибок, pytest — 1238 passed (1176 existing + 62 new), 6 pre-existing failures в test_config.py (docker-URLs, не связаны с TASK-018)."
     },
     {
       "id": "TASK-019",
