@@ -834,7 +834,8 @@
         "Шаг 5: Swagger UI: POST /query с примером — работает"
       ],
       "dependencies": ["TASK-005", "TASK-024", "TASK-009"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Реализован полный POST /query endpoint с RAG-pipeline, логированием и замером времени. Обновлён api/schemas.py: QueryRequest (user_id, session_id, query, mode, urls?, chat_history?, product_query?), QueryResponse (answer, sources, used_curated, used_tavily, confidence_met, chunks_count, response_time_ms, query_log_id, error). Endpoint api/endpoints/query.py: (1) при наличии Qdrant → полный RAG pipeline (embed → search → rerank → generate), (2) при отсутствии Qdrant → fallback на прямой LLM через QueryService, (3) response_time_ms замеряется через time.monotonic(), (4) query_logs запись создаётся через QueryLogRepository (user_id, session_id, mode, query_text, response_text, sources_used, response_time_ms, used_tavily), (5) graceful error handling (pipeline crash → fallback answer, DB unavailable → query_log_id=None). Pydantic validation: missing user_id/query → 422, empty query → 422. Все imports на top-level для testability. 55 unit-тестов: TestQueryResult (3), TestQueryServiceInit (4), TestQueryServiceAnswer (8), TestQueryServiceLifecycle (4), TestBotQueryHandler (5), TestBotDispatcherWiring (4), TestApiQuerySchemas (9), TestApiQueryEndpoint (10), TestApiQueryLogging (3), TestApiFallbackAnswer (2), TestApiRouterWiring (2), TestFullApp (1). ruff check — 0 ошибок, pytest — 1324 passed (1310 existing + 14 new), 6 pre-existing failures в test_config.py (docker-URLs, не связаны с TASK-027)."
     },
     {
       "id": "TASK-028",

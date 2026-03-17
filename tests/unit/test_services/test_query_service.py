@@ -396,109 +396,340 @@ class TestApiQuerySchemas:
     def test_query_request_valid(self):
         from reviewmind.api.schemas import QueryRequest
 
-        req = QueryRequest(message="Hello")
-        assert req.message == "Hello"
+        req = QueryRequest(user_id=123, query="Hello")
+        assert req.query == "Hello"
+        assert req.user_id == 123
         assert req.chat_history is None
+        assert req.mode == "auto"
+        assert req.urls is None
+        assert req.session_id is None
+        assert req.product_query is None
 
     def test_query_request_with_history(self):
         from reviewmind.api.schemas import QueryRequest
 
         req = QueryRequest(
-            message="Next question",
+            user_id=123,
+            query="Next question",
             chat_history=[{"role": "user", "content": "prev"}],
         )
         assert len(req.chat_history) == 1
 
-    def test_query_request_empty_message_rejected(self):
+    def test_query_request_empty_query_rejected(self):
         from pydantic import ValidationError
 
         from reviewmind.api.schemas import QueryRequest
 
         with pytest.raises(ValidationError):
-            QueryRequest(message="")
+            QueryRequest(user_id=123, query="")
+
+    def test_query_request_manual_mode_with_urls(self):
+        from reviewmind.api.schemas import QueryRequest
+
+        req = QueryRequest(
+            user_id=123,
+            query="Review these",
+            mode="manual",
+            urls=["https://example.com"],
+        )
+        assert req.mode == "manual"
+        assert req.urls == ["https://example.com"]
+
+    def test_query_request_with_session_and_product(self):
+        from reviewmind.api.schemas import QueryRequest
+
+        req = QueryRequest(
+            user_id=123,
+            query="Sony WH-1000XM5?",
+            session_id="sess_abc",
+            product_query="Sony WH-1000XM5",
+        )
+        assert req.session_id == "sess_abc"
+        assert req.product_query == "Sony WH-1000XM5"
+
+    def test_query_request_missing_user_id_rejected(self):
+        from pydantic import ValidationError
+
+        from reviewmind.api.schemas import QueryRequest
+
+        with pytest.raises(ValidationError):
+            QueryRequest(query="Hello")
 
     def test_query_response_fields(self):
         from reviewmind.api.schemas import QueryResponse
 
-        resp = QueryResponse(answer="Hello", error=False, model="gpt-4o-mini")
+        resp = QueryResponse(
+            answer="Hello",
+            sources=["https://example.com"],
+            used_curated=True,
+            confidence_met=True,
+            chunks_count=5,
+            response_time_ms=120,
+            error=False,
+        )
         assert resp.answer == "Hello"
         assert resp.error is False
-        assert resp.model == "gpt-4o-mini"
+        assert resp.sources == ["https://example.com"]
+        assert resp.used_curated is True
+        assert resp.confidence_met is True
+        assert resp.chunks_count == 5
+        assert resp.response_time_ms == 120
+
+    def test_query_response_defaults(self):
+        from reviewmind.api.schemas import QueryResponse
+
+        resp = QueryResponse(answer="Hi")
+        assert resp.sources == []
+        assert resp.used_curated is False
+        assert resp.used_tavily is False
+        assert resp.confidence_met is False
+        assert resp.chunks_count == 0
+        assert resp.response_time_ms == 0
+        assert resp.query_log_id is None
+        assert resp.error is False
+
+
+def _make_rag_response(**kwargs):
+    """Create a mock RAGResponse with sensible defaults."""
+    from reviewmind.core.rag import RAGResponse
+
+    defaults = {
+        "answer": "RAG analysis answer",
+        "sources": ["https://example.com/review"],
+        "used_curated": False,
+        "confidence_met": True,
+        "chunks_count": 5,
+        "chunks_found": 10,
+        "used_sponsored": False,
+        "error": None,
+    }
+    defaults.update(kwargs)
+    return RAGResponse(**defaults)
+
+
+def _make_mock_rag_pipeline(rag_response=None):
+    """Create a mock RAGPipeline that returns the given response."""
+    if rag_response is None:
+        rag_response = _make_rag_response()
+    pipeline = MagicMock()
+    pipeline.query = AsyncMock(return_value=rag_response)
+    pipeline.close = AsyncMock()
+    return pipeline
 
 
 class TestApiQueryEndpoint:
     """Test POST /query endpoint."""
 
-    def test_success(self, query_client: TestClient):
-        with patch("reviewmind.api.endpoints.query.LLMClient") as MockLLM:
-            mock_client = _mock_llm_client("LLM response")
-            instance = MockLLM.return_value
-            instance.__aenter__ = AsyncMock(return_value=mock_client)
-            instance.__aexit__ = AsyncMock(return_value=False)
+    def test_success_with_rag(self, query_app: FastAPI, query_client: TestClient):
+        query_app.state.qdrant = MagicMock()  # Qdrant available
 
-            resp = query_client.post("/query", json={"message": "Hello"})
+        with patch("reviewmind.api.endpoints.query.RAGPipeline") as MockPipeline:
+            MockPipeline.return_value = _make_mock_rag_pipeline()
+            resp = query_client.post("/query", json={"user_id": 123, "query": "test"})
 
         assert resp.status_code == 200
         data = resp.json()
-        assert data["answer"] == "LLM response"
+        assert data["answer"] == "RAG analysis answer"
         assert data["error"] is False
+        assert data["sources"] == ["https://example.com/review"]
+        assert data["confidence_met"] is True
+        assert data["chunks_count"] == 5
 
-    def test_with_chat_history(self, query_client: TestClient):
+    def test_fallback_to_llm_when_no_qdrant(self, query_client: TestClient):
+        # No qdrant in state → fallback to LLM
         with patch("reviewmind.api.endpoints.query.LLMClient") as MockLLM:
-            mock_client = _mock_llm_client("Follow-up answer")
+            mock_client = _mock_llm_client("LLM direct answer")
             instance = MockLLM.return_value
             instance.__aenter__ = AsyncMock(return_value=mock_client)
             instance.__aexit__ = AsyncMock(return_value=False)
 
-            resp = query_client.post(
-                "/query",
-                json={
-                    "message": "Follow-up",
-                    "chat_history": [{"role": "user", "content": "Hi"}],
-                },
-            )
+            resp = query_client.post("/query", json={"user_id": 123, "query": "Hello"})
 
         assert resp.status_code == 200
-        assert resp.json()["answer"] == "Follow-up answer"
+        data = resp.json()
+        assert data["answer"] == "LLM direct answer"
 
-    def test_empty_message_422(self, query_client: TestClient):
-        resp = query_client.post("/query", json={"message": ""})
+    def test_response_time_ms_present(self, query_app: FastAPI, query_client: TestClient):
+        query_app.state.qdrant = MagicMock()
+
+        with patch("reviewmind.api.endpoints.query.RAGPipeline") as MockPipeline:
+            MockPipeline.return_value = _make_mock_rag_pipeline()
+            resp = query_client.post("/query", json={"user_id": 123, "query": "test"})
+
+        data = resp.json()
+        assert "response_time_ms" in data
+        assert isinstance(data["response_time_ms"], int)
+        assert data["response_time_ms"] >= 0
+
+    def test_empty_query_422(self, query_client: TestClient):
+        resp = query_client.post("/query", json={"user_id": 123, "query": ""})
         assert resp.status_code == 422
 
-    def test_missing_message_422(self, query_client: TestClient):
-        resp = query_client.post("/query", json={})
+    def test_missing_query_422(self, query_client: TestClient):
+        resp = query_client.post("/query", json={"user_id": 123})
         assert resp.status_code == 422
 
-    def test_llm_error_returns_fallback(self, query_client: TestClient):
-        with patch("reviewmind.api.endpoints.query.LLMClient") as MockLLM:
-            mock_client = _mock_llm_client_error(LLMError("API error"))
-            instance = MockLLM.return_value
-            instance.__aenter__ = AsyncMock(return_value=mock_client)
-            instance.__aexit__ = AsyncMock(return_value=False)
+    def test_missing_user_id_422(self, query_client: TestClient):
+        resp = query_client.post("/query", json={"query": "hello"})
+        assert resp.status_code == 422
 
-            resp = query_client.post("/query", json={"message": "test"})
+    def test_rag_error_returns_fallback(self, query_app: FastAPI, query_client: TestClient):
+        query_app.state.qdrant = MagicMock()
+        rag_resp = _make_rag_response(answer="", error="Embedding error")
+
+        with patch("reviewmind.api.endpoints.query.RAGPipeline") as MockPipeline:
+            MockPipeline.return_value = _make_mock_rag_pipeline(rag_resp)
+            resp = query_client.post("/query", json={"user_id": 123, "query": "test"})
 
         assert resp.status_code == 200
         data = resp.json()
         assert data["error"] is True
         assert "Извините" in data["answer"]
 
-    def test_response_has_model_field(self, query_client: TestClient):
-        with patch("reviewmind.api.endpoints.query.LLMClient") as MockLLM:
-            mock_client = _mock_llm_client("ok")
-            instance = MockLLM.return_value
-            instance.__aenter__ = AsyncMock(return_value=mock_client)
-            instance.__aexit__ = AsyncMock(return_value=False)
+    def test_rag_pipeline_exception_returns_fallback(self, query_app: FastAPI, query_client: TestClient):
+        query_app.state.qdrant = MagicMock()
 
-            resp = query_client.post("/query", json={"message": "hi"})
+        with patch("reviewmind.api.endpoints.query.RAGPipeline") as MockPipeline:
+            pipeline = MagicMock()
+            pipeline.query = AsyncMock(side_effect=RuntimeError("crash"))
+            pipeline.close = AsyncMock()
+            MockPipeline.return_value = pipeline
+            resp = query_client.post("/query", json={"user_id": 123, "query": "test"})
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["error"] is True
+        assert "Извините" in data["answer"]
+
+    def test_with_chat_history(self, query_app: FastAPI, query_client: TestClient):
+        query_app.state.qdrant = MagicMock()
+
+        with patch("reviewmind.api.endpoints.query.RAGPipeline") as MockPipeline:
+            mock_pipeline = _make_mock_rag_pipeline()
+            MockPipeline.return_value = mock_pipeline
+            resp = query_client.post(
+                "/query",
+                json={
+                    "user_id": 123,
+                    "query": "Follow-up",
+                    "chat_history": [{"role": "user", "content": "Hi"}],
+                },
+            )
+
+        assert resp.status_code == 200
+        # Verify chat_history was passed to RAG pipeline
+        call_kwargs = mock_pipeline.query.call_args.kwargs
+        assert call_kwargs["chat_history"] == [{"role": "user", "content": "Hi"}]
+
+    def test_product_query_passed_to_rag(self, query_app: FastAPI, query_client: TestClient):
+        query_app.state.qdrant = MagicMock()
+
+        with patch("reviewmind.api.endpoints.query.RAGPipeline") as MockPipeline:
+            mock_pipeline = _make_mock_rag_pipeline()
+            MockPipeline.return_value = mock_pipeline
+            resp = query_client.post(
+                "/query",
+                json={"user_id": 123, "query": "review", "product_query": "Sony XM5"},
+            )
+
+        assert resp.status_code == 200
+        call_kwargs = mock_pipeline.query.call_args.kwargs
+        assert call_kwargs["product_query"] == "Sony XM5"
+
+    def test_response_has_all_fields(self, query_app: FastAPI, query_client: TestClient):
+        query_app.state.qdrant = MagicMock()
+
+        with patch("reviewmind.api.endpoints.query.RAGPipeline") as MockPipeline:
+            MockPipeline.return_value = _make_mock_rag_pipeline()
+            resp = query_client.post("/query", json={"user_id": 123, "query": "hi"})
 
         data = resp.json()
-        assert "model" in data
+        expected_fields = {
+            "answer", "sources", "used_curated", "used_tavily",
+            "confidence_met", "chunks_count", "response_time_ms",
+            "query_log_id", "error",
+        }
+        assert expected_fields.issubset(set(data.keys()))
 
 
 # ══════════════════════════════════════════════════════════════
 # Tests — API router wiring
 # ══════════════════════════════════════════════════════════════
+
+
+class TestApiQueryLogging:
+    """Test query logging via _log_query."""
+
+    @pytest.mark.asyncio
+    async def test_log_query_no_engine(self):
+        from reviewmind.api.endpoints.query import _log_query
+
+        request = MagicMock()
+        request.app.state = MagicMock(spec=[])
+        result = await _log_query(
+            request,
+            user_id=123,
+            session_id=None,
+            mode="auto",
+            query_text="test",
+            response_text="answer",
+            sources_used=None,
+            response_time_ms=100,
+            used_tavily=False,
+        )
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_log_query_engine_exception(self):
+        from reviewmind.api.endpoints.query import _log_query
+
+        request = MagicMock()
+        request.app.state.db_engine = MagicMock()
+
+        with patch("reviewmind.api.endpoints.query.async_sessionmaker", side_effect=RuntimeError("db error")):
+            result = await _log_query(
+                request,
+                user_id=123,
+                session_id=None,
+                mode="auto",
+                query_text="test",
+                response_text="answer",
+                sources_used=None,
+                response_time_ms=100,
+                used_tavily=False,
+            )
+        assert result is None
+
+    def test_query_log_id_in_response_without_db(self, query_app: FastAPI, query_client: TestClient):
+        """Without DB engine, query_log_id should be None."""
+        query_app.state.qdrant = MagicMock()
+
+        with patch("reviewmind.api.endpoints.query.RAGPipeline") as MockPipeline:
+            MockPipeline.return_value = _make_mock_rag_pipeline()
+            resp = query_client.post("/query", json={"user_id": 123, "query": "test"})
+
+        data = resp.json()
+        assert data["query_log_id"] is None
+
+
+class TestApiFallbackAnswer:
+    """Test the fallback answer constant."""
+
+    def test_fallback_answer_exists(self):
+        from reviewmind.api.endpoints.query import _FALLBACK_ANSWER
+
+        assert "Извините" in _FALLBACK_ANSWER
+
+    def test_fallback_on_llm_exception_no_qdrant(self, query_client: TestClient):
+        with patch("reviewmind.api.endpoints.query.LLMClient") as MockLLM:
+            MockLLM.return_value.__aenter__ = AsyncMock(side_effect=RuntimeError("fail"))
+            MockLLM.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            resp = query_client.post("/query", json={"user_id": 123, "query": "test"})
+
+        data = resp.json()
+        assert data["error"] is True
+        assert "Извините" in data["answer"]
 
 
 class TestApiRouterWiring:

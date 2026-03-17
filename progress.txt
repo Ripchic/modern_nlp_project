@@ -854,3 +854,33 @@
 - `is_curated=True` параметр позволяет использовать pipeline для curated_kb (TASK-040)
 
 ---
+
+## Итерация 21 — 2026-03-17
+**Фича:** TASK-027 — POST /query endpoint: полный RAG-запрос с логированием и замером времени
+**Статус:** Завершено
+**Что сделано:**
+- Обновлён `src/reviewmind/api/schemas.py`: QueryRequest расширен (user_id, session_id, query, mode, urls?, chat_history?, product_query?), QueryResponse расширен (answer, sources, used_curated, used_tavily, confidence_met, chunks_count, response_time_ms, query_log_id, error)
+- Переписан `src/reviewmind/api/endpoints/query.py` — полный RAG pipeline:
+  - При наличии Qdrant → RAGPipeline (embed query → hybrid search → rerank → generate)
+  - При отсутствии Qdrant → graceful fallback на прямой LLM через QueryService
+  - `response_time_ms` замеряется через `time.monotonic()`
+  - Query logging через `QueryLogRepository.create()` (user_id, session_id, mode, query_text, response_text, sources_used, response_time_ms, used_tavily)
+  - Graceful error handling: pipeline crash → fallback answer, DB unavailable → query_log_id=None
+- Pydantic validation: missing user_id or query → 422, empty query → 422
+- 55 unit-тестов (14 новых): schemas (9), endpoint (10), logging (3), fallback (2), wiring (2)
+- `ruff check .` — All checks passed
+- `pytest` — 1324 passed (1310 existing + 14 new), 6 pre-existing failures в test_config.py
+**Следующие шаги:**
+- TASK-027 ✅ разблокировала: TASK-028 (POST /ingest, нужен ещё TASK-026), TASK-029 (Bot links), TASK-036 (limits), TASK-048 (feedback), TASK-050 (sources button)
+- TASK-004: GitHub Actions CI/CD — all deps met — high
+- TASK-025: Seed test data + RAG quality verification — all deps met — high
+- TASK-026: URL type detection — all deps met — high
+- TASK-031: Celery app factory — all deps met — high
+- TASK-023: Language detection — all deps met — medium
+**Заметки для следующей итерации:**
+- `_log_query()` — отдельная async helper, не блокирует ответ при DB failure
+- Fallback LLM path покрывает случай когда Qdrant ещё не запущен — удобно для dev
+- Schema backward incompatibility: `message` → `query`, добавлен `user_id` — если есть внешние клиенты, нужно обновить
+- Все imports в endpoint на top level — упрощает тестирование через `patch()`
+
+---
