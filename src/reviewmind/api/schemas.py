@@ -70,3 +70,19 @@ class IngestResponse(BaseModel):
     success_count: int = Field(default=0, description="Number of successfully ingested URLs")
     failed_count: int = Field(default=0, description="Number of failed URLs")
     chunks_count: int = Field(default=0, description="Total number of chunks ingested")
+
+
+# ── Status schemas ────────────────────────────────────────────
+
+
+class JobStatusResponse(BaseModel):
+    """Response body for GET /status/{job_id}."""
+
+    job_id: str = Field(..., description="UUID of the job")
+    status: str = Field(..., description="Job status: pending | running | done | failed")
+    job_type: str = Field(default="", description="Job type: auto_search | manual_links")
+    product_query: str | None = Field(default=None, description="Product query associated with the job")
+    celery_task_id: str | None = Field(default=None, description="Celery task ID (if dispatched)")
+    created_at: str | None = Field(default=None, description="ISO timestamp when job was created")
+    completed_at: str | None = Field(default=None, description="ISO timestamp when job completed (if done/failed)")
+    progress: dict | None = Field(default=None, description="Optional progress information from Celery result")

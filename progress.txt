@@ -1023,3 +1023,50 @@
 - celery_app module-level instance shadowing: `import reviewmind.workers.celery_app as mod` может вернуть Celery instance вместо модуля; используй `importlib.import_module()` при необходимости
 
 ---
+
+## Итерация 32 — TASK-032
+**Фича:** TASK-032 — Celery задача фонового сбора данных + GET /status/{job_id} endpoint
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `ingest_sources_task` в `src/reviewmind/workers/tasks.py`:
+  - Celery task (name='reviewmind.ingest_sources', bind=True, max_retries=0)
+  - Async функция `_ingest_sources(job_id, user_id, product_query, urls, session_id?)`:
+    - Создаёт собственный async engine + async_sessionmaker + AsyncQdrantClient (изолировано от web app)
+    - Job status lifecycle: pending → running → done | failed через JobRepository.update_status()
+    - Вызывает IngestionPipeline.ingest_urls() для фактического сбора данных
+    - При success_count==0 ставит status='failed'
+    - Заполняет completed_at при завершении
+    - Engine dispose в finally-блоке для cleanup
+  - `_run_async(coro)` — sync→async bridge через asyncio.run()
+- Реализован GET /status/{job_id} endpoint в `src/reviewmind/api/endpoints/status.py`:
+  - Валидация UUID формата (400 Bad Request)
+  - Поиск Job через JobRepository.get_by_id() (404 Not Found)
+  - Опциональная выборка Celery AsyncResult через `_get_celery_result()` для progress info
+  - Возвращает JobStatusResponse (503 Service Unavailable при DB ошибках)
+- Добавлена `JobStatusResponse` Pydantic модель в `src/reviewmind/api/schemas.py`:
+  - Поля: job_id, status, job_type, product_query, celery_task_id, created_at, completed_at, progress (optional dict)
+- Подключен `status_router` в `src/reviewmind/api/router.py`
+- Обновлён `src/reviewmind/workers/__init__.py` — экспорт ingest_sources_task, __all__ = 4 элемента
+- 39 новых unit-тестов:
+  - `tests/unit/test_workers/test_ingest_task.py` (20 тестов):
+    - TestIngestSourcesTaskRegistration (4), TestRunAsync (2), TestIngestSourcesSuccess (2)
+    - TestIngestSourcesFailure (3), TestIngestSourcesSessionId (1), TestEngineDisposal (1)
+    - TestWorkersExports (4), TestIntegrationScenarios (3)
+  - `tests/unit/test_api/test_status.py` (19 тестов):
+    - TestJobStatusResponse (3), TestGetJobStatusSuccess (4), TestGetJobStatusErrors (3)
+    - TestGetCeleryResult (4), TestStatusRouterWiring (2), TestStatusFullApp (1), TestSchemaExports (2)
+- `ruff check .` — All checks passed
+- `pytest` — 1547 passed (1508 existing + 39 new), 4 pre-existing failures в test_config.py
+**Следующие шаги:**
+- TASK-033: Push-уведомление в Telegram по завершении фоновой задачи — deps met (TASK-032 ✅)
+- TASK-034: Retry / dead-letter логика — deps met (TASK-032 ✅)
+- TASK-004: GitHub Actions CI/CD — high — all deps met
+- TASK-043: Product extraction — high — deps met
+- TASK-044: Auto-search — high — deps met
+**Заметки для следующей итерации:**
+- TASK-032 ✅ разблокировала TASK-033 и TASK-034
+- settings остаётся local import в _ingest_sources (не попадает на module-level без .env) — при тестировании патчить через `reviewmind.config.settings`
+- _run_async использует asyncio.run() — для Celery worker это корректно (каждый task запускает свой event loop)
+- Stage 6 прогресс: TASK-031 ✅ → TASK-032 ✅ → далее TASK-033, TASK-034, TASK-035
+
+---

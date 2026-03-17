@@ -961,7 +961,8 @@
         "Шаг 5: Повторный запуск по тем же URL → дедупликация в Qdrant"
       ],
       "dependencies": ["TASK-031", "TASK-019", "TASK-005", "TASK-009"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Реализована Celery задача ingest_sources_task (name='reviewmind.ingest_sources', bind=True, max_retries=0) в workers/tasks.py. Async функция _ingest_sources: создаёт свой async engine + sessionmaker + AsyncQdrantClient, обновляет Job status pending→running→done/failed через JobRepository, вызывает IngestionPipeline.ingest_urls(), при success_count==0 ставит status='failed', заполняет completed_at, dispose engine в finally. _run_async — sync→async bridge через asyncio.run(). GET /status/{job_id} endpoint в api/endpoints/status.py: валидация UUID (400), поиск Job через JobRepository (404), опциональная выборка Celery result через _get_celery_result(), возвращает JobStatusResponse (503 при DB ошибках). JobStatusResponse Pydantic модель добавлена в api/schemas.py (job_id, status, job_type, product_query, celery_task_id, created_at, completed_at, progress). status_router подключен в api/router.py. Обновлён workers/__init__.py — экспорт ingest_sources_task, __all__ теперь 4 элемента. 39 новых тестов: 20 в test_ingest_task.py (registration 4, _run_async 2, success 2, failure 3, session_id 1, disposal 1, exports 4, integration 3) + 19 в test_status.py (schema 3, success 4, errors 3, celery result 4, router wiring 2, full app 1, schema exports 2). ruff check — 0 ошибок, pytest — 1547 passed (1508 existing + 39 new), 4 pre-existing failures в test_config.py."
     },
     {
       "id": "TASK-033",
