@@ -1237,4 +1237,32 @@
 - MAX_AGE_DAYS=365 — фильтр publishedAfter для YouTube, time_filter='year' для Reddit
 - TASK-045 (Full auto mode) ближе к разблокировке: TASK-044 ✅, осталcя TASK-041
 
+## Итерация 28 — TASK-034: Task retry (3 попытки) + admin alert
+
+**Задача:** TASK-034 — Task retry (3 попытки) + алерт в admin Telegram-чат при финальном падении
+**Статус:** ✅ done
+
+**Что сделано:**
+- Добавлены константы `MAX_RETRIES=3`, `RETRY_COUNTDOWNS=(60, 300, 900)` в `workers/tasks.py`
+- `ingest_sources_task` изменён с `max_retries=0` на `max_retries=MAX_RETRIES`
+- Retry logic: try/except — при `request.retries < MAX_RETRIES` → `self.retry(exc=exc, countdown=countdown)`, иначе → `_handle_final_failure()`
+- `_handle_final_failure()`: (1) Job.status='failed' + completed_at в PostgreSQL, (2) send_task_failed() пользователю, (3) send_admin_alert() всем админам
+- `ADMIN_ALERT_TEMPLATE` в `notifications.py` — HTML с 🚨, task_id, job_id, user_id, product_query, error, max_retries
+- `_MAX_ERROR_LENGTH=500` — truncation длинных ошибок
+- `send_admin_alert()` — итерирует по admin_user_ids, ошибка одного не блокирует остальных
+- Обновлён `workers/__init__.py` — 4 новых экспорта, __all__ = 14
+- 45 новых тестов в `test_retry.py`
+- Обновлены `test_ingest_task.py` (max_retries 0→3), `test_celery_app.py` (__all__ 10→14)
+- `ruff check .` — All checks passed
+- `pytest` — 1810 passed (+45 new), 4 pre-existing failures
+
+**Следующие шаги:**
+- TASK-045: Full auto mode pipeline — high — нужен TASK-041
+- TASK-025: Seed-данные для тестирования RAG — high — all deps met
+- TASK-041: Tavily Search API scraper — medium — разблокирует TASK-045
+**Заметки для следующей итерации:**
+- TASK-034 ✅ — retry с экспоненциальным backoff + admin alert работают
+- Retry countdowns: 60s → 300s → 900s
+- Admin alert использует settings.admin_user_ids (list[int]) из config
+
 ---

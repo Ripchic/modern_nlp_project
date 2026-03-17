@@ -33,7 +33,7 @@ class TestIngestSourcesTaskRegistration:
     def test_task_max_retries(self):
         from reviewmind.workers.tasks import ingest_sources_task
 
-        assert ingest_sources_task.max_retries == 0
+        assert ingest_sources_task.max_retries == 3
 
     def test_task_is_bound(self):
         from reviewmind.workers.tasks import ingest_sources_task

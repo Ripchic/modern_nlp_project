@@ -189,3 +189,82 @@ async def send_task_failed(
         logger.error("push_task_failed_send_error", chat_id=chat_id, error=str(exc))
     finally:
         await bot.session.close()
+
+
+# ── Admin alerts ─────────────────────────────────────────────────────────────
+
+ADMIN_ALERT_TEMPLATE = (
+    "🚨 <b>Task failed after all retries</b>\n\n"
+    "<b>Task ID:</b> <code>{task_id}</code>\n"
+    "<b>Job ID:</b> <code>{job_id}</code>\n"
+    "<b>User ID:</b> <code>{user_id}</code>\n"
+    "<b>Product:</b> {product_query}\n"
+    "<b>Error:</b> <code>{error}</code>\n"
+    "<b>Retries exhausted:</b> {max_retries}"
+)
+
+_MAX_ERROR_LENGTH = 500  # truncate error message in admin alerts
+
+
+async def send_admin_alert(
+    *,
+    bot_token: str,
+    admin_user_ids: list[int],
+    task_id: str,
+    job_id: str,
+    user_id: int,
+    product_query: str,
+    error: str,
+    max_retries: int = 3,
+) -> None:
+    """Send an alert to all admin users when a task fails after all retries.
+
+    Parameters
+    ----------
+    bot_token:
+        Telegram bot token from config.
+    admin_user_ids:
+        List of Telegram user IDs for admin notifications.
+    task_id:
+        Celery task ID.
+    job_id:
+        UUID of the Job row.
+    user_id:
+        Telegram user ID of the requesting user.
+    product_query:
+        Product name from the failed task.
+    error:
+        Error message from the final failure.
+    max_retries:
+        Number of retries attempted.
+    """
+    if not admin_user_ids:
+        logger.warning("admin_alert_no_admins", task_id=task_id)
+        return
+
+    error_truncated = error[:_MAX_ERROR_LENGTH] if len(error) > _MAX_ERROR_LENGTH else error
+
+    text = ADMIN_ALERT_TEMPLATE.format(
+        task_id=task_id,
+        job_id=job_id,
+        user_id=user_id,
+        product_query=product_query,
+        error=error_truncated,
+        max_retries=max_retries,
+    )
+
+    bot = _create_bot(bot_token)
+    try:
+        for admin_id in admin_user_ids:
+            try:
+                await bot.send_message(chat_id=admin_id, text=text)
+                logger.info("admin_alert_sent", admin_id=admin_id, task_id=task_id)
+            except Exception as exc:
+                logger.error(
+                    "admin_alert_send_failed",
+                    admin_id=admin_id,
+                    task_id=task_id,
+                    error=str(exc),
+                )
+    finally:
+        await bot.session.close()

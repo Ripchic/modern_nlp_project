@@ -16,6 +16,11 @@ from reviewmind.workers.celery_app import celery_app
 
 logger = structlog.get_logger(__name__)
 
+# ── Retry constants ──────────────────────────────────────────────────────────
+
+MAX_RETRIES = 3
+RETRY_COUNTDOWNS = (60, 300, 900)  # 1 min, 5 min, 15 min — exponential backoff
+
 
 @celery_app.task(name="reviewmind.ping", bind=True, max_retries=0)
 def ping(self: object) -> dict:
@@ -145,7 +150,71 @@ async def _ingest_sources(
     }
 
 
-@celery_app.task(name="reviewmind.ingest_sources", bind=True, max_retries=0)
+async def _handle_final_failure(
+    *,
+    job_id: str,
+    user_id: int,
+    product_query: str,
+    task_id: str,
+    error: str,
+) -> None:
+    """Handle the final failure after all retries are exhausted.
+
+    1. Update job status to 'failed' in PostgreSQL.
+    2. Send apology to the user.
+    3. Send alert to all admin users.
+    """
+    log = logger.bind(job_id=job_id, user_id=user_id, task_id=task_id)
+    log.error("handling_final_failure", error=error)
+
+    from reviewmind.config import settings
+
+    job_uuid = uuid.UUID(job_id)
+    now = datetime.now(timezone.utc)
+
+    # 1. Update job status in PostgreSQL
+    try:
+        engine = create_async_engine(settings.database_url, pool_pre_ping=True, echo=False)
+        session_factory = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+        async with session_factory() as db_session:
+            job_repo = JobRepository(db_session)
+            await job_repo.update_status(job_uuid, "failed", completed_at=now)
+            await db_session.commit()
+        await engine.dispose()
+        log.info("job_status_updated_final_failure", status="failed")
+    except Exception as exc:
+        log.warning("job_update_final_failure_db_error", error=str(exc))
+
+    # 2. Send apology to the user
+    try:
+        from reviewmind.workers.notifications import send_task_failed
+
+        await send_task_failed(
+            bot_token=settings.telegram_bot_token,
+            chat_id=user_id,
+        )
+    except Exception as exc:
+        log.error("final_failure_user_notification_failed", error=str(exc))
+
+    # 3. Send alert to admins
+    try:
+        from reviewmind.workers.notifications import send_admin_alert
+
+        await send_admin_alert(
+            bot_token=settings.telegram_bot_token,
+            admin_user_ids=settings.admin_user_ids,
+            task_id=task_id,
+            job_id=job_id,
+            user_id=user_id,
+            product_query=product_query,
+            error=error,
+            max_retries=MAX_RETRIES,
+        )
+    except Exception as exc:
+        log.error("final_failure_admin_alert_failed", error=str(exc))
+
+
+@celery_app.task(name="reviewmind.ingest_sources", bind=True, max_retries=MAX_RETRIES)
 def ingest_sources_task(
     self: object,
     *,
@@ -159,6 +228,10 @@ def ingest_sources_task(
 
     Creates/updates a ``Job`` record in PostgreSQL through the lifecycle:
     pending → running → done | failed.
+
+    Retries up to 3 times with exponential backoff (60s, 300s, 900s).
+    On final failure: updates job status to 'failed', sends apology to user,
+    and alerts all admins.
 
     Parameters
     ----------
@@ -178,12 +251,43 @@ def ingest_sources_task(
     dict
         Summary with ``job_id``, ``status``, ``completed_at``, counts.
     """
-    return _run_async(
-        _ingest_sources(
+    try:
+        return _run_async(
+            _ingest_sources(
+                job_id=job_id,
+                user_id=user_id,
+                product_query=product_query,
+                urls=urls,
+                session_id=session_id,
+            )
+        )
+    except Exception as exc:
+        retry_num = self.request.retries
+        countdown = RETRY_COUNTDOWNS[retry_num] if retry_num < len(RETRY_COUNTDOWNS) else RETRY_COUNTDOWNS[-1]
+        log = logger.bind(
             job_id=job_id,
             user_id=user_id,
-            product_query=product_query,
-            urls=urls,
-            session_id=session_id,
+            retry=retry_num,
+            max_retries=MAX_RETRIES,
         )
-    )
+
+        if retry_num < MAX_RETRIES:
+            log.warning(
+                "ingest_task_retry",
+                countdown=countdown,
+                error=str(exc),
+            )
+            raise self.retry(exc=exc, countdown=countdown)
+
+        # Final failure — all retries exhausted
+        log.error("ingest_task_final_failure", error=str(exc))
+        _run_async(
+            _handle_final_failure(
+                job_id=job_id,
+                user_id=user_id,
+                product_query=product_query,
+                task_id=self.request.id or "unknown",
+                error=str(exc),
+            )
+        )
+        raise
