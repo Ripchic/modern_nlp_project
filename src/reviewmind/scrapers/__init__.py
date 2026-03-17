@@ -10,6 +10,22 @@ from reviewmind.scrapers.reddit import (
     RedditScraper,
     SearchResult,
 )
+from reviewmind.scrapers.tavily import (
+    DEFAULT_MAX_RESULTS as TAVILY_DEFAULT_MAX_RESULTS,
+)
+from reviewmind.scrapers.tavily import (
+    DEFAULT_SEARCH_DEPTH as TAVILY_DEFAULT_SEARCH_DEPTH,
+)
+from reviewmind.scrapers.tavily import (
+    DEFAULT_TIMEOUT as TAVILY_DEFAULT_TIMEOUT,
+)
+from reviewmind.scrapers.tavily import (
+    MIN_CONTENT_LENGTH as TAVILY_MIN_CONTENT_LENGTH,
+)
+from reviewmind.scrapers.tavily import (
+    TavilyResult,
+    TavilyScraper,
+)
 from reviewmind.scrapers.web import (
     DEFAULT_TIMEOUT,
     MIN_TEXT_LENGTH,
@@ -42,6 +58,12 @@ __all__ = [
     "RedditPost",
     "RedditScraper",
     "SearchResult",
+    "TAVILY_DEFAULT_MAX_RESULTS",
+    "TAVILY_DEFAULT_SEARCH_DEPTH",
+    "TAVILY_DEFAULT_TIMEOUT",
+    "TAVILY_MIN_CONTENT_LENGTH",
+    "TavilyResult",
+    "TavilyScraper",
     "TranscriptResult",
     "VideoInfo",
     "WebPage",

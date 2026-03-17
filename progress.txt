@@ -1266,3 +1266,38 @@
 - Admin alert использует settings.admin_user_ids (list[int]) из config
 
 ---
+
+## Итерация 29 — TASK-041: Tavily API fallback
+
+**Задача:** TASK-041 — Tavily API fallback: веб-поиск при недостатке данных
+**Статус:** ✅ done
+
+**Что сделано:**
+- Реализован `src/reviewmind/scrapers/tavily.py` — TavilyScraper для веб-поиска через Tavily API
+- TavilyResult dataclass: url, title, content (чистый текст), score, raw_content, extra, word_count property
+- TavilyScraper: async search() с lazy AsyncTavilyClient, api_key из параметра или config
+- Graceful error handling: InvalidAPIKeyError, MissingAPIKeyError, UsageLimitExceededError → []
+- Фильтрация коротких результатов (< 50 символов), сортировка по score desc
+- Интеграция в RAG pipeline (core/rag.py): Step 4b — при confidence_met=false → _tavily_fallback()
+- _tavily_results_to_search_results() конвертирует TavilyResult → SearchResult с source_type='tavily'
+- Merge tavily results с reranked, пересортировка, trim до rerank_top_k
+- RAGResponse расширен полем used_tavily: bool
+- API endpoint passes used_tavily from RAG response to QueryResponse and query_logs
+- Обновлён scrapers/__init__.py — 6 новых экспортов для Tavily
+- 59 новых unit-тестов в tests/unit/test_scrapers/test_tavily.py
+- `ruff check .` — All checks passed
+- `pytest` — 1869 passed (+59 new), 4 pre-existing failures
+
+**Следующие шаги:**
+- TASK-045: Full auto mode pipeline — high — TASK-041 ✅ разблокировала (ещё нужен TASK-025?)
+- TASK-025: Seed-данные для тестирования RAG — high — all deps met
+- TASK-036: Лимиты запросов — medium — all deps met
+- TASK-046: Multi-turn диалог — medium — all deps met
+**Заметки для следующей итерации:**
+- TASK-041 ✅ разблокировала TASK-045 (Auto mode full pipeline)
+- Tavily использует lazy import settings внутри _get_api_key() — не падает без .env
+- tavily-python >= 0.5.0 уже была в pyproject.toml
+- MissingAPIKeyError в tavily не принимает аргументов в конструкторе
+- Patch для settings нужно делать на reviewmind.config.settings (не module-level)
+
+---

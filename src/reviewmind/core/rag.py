@@ -78,6 +78,7 @@ class RAGResponse:
     chunks_count: int = 0
     chunks_found: int = 0
     used_sponsored: bool = False
+    used_tavily: bool = False
     error: str | None = None
 
 
@@ -130,6 +131,27 @@ def _check_confidence(results: list[SearchResult]) -> bool:
         1 for r in results if r.score > CONFIDENCE_SCORE_THRESHOLD
     )
     return confident_count >= CONFIDENCE_MIN_CHUNKS
+
+
+def _tavily_results_to_search_results(tavily_results: list) -> list[SearchResult]:
+    """Convert :class:`~reviewmind.scrapers.tavily.TavilyResult` objects into
+    :class:`SearchResult` objects so they can be merged into the existing
+    reranked results.
+    """
+    return [
+        SearchResult(
+            text=tr.content,
+            score=tr.score,
+            source_url=tr.url,
+            source_type="tavily",
+            is_curated=False,
+            is_sponsored=False,
+            collection="tavily_fallback",
+            extra={"title": tr.title},
+        )
+        for tr in tavily_results
+        if tr.content
+    ]
 
 
 # ── RAG Pipeline ─────────────────────────────────────────────────────────────
@@ -291,6 +313,23 @@ class RAGPipeline:
             min_required=CONFIDENCE_MIN_CHUNKS,
         )
 
+        # ── Step 4b: Tavily fallback ────────────────────────
+        used_tavily = False
+        if not confidence_met:
+            tavily_results = await self._tavily_fallback(user_query, log)
+            if tavily_results:
+                used_tavily = True
+                tavily_search = _tavily_results_to_search_results(tavily_results)
+                reranked = reranked + tavily_search
+                # Re-sort combined results by score descending and trim
+                reranked.sort(key=lambda r: r.score, reverse=True)
+                reranked = reranked[:self._rerank_top_k]
+                log.info(
+                    "rag_tavily_fallback_merged",
+                    tavily_count=len(tavily_search),
+                    total_after_merge=len(reranked),
+                )
+
         # ── Step 5: Build context ────────────────────────────
         context_chunks = reranked[:MAX_CONTEXT_CHUNKS]
         chunk_contexts = _search_results_to_chunk_contexts(context_chunks)
@@ -305,6 +344,7 @@ class RAGPipeline:
             sources_count=len(sources),
             used_curated=used_curated,
             used_sponsored=used_sponsored,
+            used_tavily=used_tavily,
         )
 
         # ── Step 6: Generate answer ──────────────────────────
@@ -325,6 +365,7 @@ class RAGPipeline:
                 chunks_count=len(chunk_contexts),
                 chunks_found=len(search_results),
                 used_sponsored=used_sponsored,
+                used_tavily=used_tavily,
                 error=f"LLM error: {exc}",
             )
 
@@ -344,7 +385,42 @@ class RAGPipeline:
             chunks_count=len(chunk_contexts),
             chunks_found=len(search_results),
             used_sponsored=used_sponsored,
+            used_tavily=used_tavily,
         )
+
+    # ── Tavily fallback ──────────────────────────────────────
+
+    async def _tavily_fallback(
+        self,
+        user_query: str,
+        log: Any,
+    ) -> list:
+        """Attempt a Tavily web search fallback.
+
+        Returns a list of :class:`~reviewmind.scrapers.tavily.TavilyResult`
+        on success, or an empty list on failure / missing API key.
+        """
+        try:
+            from reviewmind.config import settings  # noqa: PLC0415
+
+            if not settings.tavily_api_key:
+                log.debug("rag_tavily_skip", reason="no_api_key")
+                return []
+        except Exception:
+            log.debug("rag_tavily_skip", reason="config_unavailable")
+            return []
+
+        log.info("rag_tavily_fallback_start")
+        try:
+            from reviewmind.scrapers.tavily import TavilyScraper  # noqa: PLC0415
+
+            scraper = TavilyScraper(api_key=settings.tavily_api_key)
+            results = await scraper.search(user_query)
+            log.info("rag_tavily_fallback_done", results_count=len(results))
+            return results
+        except Exception as exc:
+            log.warning("rag_tavily_fallback_error", error=str(exc))
+            return []
 
     async def close(self) -> None:
         """Close owned resources (embedding service and LLM client).

@@ -144,6 +144,7 @@ async def post_query(body: QueryRequest, request: Request) -> QueryResponse:
         sources_count=len(rag_result.sources),
         confidence_met=rag_result.confidence_met,
         used_curated=rag_result.used_curated,
+        used_tavily=rag_result.used_tavily,
     )
 
     query_log_id = await _log_query(
@@ -155,14 +156,14 @@ async def post_query(body: QueryRequest, request: Request) -> QueryResponse:
         response_text=answer,
         sources_used=rag_result.sources if rag_result.sources else None,
         response_time_ms=elapsed_ms,
-        used_tavily=False,
+        used_tavily=rag_result.used_tavily,
     )
 
     return QueryResponse(
         answer=answer,
         sources=rag_result.sources,
         used_curated=rag_result.used_curated,
-        used_tavily=False,
+        used_tavily=rag_result.used_tavily,
         confidence_met=rag_result.confidence_met,
         chunks_count=rag_result.chunks_count,
         response_time_ms=elapsed_ms,
