@@ -1104,3 +1104,40 @@
 - Critical path к TASK-045: осталось TASK-044, TASK-033, TASK-041
 
 ---
+
+## Итерация 22 — 2026-03-17
+**Фича:** TASK-004 — GitHub Actions: CI (lint + tests на PR) и CD (multi-arch build + deploy)
+**Статус:** Завершено
+**Что сделано:**
+- Создан `.github/workflows/ci.yml`:
+  - Triggers: push/PR в main
+  - Job `lint`: ruff check + ruff format --check
+  - Job `test`: pytest с coverage на матрице Python 3.11/3.12 (fail-fast: false)
+  - setup-uv@v4 (uv 0.5.26) для быстрой установки зависимостей
+  - Coverage report → artifact (14 дней), xml + term-missing
+  - Concurrency group с cancel-in-progress для отмены устаревших CI runs
+  - Фейковые env vars (TELEGRAM_BOT_TOKEN, OPENAI_API_KEY) для прохождения config validation
+- Создан `.github/workflows/cd.yml`:
+  - Trigger: push в main только
+  - Job `build-and-push`: buildx multi-arch (linux/amd64 + linux/arm64)
+  - Push в ghcr.io с тегами: SHA-prefix + latest
+  - GHA cache (cache-from/cache-to type=gha,mode=max) для быстрых ребилдов
+  - Job `deploy`: SSH deploy через appleboy/ssh-action@v1
+  - Deploy: `docker compose pull && up -d --remove-orphans && image prune -f`
+  - Все credentials через GitHub Secrets (GITHUB_TOKEN auto, DEPLOY_HOST/USER/SSH_KEY/PORT/PATH)
+  - Deploy job: needs build-and-push, environment: production, only refs/heads/main
+- `ruff check .` — All checks passed
+- `pytest` — 1616 passed, 4 pre-existing failures в test_config.py (не связаны)
+**Следующие шаги:**
+- TASK-044: Auto-search YouTube/Reddit — high — all deps met
+- TASK-033: Push-уведомление в Telegram — high — all deps met
+- TASK-034: Task retry + admin alert — high — all deps met
+- TASK-023: Language detection — medium — deps met
+**Заметки для следующей итерации:**
+- TASK-004 ✅ — Stage 0 Foundation полностью завершён (все 4 задачи done)
+- Для работы CD нужно настроить GitHub Secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY
+- DEPLOY_PORT (default 22) и DEPLOY_PATH (default ~/reviewmind) — опциональные
+- CI использует `uv pip install --system` (без venv) для скорости в GitHub Actions
+- Critical path к TASK-045: TASK-044, TASK-033, TASK-041
+
+---

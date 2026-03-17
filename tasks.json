@@ -252,7 +252,8 @@
         "Шаг 4: Проверить логи CD: buildx, push to GHCR, SSH deploy"
       ],
       "dependencies": ["TASK-001", "TASK-002"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Создан .github/workflows/ci.yml: запускается на push/PR в main, выполняет ruff check, ruff format --check, pytest с coverage (xml + term-missing) на матрице Python 3.11/3.12. Использует astral-sh/setup-uv@v4 (uv 0.5.26) для быстрой установки зависимостей. Coverage report загружается как artifact (14 дней). Concurrency group ci-${{ github.ref }} с cancel-in-progress. Тестовые env vars TELEGRAM_BOT_TOKEN и OPENAI_API_KEY — фейковые значения для прохождения config validation. Создан .github/workflows/cd.yml: запускается на push в main только, buildx multi-arch (linux/amd64 + linux/arm64) через docker/build-push-action@v6, push в ghcr.io, GHA cache (cache-from/cache-to type=gha). Deploy через appleboy/ssh-action@v1: docker compose pull && up -d --remove-orphans && image prune. Все credentials через GitHub Secrets: GITHUB_TOKEN (auto), DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_PORT, DEPLOY_PATH. Deploy job запускается только для refs/heads/main с environment: production. ruff check — 0 ошибок, pytest — 1616 passed, 4 pre-existing failures в test_config.py (docker-URLs в .env, не связаны с TASK-004)."
     },
     {
       "id": "TASK-005",
