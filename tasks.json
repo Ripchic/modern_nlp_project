@@ -887,7 +887,8 @@
         "Шаг 5: Проверить кнопки [👍] [👎] [📎 Источники] под ответом"
       ],
       "dependencies": ["TASK-007", "TASK-027", "TASK-028", "TASK-011"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Реализован src/reviewmind/bot/handlers/links.py — обработчик режима «Свои ссылки». Функционал: (1) extract_urls — regex-извлечение уникальных HTTP(S) URL из текста сообщения, (2) extract_query_text — выделение не-URL текста как пользовательского запроса, (3) on_links_message — основной хендлер (F.text.regexp(r\"https?://\")), отправляет статус обработки, показывает typing, создаёт Qdrant-клиент, (4) _ingest_and_analyse — оркестрация: IngestionPipeline (scrape→clean→chunk→embed→upsert) + RAGPipeline (query), формирование структурированного ответа с feedback_keyboard. Обработка ошибок: per-URL failure reporting (❌ Не удалось загрузить: {url}), Qdrant unavailable → SERVICE_UNAVAILABLE_MSG, unexpected error → graceful message, qdrant.close() в finally. Поддержка: множественные URL, partial failure (1+ успешный URL достаточен), product_query из пользовательского текста, truncation до 4096 символов. Русская плюрализация ссылок. Обновлён bot/main.py — links_router подключён между mode_router и query_router. 53 unit-теста в tests/unit/test_bot/test_links.py: TestExtractUrls (11), TestExtractQueryText (4), TestPluralizeLinks (6), TestBuildFailureLines (3), TestOnLinksMessage (8), TestIngestAndAnalyse (10), TestDispatcherWiring (4), TestConstants (5), TestIntegrationScenarios (3). ruff check — 0 ошибок, pytest — 1458 passed (1405 existing + 53 new), 6 pre-existing failures в test_config.py."
     },
     {
       "id": "TASK-030",

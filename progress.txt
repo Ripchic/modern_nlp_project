@@ -952,3 +952,36 @@
 - Endpoint /ingest работает синхронно (MVP); в будущем TASK-032 добавит async через Celery
 
 ---
+
+## Итерация 17 — TASK-029: Bot: режим «Свои ссылки»
+**Фича:** Bot links mode — приём URL, парсинг, RAG-ответ
+**Статус:** Завершено ✅
+**Что сделано:**
+- Реализован `src/reviewmind/bot/handlers/links.py` (~220 строк):
+  - `extract_urls(text)` — regex-извлечение уникальных HTTP(S) URL с дедупликацией
+  - `extract_query_text(text, urls)` — выделение не-URL текста как пользовательского запроса
+  - `_pluralize_links(count)` — русская плюрализация «ссылка/ссылки/ссылок»
+  - `_build_failure_lines(results)` — per-URL failure messages
+  - `_create_qdrant_client()` — lazy-импорт settings, создание AsyncQdrantClient
+  - `on_links_message(message)` — основной хендлер (F.text.regexp(r"https?://"))
+  - `_ingest_and_analyse(...)` — оркестрация: IngestionPipeline + RAGPipeline
+  - Обработка ошибок: per-URL failure, Qdrant unavailable, unexpected error, qdrant.close() в finally
+  - Поддержка: множественные URL, partial failure, product_query, truncation до 4096 символов
+- Обновлён `src/reviewmind/bot/main.py` — links_router подключён между mode_router и query_router
+- 53 unit-теста в `tests/unit/test_bot/test_links.py`:
+  - TestExtractUrls (11), TestExtractQueryText (4), TestPluralizeLinks (6)
+  - TestBuildFailureLines (3), TestOnLinksMessage (8), TestIngestAndAnalyse (10)
+  - TestDispatcherWiring (4), TestConstants (5), TestIntegrationScenarios (3)
+- `ruff check .` — All checks passed
+- `pytest` — 1458 passed (1405 existing + 53 new), 6 pre-existing failures в test_config.py
+**Следующие шаги:**
+- TASK-031: Celery app factory — all deps met — high (разблокирует TASK-032..035)
+- TASK-004: GitHub Actions CI/CD — all deps met — high
+- TASK-030: /mode переключение авто/ссылки — deps met — medium
+- TASK-043: Product extraction — high
+- TASK-044: Auto-search — high
+**Заметки для следующей итерации:**
+- Stage 5 (Manual Mode) почти завершён: TASK-029 ✅, осталось TASK-030 (/mode switching)
+- TASK-031 (Celery) — стратегический приоритет, разблокирует всю Stage 6
+
+---
