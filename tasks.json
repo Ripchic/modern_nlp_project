@@ -809,7 +809,8 @@
         "Шаг 5: detect_url_type('not-a-url') → ValueError"
       ],
       "dependencies": ["TASK-012", "TASK-013", "TASK-014"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Реализован src/reviewmind/ingestion/url_detector.py — полный модуль определения типа URL и маршрутизации к парсерам. Функция _validate_url(url) — валидация HTTP(S) URL с понятными сообщениями об ошибках (пустой URL, отсутствующая схема, неподдерживаемая схема, отсутствующий hostname). Функция detect_url_type(url) → str ('youtube'|'reddit'|'web') — regex-паттерны для youtube.com/youtu.be и reddit.com/redd.it, все остальные → 'web', с обязательной валидацией URL. Функция route_to_scraper(url) → YouTubeScraper|RedditScraper|WebScraper — создаёт соответствующий scraper instance. Обновлён ingestion/__init__.py — экспорт route_to_scraper и ScraperType. 48 unit-тестов: TestYouTubePattern (6), TestRedditPattern (5), TestValidateUrl (10), TestDetectUrlType (16), TestRouteToScraper (8), TestModuleExports (3). ruff check — 0 ошибок, pytest — 1372 passed (1324 existing + 48 new), 6 pre-existing failures в test_config.py (docker-URLs, не связаны с TASK-026)."
     },
     {
       "id": "TASK-027",

@@ -25,6 +25,10 @@ from reviewmind.ingestion.sponsor import (
     detect_sponsor,
     detect_sponsor_detailed,
 )
+from reviewmind.ingestion.url_detector import (
+    ScraperType,
+    route_to_scraper,
+)
 
 __all__ = [
     "ALL_PATTERNS",
@@ -39,6 +43,7 @@ __all__ = [
     "IngestionResult",
     "MIN_CHUNK_LENGTH",
     "MIN_CLEAN_LENGTH",
+    "ScraperType",
     "SourceIngestionResult",
     "SponsorDetectionResult",
     "chunk_text",
@@ -47,4 +52,5 @@ __all__ = [
     "detect_sponsor",
     "detect_sponsor_detailed",
     "detect_url_type",
+    "route_to_scraper",
 ]
