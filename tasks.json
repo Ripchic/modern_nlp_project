@@ -1229,7 +1229,8 @@
         "Шаг 5: Тест 10 разных формулировок → ≥ 80% корректных извлечений"
       ],
       "dependencies": ["TASK-006"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Реализован src/reviewmind/services/product_extractor.py — извлечение названий товаров из пользовательских запросов. Двухуровневый подход: (1) LLM-extraction через gpt-4o-mini с JSON-промптом ({\"products\": [...]}) — temperature=0.0 для детерминизма, max_tokens=200, (2) regex fallback для известных брендов (Sony, Samsung, Apple, Dyson, Bose, JBL, Sennheiser, etc.) + паттернов iPhone/iPad/MacBook/Galaxy/Pixel/AirPods. Функция extract_product(query, llm_client?) → list[str]: async, LLM-first с graceful regex fallback при LLMError. Функция extract_product_regex(query) → list[str]: синхронный regex-only extractor, дедупликация результатов. Функция is_comparison_query(query) → bool: детекция сравнительных запросов ('vs', 'versus', 'или', 'против', 'compared to'). _parse_llm_response(raw) → list[str] | None: парсинг JSON, markdown fence stripping, фильтрация пустых строк и None. Поддержка русского и английского. 69 unit-тестов: TestConstants (6), TestExtractProductRegex (17), TestIsComparisonQuery (10), TestParseLlmResponse (11), TestExtractViaLlm (9), TestExtractProduct (9), TestIntegrationScenarios (7 вкл. тест 10 формулировок ≥80%). ruff check — 0 ошибок, pytest — 1616 passed (1547 existing + 69 new), 4 pre-existing failures в test_config.py (docker-URLs, не связаны с TASK-043)."
     },
     {
       "id": "TASK-044",

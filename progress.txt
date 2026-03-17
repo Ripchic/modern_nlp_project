@@ -1070,3 +1070,37 @@
 - Stage 6 прогресс: TASK-031 ✅ → TASK-032 ✅ → далее TASK-033, TASK-034, TASK-035
 
 ---
+
+## Итерация 22 — 2026-03-17
+**Фича:** TASK-043 — Извлечение названия товара из естественно-языкового запроса
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/services/product_extractor.py` — модуль извлечения товаров из запросов
+- Двухуровневый подход: LLM-extraction (gpt-4o-mini, JSON-формат) + regex fallback
+- `extract_product(query, llm_client?)` → `list[str]`: async, LLM-first с graceful regex fallback при LLMError
+- `extract_product_regex(query)` → `list[str]`: синхронный regex-only экстрактор
+- `is_comparison_query(query)` → `bool`: детекция "X vs Y", "X или Y", "X против Y"
+- `_parse_llm_response(raw)` → JSON парсер с markdown fence stripping
+- LLM prompt: temperature=0.0 (детерминизм), max_tokens=200, формат `{"products": [...]}`
+- Regex: 30+ брендов (Sony, Samsung, Apple, Dyson, Bose, JBL...) + iPhone/Galaxy/Pixel/MacBook/AirPods
+- Дедупликация результатов (case-insensitive), фильтрация пустых строк
+- 69 unit-тестов в `tests/unit/test_services/test_product_extractor.py`:
+  - TestConstants (6), TestExtractProductRegex (17), TestIsComparisonQuery (10)
+  - TestParseLlmResponse (11), TestExtractViaLlm (9), TestExtractProduct (9)
+  - TestIntegrationScenarios (7, вкл. тест 10 формулировок ≥80%)
+- `ruff check .` — All checks passed
+- `pytest` — 1616 passed (1547 existing + 69 new), 4 pre-existing failures в test_config.py
+**Следующие шаги:**
+- TASK-044: Auto-search YouTube/Reddit — high — all deps met (TASK-012 ✅, TASK-013 ✅)
+- TASK-033: Push-уведомление в Telegram — high — all deps met
+- TASK-034: Task retry + admin alert — high — all deps met
+- TASK-004: GitHub Actions CI/CD — high — all deps met
+- TASK-023: Language detection — medium — deps met
+**Заметки для следующей итерации:**
+- TASK-043 ✅ разблокировала TASK-045 (full auto mode) и TASK-047 (comparison X vs Y)
+- extract_product принимает опциональный llm_client для dependency injection и тестирования
+- При отсутствии LLM (offline) regex fallback покрывает ~70% запросов с известными брендами
+- Общие категории ("наушники", "ноутбуки") корректно возвращают [] — не являются конкретными товарами
+- Critical path к TASK-045: осталось TASK-044, TASK-033, TASK-041
+
+---
