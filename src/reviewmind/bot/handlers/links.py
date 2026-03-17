@@ -14,7 +14,7 @@ from __future__ import annotations
 import re
 
 import structlog
-from aiogram import F, Router
+from aiogram import Router
 from aiogram.enums import ChatAction
 from aiogram.types import Message
 from qdrant_client import AsyncQdrantClient
@@ -31,6 +31,15 @@ router = Router(name="links")
 
 _URL_RE = re.compile(r"https?://[^\s<>\"']+")
 _MAX_ANSWER_LENGTH = 4096  # Telegram message length limit
+
+
+async def _message_has_url(message: Message) -> bool:
+    """Filter: True when the message text contains at least one HTTP(S) URL.
+
+    Uses re.search so the URL can appear anywhere in the text, not just
+    at the start (F.text.regexp uses re.match which only checks the start).
+    """
+    return bool(_URL_RE.search(message.text or ""))
 _DEFAULT_QUERY = "Проанализируй эти обзоры"
 
 _PROCESSING_TEMPLATE = "🔄 Обрабатываю {count} {word}...\nЭто может занять некоторое время."
@@ -100,7 +109,7 @@ def _create_qdrant_client() -> AsyncQdrantClient:
     return AsyncQdrantClient(url=settings.qdrant_url)
 
 
-@router.message(F.text.regexp(r"https?://"))
+@router.message(_message_has_url)
 async def on_links_message(message: Message) -> None:
     """Handle messages containing HTTP(S) URLs — ingest and analyse."""
     text = message.text or ""
