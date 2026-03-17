@@ -22,6 +22,7 @@ from reviewmind.core.embeddings import EmbeddingError, EmbeddingService
 from reviewmind.core.llm import LLMClient, LLMError
 from reviewmind.core.prompts import ChunkContext
 from reviewmind.core.reranker import DEFAULT_RERANK_TOP_K, rerank
+from reviewmind.services.language import detect_language
 from reviewmind.vectorstore.search import SearchResult, hybrid_search
 
 logger = structlog.get_logger("reviewmind.core.rag")
@@ -232,6 +233,10 @@ class RAGPipeline:
         # ── Step 1: Embed query ──────────────────────────────
         log.info("rag_pipeline_start", user_query=user_query[:120])
 
+        # Detect query language for response localisation
+        query_language = detect_language(user_query)
+        log.debug("rag_language_detected", language=query_language)
+
         try:
             query_vector = await self.embedding_service.embed_text(user_query)
         except EmbeddingError as exc:
@@ -308,6 +313,7 @@ class RAGPipeline:
                 user_query=user_query,
                 chunks=chunk_contexts if chunk_contexts else None,
                 chat_history=chat_history,
+                language=query_language,
             )
         except LLMError as exc:
             log.error("rag_llm_error", error=str(exc))

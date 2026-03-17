@@ -1141,3 +1141,33 @@
 - Critical path к TASK-045: TASK-044, TASK-033, TASK-041
 
 ---
+
+## Итерация 23 — 2026-03-17
+**Фича:** TASK-023 — Автоопределение языка запроса (langdetect) + ответ на языке пользователя
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/services/language.py` — модуль определения языка через langdetect
+- Функция `detect_language(text) → str`: определяет язык, fallback на 'ru'
+- DetectorFactory.seed=0 для детерминизма
+- Graceful обработка: пустой текст → 'ru', короткий (< 4 символов) → 'ru', exception → 'ru', unsupported → 'ru'
+- SUPPORTED_LANGUAGES: 12 языков (ru, en, uk, de, fr, es, it, pt, ja, ko, zh-cn, zh-tw)
+- Интеграция с промптами: обновлён SYSTEM_PROMPT_TEMPLATE — правило 6 содержит `{response_language}`
+- `build_rag_system_prompt()` принимает `language` параметр, `DEFAULT_PROMPT_LANGUAGE='ru'`
+- `LLMClient.generate_analysis()` принимает и прокидывает `language`
+- `RAGPipeline.query()` вызывает `detect_language(user_query)` и передаёт в generate_analysis
+- structlog логирование всех решений
+- 44 unit-теста (Constants 4, Russian 5, English 4, Fallback 9, Unicode 5, Contract 4, Prompt 5, Exports 3, Integration 5)
+- `ruff check .` — All checks passed
+- `pytest` — 1660 passed (+44 new), 4 pre-existing failures в test_config.py (не связаны)
+**Следующие шаги:**
+- TASK-044: Auto-search YouTube/Reddit — high — all deps met
+- TASK-033: Push-уведомление в Telegram — high — all deps met
+- TASK-034: Task retry + admin alert — high — all deps met
+- TASK-025: Seed-данные для тестирования RAG — high — all deps met
+**Заметки для следующей итерации:**
+- TASK-023 ✅ — Stage 4 RAG Pipeline полностью завершён (TASK-022, 023, 024 все done)
+- `detect_language` детерминистичен (seed=0), безопасен для коротких текстов
+- Язык явно передаётся в системный промпт через слот `{response_language}`
+- Обратная совместимость: `language=None` → автоматически 'ru'
+
+---

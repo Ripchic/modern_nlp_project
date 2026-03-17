@@ -41,7 +41,7 @@ SYSTEM_PROMPT_TEMPLATE = """\
 3. Источники с флагом [sponsored] считай менее достоверными, указывай это в анализе.
 4. Структурируй ответ: [✅ Плюсы] [❌ Минусы] [⚖️ Спорные моменты] [🏆 Вывод].
 5. Если контекста недостаточно — честно скажи об этом, не додумывай.
-6. Отвечай на языке пользователя.
+6. Отвечай на языке пользователя (определённый язык: {response_language}).
 7. В конце укажи: количество источников и наличие проверенных материалов (📚).
 8. Отклоняй вопросы, не связанные с анализом товаров.
 
@@ -197,9 +197,15 @@ def format_chat_history(history: list[dict[str, str]]) -> str:
     return "\n".join(lines)
 
 
+#: Default language code injected into the prompt when none is detected.
+DEFAULT_PROMPT_LANGUAGE: str = "ru"
+
+
 def build_rag_system_prompt(
     chunks: list[ChunkContext],
     chat_history: list[dict[str, str]] | None = None,
+    *,
+    language: str | None = None,
 ) -> str:
     """Build the full RAG system prompt by filling in the template slots.
 
@@ -210,6 +216,9 @@ def build_rag_system_prompt(
         a "no context" notice is injected.
     chat_history:
         Optional conversation history.
+    language:
+        ISO 639-1 language code for the response (e.g. ``'ru'``, ``'en'``).
+        When *None*, defaults to :data:`DEFAULT_PROMPT_LANGUAGE`.
 
     Returns
     -------
@@ -219,8 +228,10 @@ def build_rag_system_prompt(
     """
     context_text = format_chunks_for_context(chunks)
     history_text = format_chat_history(chat_history or [])
+    lang = language or DEFAULT_PROMPT_LANGUAGE
 
     return SYSTEM_PROMPT_TEMPLATE.format(
         retrieved_chunks=context_text,
         chat_history=history_text,
+        response_language=lang,
     )

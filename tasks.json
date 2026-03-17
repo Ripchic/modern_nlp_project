@@ -736,7 +736,8 @@
         "Шаг 5: pytest tests/unit/test_services/test_language.py — зелёные"
       ],
       "dependencies": ["TASK-022"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Реализован src/reviewmind/services/language.py — модуль автоопределения языка запроса через langdetect. Функция detect_language(text) → str: определяет язык пользовательского текста, fallback на 'ru' при пустом/коротком тексте (< 4 символов), exception от langdetect, или неподдерживаемом языке. DetectorFactory.seed=0 для детерминизма. Константы: FALLBACK_LANGUAGE='ru', MIN_TEXT_LENGTH=4, SUPPORTED_LANGUAGES — frozenset из 12 языков (ru, en, uk, de, fr, es, it, pt, ja, ko, zh-cn, zh-tw). Интеграция с промптами: обновлён SYSTEM_PROMPT_TEMPLATE в core/prompts.py — правило 6 теперь содержит слот {response_language} с явным указанием определённого языка. Добавлена константа DEFAULT_PROMPT_LANGUAGE='ru'. build_rag_system_prompt() принимает опциональный параметр language. LLMClient.generate_analysis() принимает и передаёт language в build_rag_system_prompt. RAGPipeline.query() вызывает detect_language(user_query) перед генерацией и передаёт результат в generate_analysis. structlog логирование всех решений (empty, too_short, exception, unsupported, detected). 44 unit-теста в tests/unit/test_services/test_language.py: TestConstants (4), TestDetectRussian (5), TestDetectEnglish (4), TestFallback (9), TestUnicodeSupport (5), TestReturnContract (4), TestPromptIntegration (5), TestExports (3), TestIntegrationScenarios (5 — все PRD шаги проверены). ruff check — 0 ошибок, pytest — 1660 passed (1616 existing + 44 new), 4 pre-existing failures в test_config.py (docker-URLs, не связаны с TASK-023)."
     },
     {
       "id": "TASK-024",

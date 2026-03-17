@@ -156,6 +156,7 @@ class LLMClient:
         chunks: list[ChunkContext] | None = None,
         *,
         chat_history: list[dict[str, str]] | None = None,
+        language: str | None = None,
     ) -> str:
         """Generate a structured product-review analysis using the RAG prompt.
 
@@ -196,6 +197,7 @@ class LLMClient:
         system_prompt = build_rag_system_prompt(
             chunks=chunks or [],
             chat_history=chat_history,
+            language=language,
         )
 
         return await self.generate(
