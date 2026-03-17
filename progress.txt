@@ -912,3 +912,43 @@
 - route_to_scraper создаёт новый instance при каждом вызове — для pipeline лучше кэшировать scrapers (как уже делает IngestionPipeline)
 
 ---
+
+## Итерация 21 — 2026-03-17
+**Фича:** TASK-028 — POST /ingest endpoint: приём URL, парсинг, эмбеддинг, upsert в Qdrant
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/api/endpoints/ingest.py` — POST /ingest endpoint
+  - Принимает `{user_id, session_id, urls: [...], product_query}` (Pydantic-валидация)
+  - Проверяет наличие Qdrant в app.state → при отсутствии все URLs failed
+  - Создаёт DB session если db_engine доступен (non-fatal при отсутствии)
+  - Вызывает `IngestionPipeline.ingest_urls` (parse → clean → sponsor detect → chunk → embed → upsert)
+  - Ошибка одного URL не блокирует остальные
+  - Graceful error handling: pipeline exception → all URLs 'Internal error'
+  - Per-URL результат: status ('success'/'failed'), source_type, chunks_count, error
+- Добавлены Pydantic schemas в `src/reviewmind/api/schemas.py`:
+  - `IngestRequest` (user_id, session_id, urls min_length=1, product_query)
+  - `IngestURLResult` (url, status, source_type, chunks_count, error)
+  - `IngestResponse` (results, success_count, failed_count, chunks_count)
+- Обновлён `src/reviewmind/api/router.py` — подключён ingest_router с тегом 'ingest'
+- 33 unit-теста в `tests/unit/test_api/test_ingest.py`:
+  - TestIngestRequest (5), TestIngestURLResult (3), TestIngestResponse (3)
+  - TestIngestEndpointSuccess (3), TestIngestEndpointPartialFailure (2)
+  - TestIngestEndpointQdrantUnavailable (1), TestIngestEndpointNoDB (1)
+  - TestIngestEndpointWithDB (1), TestIngestEndpointPipelineError (1)
+  - TestIngestEndpointValidation (4), TestIngestEndpointProductQuery (2)
+  - TestIngestEndpointSessionId (1), TestIngestRouterWiring (2)
+  - TestIngestFullApp (1), TestSchemaExports (3)
+- `ruff check .` — All checks passed
+- `pytest` — 1405 passed (1372 existing + 33 new), 6 pre-existing failures в test_config.py
+**Следующие шаги:**
+- TASK-028 ✅ разблокировала: TASK-029 (Bot: режим 'Свои ссылки')
+- TASK-029: Bot links mode — deps: TASK-007 ✅, TASK-027 ✅, TASK-028 ✅, TASK-011 ✅ — high
+- TASK-004: GitHub Actions CI/CD — all deps met — high (но не блокирует ничего)
+- TASK-031: Celery app factory — all deps met — high (блокирует TASK-032..035)
+- TASK-023: Language detection — all deps met — medium
+**Заметки для следующей итерации:**
+- TASK-029 (Bot links mode) — логичный следующий шаг, завершает Stage 5 Manual Mode
+- TASK-031 (Celery app factory) — стратегически важен, разблокирует 4 задачи Stage 6
+- Endpoint /ingest работает синхронно (MVP); в будущем TASK-032 добавит async через Celery
+
+---

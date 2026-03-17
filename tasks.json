@@ -861,7 +861,8 @@
         "Шаг 5: Проверить PostgreSQL sources — записи созданы"
       ],
       "dependencies": ["TASK-005", "TASK-019", "TASK-026"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Реализован src/reviewmind/api/endpoints/ingest.py — POST /ingest endpoint для приёма и обработки списка URL. Pydantic schemas в api/schemas.py: IngestRequest (user_id, session_id, urls min_length=1, product_query), IngestURLResult (url, status, source_type, chunks_count, error), IngestResponse (results, success_count, failed_count, chunks_count). Endpoint POST /ingest: (1) проверяет наличие Qdrant → при отсутствии все URL failed с 'Vector store unavailable', (2) создаёт DB session если db_engine доступен (non-fatal при отсутствии), (3) вызывает IngestionPipeline.ingest_urls с product_query и session_id, (4) каждый URL обрабатывается независимо — ошибка одного не блокирует остальные, (5) возвращает per-URL status ('success'/'failed') с source_type, chunks_count, error. Graceful error handling: pipeline exception → all URLs 'Internal error'. Обновлён api/router.py — подключён ingest_router с тегом 'ingest'. 33 unit-теста в tests/unit/test_api/test_ingest.py: TestIngestRequest (5), TestIngestURLResult (3), TestIngestResponse (3), TestIngestEndpointSuccess (3), TestIngestEndpointPartialFailure (2), TestIngestEndpointQdrantUnavailable (1), TestIngestEndpointNoDB (1), TestIngestEndpointWithDB (1), TestIngestEndpointPipelineError (1), TestIngestEndpointValidation (4), TestIngestEndpointProductQuery (2), TestIngestEndpointSessionId (1), TestIngestRouterWiring (2), TestIngestFullApp (1), TestSchemaExports (3). ruff check — 0 ошибок, pytest — 1405 passed (1372 existing + 33 new), 6 pre-existing failures в test_config.py (docker-URLs, не связаны с TASK-028)."
     },
     {
       "id": "TASK-029",

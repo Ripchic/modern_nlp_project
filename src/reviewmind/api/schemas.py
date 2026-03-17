@@ -35,3 +35,38 @@ class QueryResponse(BaseModel):
     response_time_ms: int = Field(default=0, description="Response time in milliseconds")
     query_log_id: int | None = Field(default=None, description="Query log ID for feedback")
     error: bool = Field(default=False, description="Whether an error occurred")
+
+
+# ── Ingest schemas ────────────────────────────────────────────
+
+
+class IngestRequest(BaseModel):
+    """Request body for POST /ingest."""
+
+    user_id: int = Field(..., description="Telegram user ID")
+    session_id: str | None = Field(default=None, description="Session identifier")
+    urls: list[str] = Field(..., min_length=1, description="List of URLs to ingest")
+    product_query: str = Field(
+        default="",
+        max_length=500,
+        description="Product name / search query to tag ingested chunks",
+    )
+
+
+class IngestURLResult(BaseModel):
+    """Per-URL ingestion result."""
+
+    url: str = Field(..., description="The URL that was processed")
+    status: str = Field(..., description="'success' or 'failed'")
+    source_type: str = Field(default="", description="Detected source type (youtube/reddit/web)")
+    chunks_count: int = Field(default=0, description="Number of chunks ingested from this URL")
+    error: str | None = Field(default=None, description="Error message if status is 'failed'")
+
+
+class IngestResponse(BaseModel):
+    """Response body for POST /ingest."""
+
+    results: list[IngestURLResult] = Field(default_factory=list, description="Per-URL results")
+    success_count: int = Field(default=0, description="Number of successfully ingested URLs")
+    failed_count: int = Field(default=0, description="Number of failed URLs")
+    chunks_count: int = Field(default=0, description="Total number of chunks ingested")
