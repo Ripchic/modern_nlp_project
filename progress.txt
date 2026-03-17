@@ -1301,3 +1301,41 @@
 - Patch для settings нужно делать на reviewmind.config.settings (не module-level)
 
 ---
+
+## Итерация 30 — TASK-045: Auto-mode full pipeline
+
+**Задача:** TASK-045 — Авто-режим: полный pipeline (извлечь товар → найти источники → ingestion → RAG → ответ)
+**Статус:** ✅ done
+
+**Что сделано:**
+- Полностью переписан `src/reviewmind/bot/handlers/query.py` — из простого LLM-обработчика в полноценный auto-mode pipeline
+- Flow: (1) extract_product → (2) check Qdrant cache → (3) instant RAG если данные есть → (4) Tavily quick + Celery background (YouTube+Reddit search → ingest) → (5) push final answer
+- `on_text_message()` — главный обработчик, зарегистрирован последним в dispatcher (catch-all)
+- `_try_instant_rag()` — RAGPipeline.query() с product_query фильтром, проверка confidence
+- `_collect_source_urls()` — YouTube + Reddit поиск, дедупликация, cap MAX_SEARCH_URLS=10
+- `_schedule_background_job()` — создание Job в PostgreSQL + ingest_sources_task.apply_async()
+- `_fallback_llm_answer()` — прямой LLM через QueryService, tip о конкретном товаре
+- `_build_search_query()`, `_truncate()`, `_create_qdrant_client()` вспомогательные функции
+- Бейдж 📚 для curated данных, keyboard с feedback buttons
+- Lazy imports для тяжёлых зависимостей (scrapers, SQLAlchemy, Celery tasks)
+- 46 новых unit-тестов в `tests/unit/test_bot/test_auto_mode.py`:
+  - TestConstants (5), TestTruncate (4), TestBuildSearchQuery (2)
+  - TestCollectSourceUrls (7), TestScheduleBackgroundJob (3)
+  - TestAutoModeInstantRAG (2), TestAutoModeCacheMiss (3), TestAutoModeNoProduct (2)
+  - TestAutoModeEdgeCases (4), TestAutoModeAnswerStructure (2)
+  - TestTryInstantRag (1), TestFallbackLlmAnswer (2)
+  - TestDispatcherWiring (4), TestIntegrationScenarios (5)
+- Обновлены существующие тесты в test_query_service.py (TestBotQueryHandler)
+- `ruff check .` — All checks passed
+- `pytest` — 1915 passed (+46 new), 4 pre-existing failures (test_config.py)
+
+**Следующие шаги:**
+- TASK-046: Multi-turn диалог — medium — all deps met
+- TASK-025: Seed-данные для тестирования RAG — high — all deps met
+- TASK-036: Лимиты запросов — medium — all deps met
+**Заметки для следующей итерации:**
+- Lazy imports в функциях patching через source module (reviewmind.scrapers.youtube.YouTubeScraper), не through query module
+- _schedule_background_job создаёт отдельный engine (не переиспользует app session) — для изоляции bot от DB lifecycle
+- 4 pre-existing failures в test_config.py не связаны с TASK-045
+
+---

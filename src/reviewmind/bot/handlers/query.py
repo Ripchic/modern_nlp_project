@@ -1,63 +1,337 @@
-"""reviewmind/bot/handlers/query.py — Обработка текстовых запросов пользователей.
+"""reviewmind/bot/handlers/query.py — Авто-режим: полный pipeline для текстовых запросов.
 
-Temporary direct-LLM handler (without RAG).  Will be replaced by
-RAG-pipeline integration in TASK-024.
+Flow:
+1. Extract product name from the user query.
+2. If product found → check Qdrant cache for existing data.
+3. If cached (confidence met) → instant RAG answer (< 3 sec).
+4. If no/insufficient data → quick Tavily answer + Celery background
+   job (YouTube + Reddit search → ingest → push final answer).
+5. If no product detected → fallback to direct LLM.
 """
 
 from __future__ import annotations
+
+import uuid
 
 import structlog
 from aiogram import Router
 from aiogram.enums import ChatAction
 from aiogram.types import Message
+from qdrant_client import AsyncQdrantClient
 
+from reviewmind.bot.keyboards import feedback_keyboard
 from reviewmind.core.llm import LLMClient
+from reviewmind.core.rag import RAGPipeline
+from reviewmind.services.product_extractor import extract_product
 from reviewmind.services.query_service import QueryService
 
 logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
 router = Router(name="query")
 
+# ── Constants ────────────────────────────────────────────────────────────────
+
 _MAX_ANSWER_LENGTH = 4096  # Telegram message length limit
+
+_SEARCHING_MSG = "⏳ Ищу данные (~3 мин)...\nЯ пришлю результат, когда анализ будет готов."
+_NO_PRODUCT_FALLBACK_NOTE = (
+    "\n\n<i>💡 Совет: назовите конкретный товар (например, «Sony WH-1000XM5»), "
+    "чтобы я нашёл и проанализировал обзоры.</i>"
+)
+_SERVICE_UNAVAILABLE_MSG = "⚠️ Сервис анализа временно недоступен. Попробуйте позже."
+_UNEXPECTED_ERROR_MSG = "⚠️ Произошла непредвиденная ошибка. Попробуйте ещё раз."
+
+MAX_SEARCH_URLS = 10  # cap on URLs collected from YouTube + Reddit search
+
+
+# ── Helpers ──────────────────────────────────────────────────────────────────
+
+
+def _truncate(text: str, limit: int = _MAX_ANSWER_LENGTH) -> str:
+    """Truncate *text* to fit Telegram's message length limit."""
+    if len(text) > limit:
+        return text[: limit - 3] + "..."
+    return text
+
+
+def _create_qdrant_client() -> AsyncQdrantClient:
+    """Create an ``AsyncQdrantClient`` from the application settings."""
+    from reviewmind.config import settings  # noqa: PLC0415
+
+    return AsyncQdrantClient(url=settings.qdrant_url)
+
+
+def _build_search_query(product_names: list[str]) -> str:
+    """Build a search query string for YouTube/Reddit from product names."""
+    return " ".join(product_names) + " review"
+
+
+async def _collect_source_urls(product_names: list[str]) -> list[str]:
+    """Search YouTube + Reddit for review URLs.
+
+    Returns up to :data:`MAX_SEARCH_URLS` unique URLs.
+    """
+    urls: list[str] = []
+    seen: set[str] = set()
+    search_query = _build_search_query(product_names)
+
+    # ── YouTube search ───────────────────────────────────────
+    try:
+        from reviewmind.scrapers.youtube import YouTubeScraper  # noqa: PLC0415
+
+        yt = YouTubeScraper()
+        videos = yt.search_videos(search_query, max_results=5)
+        for v in videos:
+            if v.url and v.url not in seen:
+                seen.add(v.url)
+                urls.append(v.url)
+    except Exception as exc:
+        logger.warning("auto_youtube_search_failed", error=str(exc))
+
+    # ── Reddit search ────────────────────────────────────────
+    try:
+        from reviewmind.scrapers.reddit import RedditScraper  # noqa: PLC0415
+
+        reddit = RedditScraper()
+        posts = reddit.search_posts(search_query, limit=5)
+        for p in posts:
+            if p.url and p.url not in seen:
+                seen.add(p.url)
+                urls.append(p.url)
+    except Exception as exc:
+        logger.warning("auto_reddit_search_failed", error=str(exc))
+
+    return urls[:MAX_SEARCH_URLS]
+
+
+async def _schedule_background_job(
+    *,
+    user_id: int,
+    product_query: str,
+    urls: list[str],
+    session_id: str | None = None,
+) -> str | None:
+    """Create a Job row in PostgreSQL and schedule a Celery ingestion task.
+
+    Returns the ``job_id`` (UUID str) on success, or *None* if scheduling fails.
+    """
+    from reviewmind.config import settings  # noqa: PLC0415
+
+    job_id = str(uuid.uuid4())
+    log = logger.bind(job_id=job_id, user_id=user_id, product_query=product_query)
+
+    # Create Job row in DB (best-effort)
+    try:
+        from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine  # noqa: PLC0415
+
+        from reviewmind.db.repositories.jobs import JobRepository  # noqa: PLC0415
+
+        engine = create_async_engine(settings.database_url, pool_pre_ping=True, echo=False)
+        session_factory = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+        async with session_factory() as session:
+            repo = JobRepository(session)
+            await repo.create(
+                user_id=user_id,
+                job_type="auto_search",
+                product_query=product_query,
+                celery_task_id=None,  # updated below after apply_async
+            )
+            # Use our generated job_id for the row
+            # The create method generates its own UUID, but we need ours for Celery
+            # Let's update the session with our ID instead:
+            await session.rollback()
+
+        # Re-create with our job_id
+        from reviewmind.db.models import Job  # noqa: PLC0415
+
+        async with session_factory() as session:
+            job = Job(
+                id=uuid.UUID(job_id),
+                user_id=user_id,
+                job_type="auto_search",
+                status="pending",
+                product_query=product_query,
+            )
+            session.add(job)
+            await session.flush()
+            await session.commit()
+
+        await engine.dispose()
+        log.info("auto_job_created_in_db")
+    except Exception as exc:
+        log.warning("auto_job_db_create_failed", error=str(exc))
+
+    # Schedule Celery task
+    try:
+        from reviewmind.workers.tasks import ingest_sources_task  # noqa: PLC0415
+
+        result = ingest_sources_task.apply_async(
+            kwargs={
+                "job_id": job_id,
+                "user_id": user_id,
+                "product_query": product_query,
+                "urls": urls,
+                "session_id": session_id,
+            },
+        )
+        log.info("auto_celery_task_scheduled", celery_task_id=result.id)
+        return job_id
+    except Exception as exc:
+        log.error("auto_celery_schedule_failed", error=str(exc))
+        return None
+
+
+# ── Handler ──────────────────────────────────────────────────────────────────
 
 
 @router.message()
 async def on_text_message(message: Message) -> None:
-    """Handle any text message — send it to LLM and reply with the answer.
+    """Handle any text message in auto-mode.
 
-    Shows a typing indicator while waiting for the LLM response.
-    On error, sends a user-friendly fallback message (no tracebacks).
+    Full pipeline:
+    1. Extract product name(s) from the query.
+    2. If product found → try instant RAG from Qdrant.
+    3. If Qdrant has confident data → return immediately.
+    4. If insufficient data → send quick Tavily answer +
+       schedule background Celery job → push final answer later.
+    5. If no product detected → direct LLM fallback.
     """
     if not message.text:
         return
 
     user_id = message.from_user.id if message.from_user else 0
-    logger.info("query_received", user_id=user_id, text_len=len(message.text))
+    log = logger.bind(user_id=user_id, text_len=len(message.text))
+    log.info("query_received")
 
     # Show typing indicator
-    await message.bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.TYPING)
+    if message.bot:
+        await message.bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.TYPING)
 
-    async with LLMClient() as client:
-        service = QueryService(llm_client=client)
-        result = await service.answer(message.text)
+    # ── Step 1: Extract product name(s) ──────────────────────
+    try:
+        product_names = await extract_product(message.text)
+    except Exception:
+        product_names = []
 
-    if result.error:
-        logger.warning(
-            "query_error_sent",
+    log.info("auto_product_extracted", products=product_names)
+
+    # No product detected → direct LLM fallback
+    if not product_names:
+        await _fallback_llm_answer(message, user_id, log)
+        return
+
+    product_query = ", ".join(product_names)
+
+    # ── Step 2: Try instant RAG from Qdrant ──────────────────
+    try:
+        qdrant = _create_qdrant_client()
+    except Exception as exc:
+        log.error("qdrant_connect_failed", error=str(exc))
+        await message.answer(_SERVICE_UNAVAILABLE_MSG)
+        return
+
+    try:
+        rag_response = await _try_instant_rag(qdrant, message.text, product_query, log)
+    except Exception as exc:
+        log.error("instant_rag_failed", error=str(exc))
+        rag_response = None
+    finally:
+        await qdrant.close()
+
+    # ── Step 3: If confidence met → instant answer ───────────
+    if rag_response and rag_response.confidence_met and rag_response.answer:
+        answer = _truncate(rag_response.answer)
+        await message.answer(answer, reply_markup=feedback_keyboard())
+        log.info(
+            "auto_instant_rag_answer",
+            answer_len=len(answer),
+            chunks=rag_response.chunks_count,
+            sources=len(rag_response.sources),
+        )
+        return
+
+    # ── Step 4: Insufficient data → Tavily quick + background job ────
+    log.info("auto_cache_miss", product_query=product_query)
+
+    # 4a: Send quick Tavily-based answer if available
+    quick_answer_sent = False
+    if rag_response and rag_response.answer and rag_response.used_tavily:
+        # RAG already triggered Tavily fallback — use that answer
+        answer = _truncate(rag_response.answer)
+        await message.answer(answer, reply_markup=feedback_keyboard())
+        quick_answer_sent = True
+        log.info("auto_tavily_quick_answer_sent", answer_len=len(answer))
+
+    # 4b: Collect source URLs from YouTube + Reddit
+    source_urls = await _collect_source_urls(product_names)
+    log.info("auto_source_urls_collected", url_count=len(source_urls))
+
+    if source_urls:
+        # Schedule background ingestion + push notification
+        job_id = await _schedule_background_job(
             user_id=user_id,
-            error=result.error_message,
+            product_query=product_query,
+            urls=source_urls,
+        )
+        if job_id:
+            if not quick_answer_sent:
+                await message.answer(_SEARCHING_MSG)
+            else:
+                await message.answer(
+                    "🔍 Ищу дополнительные источники для более полного анализа..."
+                )
+            log.info("auto_background_job_scheduled", job_id=job_id)
+        else:
+            if not quick_answer_sent:
+                # Celery unavailable and no quick answer → report error
+                await message.answer(_SERVICE_UNAVAILABLE_MSG)
+    else:
+        # No source URLs found
+        if not quick_answer_sent:
+            # Try a final direct LLM answer as last resort
+            await _fallback_llm_answer(message, user_id, log)
+        else:
+            log.info("auto_no_additional_sources")
+
+
+async def _try_instant_rag(
+    qdrant: AsyncQdrantClient,
+    user_query: str,
+    product_query: str,
+    log,
+) -> object | None:
+    """Try a RAG query against existing Qdrant data.
+
+    Returns the :class:`~reviewmind.core.rag.RAGResponse` or ``None``.
+    The RAG pipeline includes Tavily fallback when confidence is not met.
+    """
+    async with RAGPipeline(qdrant_client=qdrant) as rag:
+        return await rag.query(
+            user_query=user_query,
+            product_query=product_query,
         )
 
-    # Telegram has a 4096-char limit; truncate if needed
-    answer = result.answer
-    if len(answer) > _MAX_ANSWER_LENGTH:
-        answer = answer[: _MAX_ANSWER_LENGTH - 3] + "..."
+
+async def _fallback_llm_answer(message: Message, user_id: int, log) -> None:
+    """Send a direct LLM answer (no RAG) for non-product queries."""
+    try:
+        async with LLMClient() as client:
+            service = QueryService(llm_client=client)
+            result = await service.answer(message.text)
+    except Exception as exc:
+        log.error("fallback_llm_error", error=str(exc))
+        await message.answer(_UNEXPECTED_ERROR_MSG)
+        return
+
+    answer = _truncate(result.answer)
+
+    # Add tip about naming a specific product
+    if len(answer) + len(_NO_PRODUCT_FALLBACK_NOTE) <= _MAX_ANSWER_LENGTH:
+        answer += _NO_PRODUCT_FALLBACK_NOTE
 
     await message.answer(answer)
-
-    logger.info(
-        "query_answered",
-        user_id=user_id,
+    log.info(
+        "auto_fallback_llm_answer",
         answer_len=len(answer),
         error=result.error,
     )

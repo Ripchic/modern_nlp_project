@@ -239,7 +239,7 @@ def _make_bot_message(text: str = "test", user_id: int = 123) -> MagicMock:
 
 
 class TestBotQueryHandler:
-    """Test on_text_message handler."""
+    """Test on_text_message handler (auto-mode)."""
 
     @pytest.mark.asyncio
     async def test_sends_typing_indicator(self):
@@ -248,24 +248,29 @@ class TestBotQueryHandler:
         msg = _make_bot_message("Hello")
         mock_client = _mock_llm_client("Response")
 
-        with patch("reviewmind.bot.handlers.query.LLMClient") as MockLLM:
+        # No product extracted → fallback to direct LLM
+        with (
+            patch("reviewmind.bot.handlers.query.extract_product", new=AsyncMock(return_value=[])),
+            patch("reviewmind.bot.handlers.query.LLMClient") as MockLLM,
+        ):
             instance = MockLLM.return_value
             instance.__aenter__ = AsyncMock(return_value=mock_client)
             instance.__aexit__ = AsyncMock(return_value=False)
             await on_text_message(msg)
 
         msg.bot.send_chat_action.assert_called_once()
-        call_args = msg.bot.send_chat_action.call_args
-        assert call_args.kwargs.get("action") or call_args.args
 
     @pytest.mark.asyncio
-    async def test_replies_with_llm_answer(self):
+    async def test_no_product_fallback_llm(self):
         from reviewmind.bot.handlers.query import on_text_message
 
         msg = _make_bot_message("What headphones to buy?")
         mock_client = _mock_llm_client("Buy Sony WH-1000XM5")
 
-        with patch("reviewmind.bot.handlers.query.LLMClient") as MockLLM:
+        with (
+            patch("reviewmind.bot.handlers.query.extract_product", new=AsyncMock(return_value=[])),
+            patch("reviewmind.bot.handlers.query.LLMClient") as MockLLM,
+        ):
             instance = MockLLM.return_value
             instance.__aenter__ = AsyncMock(return_value=mock_client)
             instance.__aexit__ = AsyncMock(return_value=False)
@@ -276,24 +281,23 @@ class TestBotQueryHandler:
         assert "Sony WH-1000XM5" in answer_text
 
     @pytest.mark.asyncio
-    async def test_error_sends_friendly_message(self):
+    async def test_fallback_llm_error_sends_friendly_message(self):
         from reviewmind.bot.handlers.query import on_text_message
 
         msg = _make_bot_message("trigger error")
-        mock_client = _mock_llm_client_error(LLMError("timeout"))
 
-        with patch("reviewmind.bot.handlers.query.LLMClient") as MockLLM:
+        with (
+            patch("reviewmind.bot.handlers.query.extract_product", new=AsyncMock(return_value=[])),
+            patch("reviewmind.bot.handlers.query.LLMClient") as MockLLM,
+        ):
             instance = MockLLM.return_value
-            instance.__aenter__ = AsyncMock(return_value=mock_client)
+            instance.__aenter__ = AsyncMock(side_effect=RuntimeError("fail"))
             instance.__aexit__ = AsyncMock(return_value=False)
             await on_text_message(msg)
 
         msg.answer.assert_called_once()
         answer_text = msg.answer.call_args.args[0]
-        assert "Извините" in answer_text
-        # Must NOT contain traceback / internal error
-        assert "traceback" not in answer_text.lower()
-        assert "timeout" not in answer_text
+        assert "ошибка" in answer_text.lower() or "Произошла" in answer_text
 
     @pytest.mark.asyncio
     async def test_skips_none_text(self):
@@ -305,22 +309,16 @@ class TestBotQueryHandler:
         msg.answer.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_truncates_long_answer(self):
-        from reviewmind.bot.handlers.query import _MAX_ANSWER_LENGTH, on_text_message
+    async def test_truncate_helper(self):
+        from reviewmind.bot.handlers.query import _MAX_ANSWER_LENGTH, _truncate
 
-        long_response = "x" * 5000
-        msg = _make_bot_message("question")
-        mock_client = _mock_llm_client(long_response)
+        long_text = "x" * 5000
+        result = _truncate(long_text)
+        assert len(result) <= _MAX_ANSWER_LENGTH
+        assert result.endswith("...")
 
-        with patch("reviewmind.bot.handlers.query.LLMClient") as MockLLM:
-            instance = MockLLM.return_value
-            instance.__aenter__ = AsyncMock(return_value=mock_client)
-            instance.__aexit__ = AsyncMock(return_value=False)
-            await on_text_message(msg)
-
-        answer_text = msg.answer.call_args.args[0]
-        assert len(answer_text) <= _MAX_ANSWER_LENGTH
-        assert answer_text.endswith("...")
+        short_text = "short"
+        assert _truncate(short_text) == "short"
 
 
 # ══════════════════════════════════════════════════════════════

@@ -1286,7 +1286,8 @@
         "Шаг 5: Проверить время push-ответа ≤ 5 минут"
       ],
       "dependencies": ["TASK-043", "TASK-044", "TASK-032", "TASK-024", "TASK-033", "TASK-041"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Реализован полный auto-mode pipeline в bot/handlers/query.py: extract_product → Qdrant cache check → instant RAG / Tavily quick + Celery background (YouTube+Reddit→ingest) → push final answer. 46 unit-тестов в test_auto_mode.py. Ruff clean."
     },
     {
       "id": "TASK-046",
