@@ -936,7 +936,8 @@
         "Шаг 5: Проверить reconnect: перезапуск redis → worker переподключается"
       ],
       "dependencies": ["TASK-002", "TASK-003"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Реализован src/reviewmind/workers/celery_app.py — Celery app factory с Redis broker. create_celery_app(broker_url?, result_backend?) → Celery: параметры из config (lazy import settings.celery_broker_url, settings.celery_result_backend), fallback на defaults при отсутствии .env. Конфигурация: task_serializer=json, accept_content=[json], result_serializer=json, task_acks_late=True, worker_prefetch_multiplier=1, timezone=UTC, enable_utc=True, result_expires=86400, broker_connection_retry_on_startup=True. Task discovery через include=[reviewmind.workers.tasks]. Module-level celery_app instance для CLI: celery -A reviewmind.workers.celery_app. Добавлены поля celery_broker_url и celery_result_backend в config.py Settings (defaults redis://localhost:6379/1 и /2). Реализован workers/tasks.py с ping health-check задачей (name='reviewmind.ping', bind=True, max_retries=0) → {'status': 'pong'}. Docker Compose services (worker, beat, flower) уже настроены в TASK-002 с CELERY_BROKER_URL=redis://redis:6379/1, CELERY_RESULT_BACKEND=redis://redis:6379/2. Обновлён workers/__init__.py — экспорт celery_app, create_celery_app, ping. structlog логирование. 48 unit-тестов в tests/unit/test_workers/test_celery_app.py: TestConstants (4), TestCreateCeleryApp (14), TestConfigFallback (3), TestModuleLevelApp (4), TestPingTask (6), TestWorkersExports (5), TestConfigCeleryFields (4), TestDockerComposeAlignment (3), TestIntegrationScenarios (5). ruff check — 0 ошибок, pytest — 1508 passed (1460 existing + 48 new), 4 pre-existing failures в test_config.py (docker-URLs, не связаны с TASK-031)."
     },
     {
       "id": "TASK-032",

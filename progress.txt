@@ -985,3 +985,41 @@
 - TASK-031 (Celery) — стратегический приоритет, разблокирует всю Stage 6
 
 ---
+
+## Итерация 21 — 2026-03-17
+**Фича:** TASK-031 — Celery app factory + Redis broker + worker конфигурация + Flower
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/workers/celery_app.py` (~70 строк):
+  - `create_celery_app(broker_url?, result_backend?)` — factory function
+  - Lazy config import: `settings.celery_broker_url` и `settings.celery_result_backend`
+  - Fallback на `DEFAULT_BROKER_URL` / `DEFAULT_RESULT_BACKEND` при отсутствии .env
+  - Конфигурация: json serializer, task_acks_late=True, worker_prefetch_multiplier=1, timezone=UTC, result_expires=86400, broker_connection_retry_on_startup=True
+  - Task discovery: `include=["reviewmind.workers.tasks"]`
+  - Module-level `celery_app` instance для CLI: `celery -A reviewmind.workers.celery_app`
+  - structlog логирование при создании app
+- Добавлены поля в `src/reviewmind/config.py`:
+  - `celery_broker_url: str = "redis://localhost:6379/1"`
+  - `celery_result_backend: str = "redis://localhost:6379/2"`
+- Реализован `src/reviewmind/workers/tasks.py`:
+  - `ping` health-check задача (name='reviewmind.ping', bind=True, max_retries=0) → {'status': 'pong'}
+- Обновлён `src/reviewmind/workers/__init__.py` — экспорт celery_app, create_celery_app, ping
+- Docker Compose services (worker, beat, flower) уже настроены с CELERY_BROKER_URL и CELERY_RESULT_BACKEND
+- 48 unit-тестов в `tests/unit/test_workers/test_celery_app.py`:
+  - TestConstants (4), TestCreateCeleryApp (14), TestConfigFallback (3)
+  - TestModuleLevelApp (4), TestPingTask (6), TestWorkersExports (5)
+  - TestConfigCeleryFields (4), TestDockerComposeAlignment (3), TestIntegrationScenarios (5)
+- `ruff check .` — All checks passed
+- `pytest` — 1508 passed (1460 existing + 48 new), 4 pre-existing failures в test_config.py
+**Следующие шаги:**
+- TASK-032: Celery задача фонового сбора данных + GET /status/{job_id} — deps met (TASK-031 ✅)
+- TASK-035: Celery Beat — deps met (TASK-031 ✅)
+- TASK-004: GitHub Actions CI/CD — all deps met — high
+- TASK-043: Product extraction — high — deps met
+- TASK-044: Auto-search — high — deps met
+**Заметки для следующей итерации:**
+- TASK-031 ✅ разблокировала TASK-032, TASK-033, TASK-034, TASK-035
+- Stage 6 (Celery Async) полностью разблокирована: можно последовательно делать TASK-032 → 033 → 034 → 035
+- celery_app module-level instance shadowing: `import reviewmind.workers.celery_app as mod` может вернуть Celery instance вместо модуля; используй `importlib.import_module()` при необходимости
+
+---

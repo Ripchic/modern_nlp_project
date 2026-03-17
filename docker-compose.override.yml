@@ -1,0 +1,14 @@
+# Local development override — exposes infrastructure ports to localhost.
+# This file is loaded automatically by docker-compose alongside docker-compose.yml.
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  qdrant:
+    ports:
+      - "6333:6333"
