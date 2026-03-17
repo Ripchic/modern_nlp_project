@@ -1203,3 +1203,38 @@
 - TASK-045 (Full auto mode) всё ещё заблокирован: нужны TASK-044 и TASK-041
 
 ---
+
+## Итерация 27 — 2026-03-17
+**Фича:** TASK-044 — Auto-search: YouTube Data API v3 + Reddit PRAW multi-subreddit search
+**Статус:** Завершено
+**Что сделано:**
+- Расширен `src/reviewmind/scrapers/youtube.py`:
+  - `VideoInfo` dataclass (video_id, title, channel_title, published_at, description, url)
+  - `search_videos(query, max_results=10, api_key=None) → list[VideoInfo]` через YouTube Data API v3 + httpx
+  - `_do_search()` — HTTP GET с params (part=snippet, type=video, relevanceLanguage=en, publishedAfter)
+  - `_published_after_iso(max_age_days)` — ISO timestamp для фильтра по дате (MAX_AGE_DAYS=365)
+  - `_parse_search_items()` — парсинг items из API response → VideoInfo
+  - Clamping max_results [1..50], graceful error handling (HTTP/network/timeout → [])
+  - Fallback на `settings.youtube_api_key` если api_key не передан (lazy import)
+  - Константы: DEFAULT_SEARCH_MAX_RESULTS=10, YOUTUBE_API_BASE_URL, MAX_AGE_DAYS=365
+- Расширен `src/reviewmind/scrapers/reddit.py`:
+  - `DEFAULT_REVIEW_SUBREDDITS` — tuple из 8 сабреддитов (BuyItForLife, gadgets, headphones, audiophile, buildapc, smarthome, apple, Android)
+  - `search_posts(query, subreddits, limit=10, sort='relevance', time_filter='year') → list[SearchResult]`
+  - Поиск по каждому сабреддиту, дедупликация по post_id, сортировка по score desc
+  - Graceful error per subreddit — ошибка одного саба не крашит весь поиск
+- Обновлён `src/reviewmind/scrapers/__init__.py` — новые экспорты (VideoInfo, DEFAULT_SEARCH_MAX_RESULTS, MAX_AGE_DAYS, YOUTUBE_API_BASE_URL, DEFAULT_REVIEW_SUBREDDITS)
+- 61 unit-тест: YouTube (38 — constants, VideoInfo, _published_after_iso, _parse_search_items, search success/empty/errors/config fallback/date/integration), Reddit (23 — constants, success/sort/dedup/limit, empty input, errors, time_filter, exports, integration)
+- `ruff check .` — All checks passed
+- `pytest` — 1765 passed (+61 new), 4 pre-existing failures в test_config.py (не связаны)
+**Следующие шаги:**
+- TASK-045: Full auto mode pipeline — high — TASK-044 ✅ разблокирован, нужен TASK-041
+- TASK-034: Task retry + admin alert — high — all deps met
+- TASK-025: Seed-данные для тестирования RAG — high — all deps met
+**Заметки для следующей итерации:**
+- TASK-044 ✅ — YouTube search + Reddit multi-subreddit search работают
+- YouTube API key: приоритет — явный параметр, fallback — settings.youtube_api_key (lazy import)
+- Reddit `reddit` — @property с lazy init → тесты мокают `scraper._reddit` напрямую
+- MAX_AGE_DAYS=365 — фильтр publishedAfter для YouTube, time_filter='year' для Reddit
+- TASK-045 (Full auto mode) ближе к разблокировке: TASK-044 ✅, осталcя TASK-041
+
+---

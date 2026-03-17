@@ -1258,7 +1258,8 @@
         "Шаг 5: Тест с нишевым товаром → может вернуть < 10 результатов (не error)"
       ],
       "dependencies": ["TASK-012", "TASK-013", "TASK-003"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Реализован YouTube search_videos() и Reddit search_posts(). YouTube: добавлен VideoInfo dataclass (video_id, title, channel_title, published_at, description, url), search_videos(query, max_results=10, api_key=None) → list[VideoInfo] через YouTube Data API v3 + httpx, _do_search() (HTTP GET с params), _published_after_iso() (ISO timestamp MAX_AGE_DAYS=365 назад), _parse_search_items() (парсинг ответа API). Clamping max_results [1..50], фильтр publishedAfter. Fallback на settings.youtube_api_key если api_key не передан. Graceful error handling: HTTP/network/timeout ошибки → пустой список. Reddit: добавлен DEFAULT_REVIEW_SUBREDDITS (8 сабреддитов: BuyItForLife, gadgets, headphones, audiophile, buildapc, smarthome, apple, Android), search_posts(query, subreddits, limit=10, sort='relevance', time_filter='year') → list[SearchResult]. Поиск по каждому сабреддиту, дедупликация по post_id, сортировка по score desc. Graceful error per subreddit. Обновлён scrapers/__init__.py с новыми экспортами. 61 unit-тест: YouTube (38 — constants, VideoInfo, _published_after_iso, _parse_search_items, search success/empty/errors/config/date/integration), Reddit (23 — constants, success/sort/dedup/limit, empty input, errors, time_filter, exports, integration). ruff check — 0 ошибок, pytest — 1765 passed (1704 existing + 61 new), 4 pre-existing failures в test_config.py."
     },
     {
       "id": "TASK-045",

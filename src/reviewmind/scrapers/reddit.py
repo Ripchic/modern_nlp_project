@@ -27,6 +27,18 @@ DEFAULT_SEARCH_LIMIT: int = 10
 DEFAULT_SUBREDDIT: str = "all"
 """Default subreddit for search (r/all)."""
 
+DEFAULT_REVIEW_SUBREDDITS: tuple[str, ...] = (
+    "BuyItForLife",
+    "gadgets",
+    "headphones",
+    "audiophile",
+    "buildapc",
+    "smarthome",
+    "apple",
+    "Android",
+)
+"""Subreddits commonly used for product reviews and discussions."""
+
 _DELETED_MARKERS: frozenset[str] = frozenset({"[deleted]", "[removed]", "[удалено]"})
 """Markers indicating a deleted or removed post/comment body."""
 
@@ -359,6 +371,67 @@ class RedditScraper:
                 subreddit=subreddit,
             )
             return []
+
+    def search_posts(
+        self,
+        query: str,
+        *,
+        subreddits: tuple[str, ...] | list[str] = DEFAULT_REVIEW_SUBREDDITS,
+        limit: int = DEFAULT_SEARCH_LIMIT,
+        sort: str = "relevance",
+        time_filter: str = "year",
+    ) -> list[SearchResult]:
+        """Search multiple subreddits and return deduplicated, merged results.
+
+        Searches each subreddit individually and merges results, deduplicating
+        by ``post_id`` and sorting by score descending. Returns at most *limit*
+        unique results.
+
+        Args:
+            query: Search query string.
+            subreddits: Subreddits to search (default :data:`DEFAULT_REVIEW_SUBREDDITS`).
+            limit: Maximum total results to return (default 10).
+            sort: Sort order per subreddit search.
+            time_filter: Time filter: ``"year"``, ``"month"``, ``"week"``, etc.
+
+        Returns:
+            Deduplicated list of :class:`SearchResult` sorted by score descending.
+        """
+        if not query or not isinstance(query, str):
+            logger.warning("reddit.empty_search_posts_query")
+            return []
+
+        query = query.strip()
+        if not query:
+            return []
+
+        seen_ids: set[str] = set()
+        merged: list[SearchResult] = []
+
+        for sub_name in subreddits:
+            per_sub = self.search_subreddit(
+                query,
+                subreddit=sub_name,
+                limit=max(3, limit // max(len(subreddits), 1)),
+                sort=sort,
+                time_filter=time_filter,
+            )
+            for result in per_sub:
+                if result.post_id not in seen_ids:
+                    seen_ids.add(result.post_id)
+                    merged.append(result)
+
+        # Sort by score descending, then trim
+        merged.sort(key=lambda r: r.score, reverse=True)
+        final = merged[:limit]
+
+        logger.info(
+            "reddit.search_posts_completed",
+            query=query,
+            subreddits_searched=len(subreddits),
+            results_count=len(final),
+        )
+        return final
 
     # ── Helpers ───────────────────────────────────────────────
 
