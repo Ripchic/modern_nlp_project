@@ -115,6 +115,28 @@ async def _ingest_sources(
 
     await engine.dispose()
 
+    # -- Send push notification to the user ---------------------------------
+    try:
+        from reviewmind.workers.notifications import (
+            send_task_completed,
+            send_task_failed,
+        )
+
+        if success:
+            await send_task_completed(
+                bot_token=settings.telegram_bot_token,
+                chat_id=user_id,
+                product_query=product_query,
+                qdrant_url=settings.qdrant_url,
+            )
+        else:
+            await send_task_failed(
+                bot_token=settings.telegram_bot_token,
+                chat_id=user_id,
+            )
+    except Exception as exc:
+        log.error("push_notification_failed", error=str(exc))
+
     return {
         "job_id": job_id,
         "status": final_status,

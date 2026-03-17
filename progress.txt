@@ -1171,3 +1171,35 @@
 - Обратная совместимость: `language=None` → автоматически 'ru'
 
 ---
+
+## Итерация 26 — 2026-03-17
+**Фича:** TASK-033 — Push-уведомление в Telegram по завершении фоновой задачи
+**Статус:** Завершено
+**Что сделано:**
+- Создан `src/reviewmind/workers/notifications.py` — модуль push-уведомлений из Celery-задач
+- `send_task_started(bot_token, chat_id)` — отправляет '⏳ Ищу данные (~3 мин)...'
+- `send_task_completed(bot_token, chat_id, product_query, qdrant_url)` — запускает RAG query, отправляет анализ с кнопками [👍] [👎] [📎]
+- `send_task_failed(bot_token, chat_id)` — отправляет извинение при ошибке
+- Хелпер `_run_rag_query(qdrant, product_query)` — запускает RAGPipeline.query()
+- Truncation ответа до 4096 символов (Telegram limit)
+- Fallback на `TASK_COMPLETED_NO_ANSWER_MSG` при пустом RAG-ответе
+- Graceful error handling: ошибка отправки не крашит задачу
+- Все ресурсы (Bot session, Qdrant client) закрываются в finally
+- Интеграция в `workers/tasks.py`: _ingest_sources вызывает send_task_completed/failed после engine.dispose
+- Обновлён `workers/__init__.py` — 6 новых экспортов (3 функции + 3 константы)
+- 44 unit-теста в `tests/unit/test_workers/test_notifications.py`
+- `ruff check .` — All checks passed
+- `pytest` — 1704 passed (+44 new), 4 pre-existing failures в test_config.py (не связаны)
+**Следующие шаги:**
+- TASK-034: Task retry + admin alert — high — all deps met
+- TASK-044: Auto-search YouTube/Reddit — high — all deps met
+- TASK-025: Seed-данные для тестирования RAG — high — all deps met
+- TASK-033 ✅ → разблокирует TASK-045 (полный auto-pipeline)
+**Заметки для следующей итерации:**
+- TASK-033 ✅ — push-уведомления работают после завершения Celery ingestion задачи
+- Уведомления отправляются после engine.dispose — не держат DB-соединения
+- aiogram Bot валидирует токен при создании — нужен формат 'digits:string'
+- Notification failure не блокирует задачу (try/except вокруг всего блока)
+- TASK-045 (Full auto mode) всё ещё заблокирован: нужны TASK-044 и TASK-041
+
+---
