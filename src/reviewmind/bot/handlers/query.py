@@ -20,6 +20,7 @@ from aiogram.types import Message
 from qdrant_client import AsyncQdrantClient
 
 from reviewmind.bot.keyboards import feedback_keyboard, subscribe_keyboard
+from reviewmind.cache.redis import SessionManager
 from reviewmind.core.llm import LLMClient
 from reviewmind.core.rag import RAGPipeline
 from reviewmind.services.product_extractor import extract_product
@@ -59,6 +60,20 @@ def _create_qdrant_client() -> AsyncQdrantClient:
     from reviewmind.config import settings  # noqa: PLC0415
 
     return AsyncQdrantClient(url=settings.qdrant_url)
+
+
+async def _create_session_manager() -> tuple[SessionManager, object]:
+    """Create a Redis connection and :class:`SessionManager`.
+
+    Returns ``(session_manager, redis_client)`` — caller must close the
+    client with ``await redis_client.aclose()`` when done.
+    """
+    from redis.asyncio import from_url as redis_from_url  # noqa: PLC0415
+
+    from reviewmind.config import settings  # noqa: PLC0415
+
+    client = redis_from_url(settings.redis_url, decode_responses=True)
+    return SessionManager(client), client
 
 
 def _build_search_query(product_names: list[str]) -> str:
@@ -213,6 +228,18 @@ async def on_text_message(message: Message) -> None:
         await message.answer(limit_result.message, reply_markup=subscribe_keyboard())
         return
 
+    # ── Retrieve chat history from Redis ─────────────────────
+    chat_history: list[dict[str, str]] = []
+    session_mgr: SessionManager | None = None
+    redis_client = None
+    try:
+        session_mgr, redis_client = await _create_session_manager()
+        chat_history = await session_mgr.get_history(user_id)
+        await session_mgr.refresh_ttl(user_id)
+        log.debug("session_history_loaded", history_len=len(chat_history))
+    except Exception as exc:
+        log.warning("session_history_load_failed", error=str(exc))
+
     # ── Step 1: Extract product name(s) ──────────────────────
     try:
         product_names = await extract_product(message.text)
@@ -223,7 +250,10 @@ async def on_text_message(message: Message) -> None:
 
     # No product detected → direct LLM fallback
     if not product_names:
-        await _fallback_llm_answer(message, user_id, log)
+        await _fallback_llm_answer(message, user_id, log, chat_history=chat_history)
+        # Store user + assistant messages in history
+        await _store_exchange(session_mgr, user_id, message.text, log=log)
+        await _close_redis(redis_client)
         return
 
     product_query = ", ".join(product_names)
@@ -234,10 +264,11 @@ async def on_text_message(message: Message) -> None:
     except Exception as exc:
         log.error("qdrant_connect_failed", error=str(exc))
         await message.answer(_SERVICE_UNAVAILABLE_MSG)
+        await _close_redis(redis_client)
         return
 
     try:
-        rag_response = await _try_instant_rag(qdrant, message.text, product_query, log)
+        rag_response = await _try_instant_rag(qdrant, message.text, product_query, log, chat_history=chat_history)
     except Exception as exc:
         log.error("instant_rag_failed", error=str(exc))
         rag_response = None
@@ -249,6 +280,9 @@ async def on_text_message(message: Message) -> None:
         answer = _truncate(rag_response.answer)
         await message.answer(answer, reply_markup=feedback_keyboard())
         await _increment_user_limit(user_id, log)
+        # Store user + assistant messages in history
+        await _store_exchange(session_mgr, user_id, message.text, answer, log)
+        await _close_redis(redis_client)
         log.info(
             "auto_instant_rag_answer",
             answer_len=len(answer),
@@ -297,9 +331,13 @@ async def on_text_message(message: Message) -> None:
         # No source URLs found
         if not quick_answer_sent:
             # Try a final direct LLM answer as last resort
-            await _fallback_llm_answer(message, user_id, log)
+            await _fallback_llm_answer(message, user_id, log, chat_history=chat_history)
         else:
             log.info("auto_no_additional_sources")
+
+    # Store user message in history (answer may come later via push)
+    await _store_exchange(session_mgr, user_id, message.text, log=log)
+    await _close_redis(redis_client)
 
 
 async def _try_instant_rag(
@@ -307,6 +345,8 @@ async def _try_instant_rag(
     user_query: str,
     product_query: str,
     log,
+    *,
+    chat_history: list[dict[str, str]] | None = None,
 ) -> object | None:
     """Try a RAG query against existing Qdrant data.
 
@@ -317,6 +357,7 @@ async def _try_instant_rag(
         return await rag.query(
             user_query=user_query,
             product_query=product_query,
+            chat_history=chat_history or None,
         )
 
 
@@ -360,12 +401,42 @@ async def _increment_user_limit(user_id: int, log) -> None:
         log.warning("limit_increment_failed", error=str(exc))
 
 
-async def _fallback_llm_answer(message: Message, user_id: int, log) -> None:
+async def _store_exchange(
+    session_mgr: SessionManager | None,
+    user_id: int,
+    user_text: str,
+    assistant_text: str | None = None,
+    log=None,
+) -> None:
+    """Store user and (optionally) assistant messages in Redis history."""
+    if session_mgr is None:
+        return
+    try:
+        await session_mgr.add_to_history(user_id, {"role": "user", "content": user_text})
+        if assistant_text:
+            await session_mgr.add_to_history(user_id, {"role": "assistant", "content": assistant_text})
+    except Exception as exc:
+        if log:
+            log.warning("session_history_store_failed", error=str(exc))
+
+
+async def _close_redis(redis_client) -> None:
+    """Close the Redis client if not None."""
+    if redis_client is not None:
+        try:
+            await redis_client.aclose()
+        except Exception:
+            pass
+
+
+async def _fallback_llm_answer(
+    message: Message, user_id: int, log, *, chat_history: list[dict[str, str]] | None = None
+) -> None:
     """Send a direct LLM answer (no RAG) for non-product queries."""
     try:
         async with LLMClient() as client:
             service = QueryService(llm_client=client)
-            result = await service.answer(message.text)
+            result = await service.answer(message.text, chat_history=chat_history)
     except Exception as exc:
         log.error("fallback_llm_error", error=str(exc))
         await message.answer(_UNEXPECTED_ERROR_MSG)

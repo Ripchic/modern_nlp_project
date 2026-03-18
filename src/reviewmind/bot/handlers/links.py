@@ -20,6 +20,7 @@ from aiogram.types import Message
 from qdrant_client import AsyncQdrantClient
 
 from reviewmind.bot.keyboards import feedback_keyboard, subscribe_keyboard
+from reviewmind.cache.redis import SessionManager
 from reviewmind.core.rag import RAGPipeline
 from reviewmind.ingestion.pipeline import IngestionPipeline
 
@@ -109,6 +110,47 @@ def _create_qdrant_client() -> AsyncQdrantClient:
     return AsyncQdrantClient(url=settings.qdrant_url)
 
 
+async def _create_session_manager() -> tuple[SessionManager, object]:
+    """Create a Redis connection and :class:`SessionManager`.
+
+    Returns ``(session_manager, redis_client)``.
+    """
+    from redis.asyncio import from_url as redis_from_url  # noqa: PLC0415
+
+    from reviewmind.config import settings  # noqa: PLC0415
+
+    client = redis_from_url(settings.redis_url, decode_responses=True)
+    return SessionManager(client), client
+
+
+async def _store_exchange(
+    session_mgr: SessionManager | None,
+    user_id: int,
+    user_text: str,
+    assistant_text: str | None = None,
+    log=None,
+) -> None:
+    """Store user and (optionally) assistant messages in Redis history."""
+    if session_mgr is None:
+        return
+    try:
+        await session_mgr.add_to_history(user_id, {"role": "user", "content": user_text})
+        if assistant_text:
+            await session_mgr.add_to_history(user_id, {"role": "assistant", "content": assistant_text})
+    except Exception as exc:
+        if log:
+            log.warning("session_history_store_failed", error=str(exc))
+
+
+async def _close_redis(redis_client) -> None:
+    """Close the Redis client if not None."""
+    if redis_client is not None:
+        try:
+            await redis_client.aclose()
+        except Exception:
+            pass
+
+
 async def _check_user_limit(user_id: int, log) -> object | None:
     """Check daily limit for *user_id*.  Returns *None* if DB is unavailable."""
     try:
@@ -173,6 +215,18 @@ async def on_links_message(message: Message) -> None:
         await message.answer(limit_result.message, reply_markup=subscribe_keyboard())
         return
 
+    # Retrieve chat history from Redis
+    chat_history: list[dict[str, str]] = []
+    session_mgr: SessionManager | None = None
+    redis_client = None
+    try:
+        session_mgr, redis_client = await _create_session_manager()
+        chat_history = await session_mgr.get_history(user_id)
+        await session_mgr.refresh_ttl(user_id)
+        log.debug("session_history_loaded", history_len=len(chat_history))
+    except Exception as exc:
+        log.warning("session_history_load_failed", error=str(exc))
+
     # Send processing status
     status_msg = await message.answer(
         _PROCESSING_TEMPLATE.format(count=len(urls), word=_pluralize_links(len(urls)))
@@ -184,22 +238,27 @@ async def on_links_message(message: Message) -> None:
     except Exception as exc:
         log.error("qdrant_connect_failed", error=str(exc))
         await status_msg.edit_text(_SERVICE_UNAVAILABLE_MSG)
+        await _close_redis(redis_client)
         return
 
     try:
-        await _ingest_and_analyse(
+        answer_text = await _ingest_and_analyse(
             message=message,
             status_msg=status_msg,
             urls=urls,
             query_text=query_text,
             qdrant=qdrant,
             log=log,
+            chat_history=chat_history,
         )
+        # Store exchange in Redis history
+        await _store_exchange(session_mgr, user_id, text, answer_text, log)
     except Exception as exc:
         log.error("links_unexpected_error", error=str(exc))
         await status_msg.edit_text(_UNEXPECTED_ERROR_MSG)
     finally:
         await qdrant.close()
+        await _close_redis(redis_client)
 
 
 async def _ingest_and_analyse(
@@ -210,8 +269,12 @@ async def _ingest_and_analyse(
     query_text: str,
     qdrant,
     log,
-) -> None:
-    """Run the ingestion pipeline and RAG query, editing *status_msg* with the result."""
+    chat_history: list[dict[str, str]] | None = None,
+) -> str | None:
+    """Run the ingestion pipeline and RAG query, editing *status_msg* with the result.
+
+    Returns the answer text sent to the user (for session history), or ``None``.
+    """
     product_query = query_text if query_text != _DEFAULT_QUERY else ""
 
     # ── Step 1: Ingest URLs ──────────────────────────────────
@@ -236,13 +299,14 @@ async def _ingest_and_analyse(
         if failed_lines:
             parts.append("\n".join(failed_lines))
         await status_msg.edit_text("\n\n".join(parts))
-        return
+        return None
 
     # ── Step 2: RAG query ────────────────────────────────────
     async with RAGPipeline(qdrant_client=qdrant) as rag:
         rag_response = await rag.query(
             user_query=query_text,
             product_query=product_query or None,
+            chat_history=chat_history or None,
         )
 
     # ── Step 3: Build final answer ───────────────────────────
@@ -282,3 +346,5 @@ async def _ingest_and_analyse(
         sources=rag_response.sources,
         confidence_met=rag_response.confidence_met,
     )
+
+    return answer

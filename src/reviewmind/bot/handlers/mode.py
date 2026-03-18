@@ -1,12 +1,25 @@
-"""reviewmind/bot/handlers/mode.py — Обработка выбора и переключения режима."""
+"""reviewmind/bot/handlers/mode.py — Обработка выбора и переключения режима.
 
+Mode is persisted to Redis via :class:`~reviewmind.cache.redis.SessionManager`.
+Switching mode does **not** clear the chat history.
+"""
+
+import structlog
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
 from reviewmind.bot.keyboards import MODE_AUTO, MODE_LINKS, mode_keyboard
 
+logger = structlog.get_logger(__name__)
+
 router = Router(name="mode")
+
+# Map callback data → internal mode string used by SessionManager
+_CALLBACK_TO_MODE = {
+    MODE_AUTO: "auto",
+    MODE_LINKS: "links",
+}
 
 MODE_NAMES = {
     MODE_AUTO: "🔍 Авто-поиск",
@@ -27,6 +40,24 @@ MODE_DESCRIPTIONS = {
 }
 
 
+async def _persist_mode(user_id: int, mode: str) -> None:
+    """Persist the selected mode to Redis.  Best-effort — never raises."""
+    try:
+        from redis.asyncio import from_url as redis_from_url  # noqa: PLC0415
+
+        from reviewmind.cache.redis import SessionManager  # noqa: PLC0415
+        from reviewmind.config import settings  # noqa: PLC0415
+
+        client = redis_from_url(settings.redis_url, decode_responses=True)
+        sm = SessionManager(client)
+        await sm.set_mode(user_id, mode)
+        # Refresh TTL on all session keys (history is NOT cleared)
+        await sm.refresh_ttl(user_id)
+        await client.aclose()
+    except Exception as exc:
+        logger.warning("mode_persist_failed", user_id=user_id, mode=mode, error=str(exc))
+
+
 @router.callback_query(F.data.in_({MODE_AUTO, MODE_LINKS}))
 async def on_mode_selected(callback: CallbackQuery) -> None:
     """Handle inline button press for mode selection."""
@@ -35,6 +66,11 @@ async def on_mode_selected(callback: CallbackQuery) -> None:
 
     await callback.message.edit_text(description, parse_mode="HTML")  # type: ignore[union-attr]
     await callback.answer(f"Выбран режим: {MODE_NAMES.get(mode, mode)}")
+
+    # Persist mode to Redis (does NOT clear chat history)
+    user_id = callback.from_user.id if callback.from_user else 0
+    internal_mode = _CALLBACK_TO_MODE.get(mode, "auto")
+    await _persist_mode(user_id, internal_mode)
 
 
 @router.message(Command("mode"))

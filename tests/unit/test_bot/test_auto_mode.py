@@ -896,6 +896,7 @@ class TestTryInstantRag:
         mock_rag.query.assert_called_once_with(
             user_query="Sony XM5?",
             product_query="Sony WH-1000XM5",
+            chat_history=None,
         )
 
 

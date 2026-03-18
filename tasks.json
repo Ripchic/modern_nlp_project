@@ -1312,7 +1312,8 @@
         "Шаг 5: /mode → история НЕ сбрасывается"
       ],
       "dependencies": ["TASK-011", "TASK-024"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Интегрирован multi-turn dialog: query.py и links.py загружают chat_history из Redis SessionManager перед RAG/LLM, сохраняют обмен после ответа. mode.py персистит режим в Redis без сброса истории. _create_session_manager, _store_exchange, _close_redis — вспомогательные функции. 40 unit-тестов в test_multi_turn.py. Ruff clean, pytest 2047 pass."
     },
     {
       "id": "TASK-047",

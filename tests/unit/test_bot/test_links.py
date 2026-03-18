@@ -773,12 +773,13 @@ class TestDispatcherWiring:
         if cls._dp is not None:
             return cls._dp
         # Reset parent_router on all routers so they can be re-attached
+        from reviewmind.bot.handlers.feedback import router as feedback_router
         from reviewmind.bot.handlers.links import router as links_router
         from reviewmind.bot.handlers.mode import router as mode_router
         from reviewmind.bot.handlers.query import router as query_router
         from reviewmind.bot.handlers.start import router as start_router
 
-        for r in (start_router, mode_router, links_router, query_router):
+        for r in (start_router, mode_router, links_router, query_router, feedback_router):
             r._parent_router = None
 
         from reviewmind.bot.main import create_dispatcher

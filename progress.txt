@@ -1427,3 +1427,44 @@
 - TASK-050 (📎 Источники) полностью покрыта on_feedback_sources handler + format_sources_list
 
 ---
+
+## Итерация: TASK-046 — Multi-turn диалог (Redis session history)
+
+**Что сделано:**
+- Интегрирован SessionManager (cache/redis.py) в bot handlers для хранения chat_history
+- `src/reviewmind/bot/handlers/query.py`:
+  - `_create_session_manager()` — создаёт Redis client + SessionManager
+  - `_store_exchange()` — сохраняет user + assistant сообщения в Redis
+  - `_close_redis()` — graceful close Redis client
+  - `on_text_message` — загружает историю из Redis, передаёт в RAG/LLM, сохраняет после ответа
+  - `_try_instant_rag` — принимает chat_history, передаёт в RAGPipeline.query()
+  - `_fallback_llm_answer` — принимает chat_history, передаёт в QueryService.answer()
+- `src/reviewmind/bot/handlers/links.py`:
+  - Аналогичная интеграция: _create_session_manager, _store_exchange, _close_redis
+  - `_ingest_and_analyse` — принимает chat_history, передаёт в RAGPipeline.query(), возвращает текст ответа
+- `src/reviewmind/bot/handlers/mode.py`:
+  - `_persist_mode(user_id, mode)` — персистит режим в Redis через SessionManager
+  - `_CALLBACK_TO_MODE` — маппинг callback data → internal mode
+  - `/mode` НЕ сбрасывает историю — только set_mode + refresh_ttl
+- `tests/unit/test_bot/conftest.py` — autouse `_bypass_session_manager` для backward compatibility
+- `tests/unit/test_bot/test_multi_turn.py` — 40 unit-тестов:
+  - TestStoreExchange (query/links), TestCloseRedis, TestCreateSessionManager
+  - TestQueryHandlerSessionIntegration, TestLinksHandlerSessionIntegration
+  - TestModePersistence, TestTryInstantRagHistory, TestFallbackLlmHistory
+  - TestIngestAndAnalyseHistory, TestSessionTTL, TestCallbackToMode
+  - TestIntegrationScenarios, TestImportsAvailable
+- `ruff check .` — All checks passed
+- `pytest` — 2047 passed (+40 new, 1 pre-existing config failure)
+
+**Следующие шаги:**
+- TASK-047: Сравнение товаров X vs Y
+- TASK-049: GDPR /delete_my_data
+- TASK-035: Celery Beat schedule
+
+**Заметки:**
+- SessionManager.get_history/add_to_history уже существовали в cache/redis.py
+- RAGPipeline.query() и QueryService.answer() уже принимали chat_history
+- Lazy imports используются в _create_session_manager и _persist_mode (PLC0415)
+- conftest.py autouse fixture патчит _create_session_manager в query+links и _persist_mode в mode
+
+---
