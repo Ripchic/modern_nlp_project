@@ -1545,4 +1545,36 @@
 
 ---
 
+## Итерация — 2026-03-18
+**Фича:** TASK-049 — /delete_my_data: каскадное удаление данных пользователя (GDPR compliance)
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/bot/handlers/gdpr.py` — полный GDPR flow
+- Команда /delete_my_data показывает предупреждение с inline-клавиатурой [🗑 Да, удалить] [Отмена]
+- При подтверждении: каскадное удаление из PostgreSQL (users → user_limits, subscriptions, jobs, query_logs через ON DELETE CASCADE) + очистка Redis-сессии
+- При DB ошибке: show_alert с сообщением об ошибке, Redis НЕ очищается
+- При отмене: данные не затрагиваются
+- `gdpr_confirm_keyboard()` — клавиатура подтверждения
+- `_delete_user_from_db()` — lazy DB session, engine.dispose() в finally
+- `_clear_redis_session()` — best-effort, ошибка не блокирует
+- Обновлён `bot/main.py` — gdpr_router зарегистрирован между mode_router и feedback_router
+- 43 unit-теста в `tests/unit/test_bot/test_gdpr.py`:
+  - TestConstants (6), TestGdprConfirmKeyboard (6), TestCmdDeleteMyData (4)
+  - TestDeleteUserFromDb (4), TestClearRedisSession (2)
+  - TestOnGdprConfirm (5), TestOnGdprCancel (3)
+  - TestRouterWiring (4), TestExports (4), TestIntegrationScenarios (5)
+- `ruff check .` — All checks passed
+- `pytest` — 2212 passed (2169 existing + 43 new), 9 pre-existing failures (test_config.py, test_links.py, test_ingest.py)
+**Следующие шаги:**
+- TASK-025: Seed-данные для тестирования + RAG верификация (high)
+- TASK-030: /mode с Redis persistence (medium)
+- TASK-037: Telegram Stars оплата подписки (medium)
+- TASK-050: Кнопка 📎 Источники (medium)
+**Заметки для следующей итерации:**
+- aiogram не позволяет re-register одни и те же router instances в разных Dispatcher — тесты dispatcher wiring лучше проверять через inspect.getsource или hasattr проверки module-level imports
+- ON DELETE CASCADE в FK constraints SQLAlchemy позволяет удалить всё одним UserRepository.delete() — не нужно явно удалять каждую таблицу
+- Lazy imports внутри async функций (redis_from_url, SessionManager, settings) патчатся через оригинальный путь модуля: `redis.asyncio.from_url`, `reviewmind.cache.redis.SessionManager`
+
+---
+
 ---
