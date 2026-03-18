@@ -1213,7 +1213,8 @@
         "Шаг 5: Проверить Retry-After header в 429 ответе"
       ],
       "dependencies": ["TASK-005"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Реализован src/reviewmind/api/rate_limit.py — slowapi rate limiting middleware, 10 req/min per user_id с admin bypass через contextvars. Компоненты: RATE_LIMIT_PER_MINUTE=10, RATE_LIMIT_STRING='10/minute', get_user_id_key(request) — извлекает user_id из JSON body (pre-parsed middleware) или fallback на IP, is_admin_request(request) — проверка по settings.admin_user_ids, _check_exempt() — zero-arg callable для slowapi exempt_when (читает ContextVar), limiter = Limiter(key_func=get_user_id_key, storage_uri='memory://'), rate_limit_exceeded_handler — JSON 429 с Retry-After header и русским сообщением, rate_limit_middleware — pre-parse JSON body + set _is_exempt ContextVar для admin bypass, setup_rate_limiting(app) — подключение к FastAPI. Config: добавлен rate_limit_per_minute: int = 10 в Settings. Endpoints: декораторы @limiter.limit(RATE_LIMIT_STRING, exempt_when=_check_exempt) на POST /query, /ingest, /feedback. Main: setup_rate_limiting(application) в create_app(). 54 unit-теста: TestConstants (6), TestGetUserIdKey (7), TestIsAdminRequest (5), TestRateLimitExceededHandler (4), TestLimiterInstance (2), TestSetupRateLimiting (3), TestRateLimitMiddleware (3), TestRateLimitIntegration (8), TestAdminBypass (3), TestMainAppIntegration (2), TestModuleExports (6), TestIntegrationScenarios (5). ruff check — 0 ошибок, pytest — 2172 passed (2118 existing + 54 new), 6 pre-existing failures."
     },
     {
       "id": "TASK-043",

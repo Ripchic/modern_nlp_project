@@ -98,6 +98,9 @@ class Settings(BaseSettings):
     # ── Session ───────────────────────────────────────────────
     session_ttl_seconds: int = 1800  # 30 minutes
 
+    # ── Rate limiting ─────────────────────────────────────────
+    rate_limit_per_minute: int = 10
+
     @field_validator("admin_user_ids", mode="before")
     @classmethod
     def parse_admin_user_ids(cls, v: object) -> list[int]:

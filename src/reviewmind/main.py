@@ -106,6 +106,12 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     application.include_router(api_router)
+
+    # ── Rate limiting (slowapi) ───────────────────────────────
+    from reviewmind.api.rate_limit import setup_rate_limiting
+
+    setup_rate_limiting(application)
+
     return application
 
 

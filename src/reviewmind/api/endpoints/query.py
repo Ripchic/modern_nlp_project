@@ -11,6 +11,7 @@ import structlog
 from fastapi import APIRouter, Request
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from reviewmind.api.rate_limit import RATE_LIMIT_STRING, _check_exempt, limiter
 from reviewmind.api.schemas import QueryRequest, QueryResponse
 from reviewmind.core.llm import LLMClient
 from reviewmind.core.rag import RAGPipeline
@@ -103,6 +104,7 @@ async def _increment_limit(request: Request, user_id: int) -> None:
 
 
 @router.post("/query", response_model=QueryResponse)
+@limiter.limit(RATE_LIMIT_STRING, exempt_when=_check_exempt)
 async def post_query(body: QueryRequest, request: Request) -> QueryResponse:
     """Accept a user query, run RAG pipeline, log result, and return the answer."""
     start_ms = time.monotonic()

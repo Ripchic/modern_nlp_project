@@ -10,6 +10,7 @@ import structlog
 from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from reviewmind.api.rate_limit import RATE_LIMIT_STRING, _check_exempt, limiter
 from reviewmind.api.schemas import FeedbackRequest, FeedbackResponse
 from reviewmind.db.repositories.query_logs import QueryLogRepository
 
@@ -19,6 +20,7 @@ router = APIRouter()
 
 
 @router.post("/feedback", response_model=FeedbackResponse)
+@limiter.limit(RATE_LIMIT_STRING, exempt_when=_check_exempt)
 async def post_feedback(body: FeedbackRequest, request: Request) -> FeedbackResponse:
     """Update the rating on an existing query log entry."""
     log = logger.bind(query_log_id=body.query_log_id, rating=body.rating)

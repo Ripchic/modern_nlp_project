@@ -1508,3 +1508,41 @@
 - Предупреждения о «coroutine never awaited» при pytest — cosmetic, от Celery task discovery при import
 
 ---
+
+## Итерация 31 — TASK-042: Rate limiting — slowapi middleware (10 req/min per user_id)
+**Фича:** TASK-042 — Rate limiting: slowapi middleware, 10 req/min per user_id, admin bypass
+**Статус:** Завершено
+**Что сделано:**
+- Создан `src/reviewmind/api/rate_limit.py` — центральный модуль rate limiting:
+  - `RATE_LIMIT_PER_MINUTE=10`, `RATE_LIMIT_STRING="10/minute"`
+  - `get_user_id_key(request)` — извлечение rate-limit ключа из pre-parsed JSON body (user_id) или fallback на client IP
+  - `is_admin_request(request)` — проверка по settings.admin_user_ids
+  - `_check_exempt()` — zero-arg callable для slowapi `exempt_when` (через ContextVar)
+  - `limiter = Limiter(key_func=get_user_id_key, storage_uri="memory://")`
+  - `rate_limit_exceeded_handler` — JSON 429 с Retry-After header и русским сообщением
+  - `rate_limit_middleware` — pre-parse JSON body + set `_is_exempt` ContextVar для admin bypass
+  - `setup_rate_limiting(app)` — подключение limiter, exception handler и middleware к FastAPI
+- Добавлен `rate_limit_per_minute: int = 10` в `config.py` Settings
+- Декораторы `@limiter.limit(RATE_LIMIT_STRING, exempt_when=_check_exempt)` на POST /query, /ingest, /feedback
+- `setup_rate_limiting(application)` вызывается в `main.py` create_app()
+- Admin bypass через contextvars: middleware устанавливает `_is_exempt` ContextVar перед endpoint
+- 54 unit-теста в `tests/unit/test_api/test_rate_limit.py`:
+  - TestConstants (6), TestGetUserIdKey (7), TestIsAdminRequest (5)
+  - TestRateLimitExceededHandler (4), TestLimiterInstance (2), TestSetupRateLimiting (3)
+  - TestRateLimitMiddleware (3), TestRateLimitIntegration (8), TestAdminBypass (3)
+  - TestMainAppIntegration (2), TestModuleExports (6), TestIntegrationScenarios (5)
+- `ruff check .` — All checks passed
+- `pytest` — 2172 passed (2118 existing + 54 new), 6 pre-existing failures (test_config.py, test_ingest.py)
+**Следующие шаги:**
+- TASK-025: Seed-данные для тестирования + RAG верификация
+- TASK-043: Извлечение названия товара из запроса
+- TASK-049: GDPR /delete_my_data
+**Заметки для следующей итерации:**
+- slowapi `exempt_when` принимает ТОЛЬКО zero-arg callable — использован ContextVar для передачи admin-статуса из middleware
+- При многократном вызове `_create_rate_limited_app()` в тестах, `limiter._route_limits` накапливает дубликаты Limit объектов → double counting. Решение: `_full_reset_limiter()` очищает `_route_limits` и `__marked_for_limiting`
+- `RateLimitExceeded` в slowapi 0.1.9 принимает `Limit` объект, не строку — в тестах использован MagicMock
+- `patch("reviewmind.config.settings")` корректно для local imports (`from reviewmind.config import settings`)
+
+---
+
+---

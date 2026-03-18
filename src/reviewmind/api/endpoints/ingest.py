@@ -11,6 +11,7 @@ import structlog
 from fastapi import APIRouter, Request
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from reviewmind.api.rate_limit import RATE_LIMIT_STRING, _check_exempt, limiter
 from reviewmind.api.schemas import IngestRequest, IngestResponse, IngestURLResult
 from reviewmind.ingestion.pipeline import IngestionPipeline
 
@@ -20,6 +21,7 @@ router = APIRouter()
 
 
 @router.post("/ingest", response_model=IngestResponse)
+@limiter.limit(RATE_LIMIT_STRING, exempt_when=_check_exempt)
 async def post_ingest(body: IngestRequest, request: Request) -> IngestResponse:
     """Ingest a list of URLs: parse → clean → chunk → embed → upsert into Qdrant."""
     log = logger.bind(user_id=body.user_id, session_id=body.session_id, url_count=len(body.urls))
