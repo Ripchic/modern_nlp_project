@@ -18,7 +18,7 @@ from reviewmind.bot.handlers.mode import router as mode_router
 from reviewmind.bot.handlers.payment import router as payment_router
 from reviewmind.bot.handlers.query import router as query_router
 from reviewmind.bot.handlers.start import router as start_router
-from reviewmind.bot.middlewares import LoggingMiddleware
+from reviewmind.bot.middlewares import AdminMiddleware, LoggingMiddleware
 
 logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
@@ -49,6 +49,9 @@ def create_dispatcher() -> Dispatcher:
 
     # Register outer middleware for structured logging
     dp.update.outer_middleware(LoggingMiddleware())
+
+    # Register admin auto-registration middleware
+    dp.update.outer_middleware(AdminMiddleware())
 
     # Register handlers — order matters: start/help first, then mode callbacks,
     # then payment (pre_checkout + successful_payment), then feedback callbacks,

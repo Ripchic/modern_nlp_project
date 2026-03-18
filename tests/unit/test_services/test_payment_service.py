@@ -748,6 +748,59 @@ class TestIntegrationScenarios:
         assert col.unique is True
 
     @pytest.mark.asyncio
+    async def test_multiple_payments_extend_subscription_cumulatively(self):
+        """Paying N times extends subscription to ~N*30 days from now."""
+        num_payments = 3
+        now = datetime.now(tz=timezone.utc)
+
+        # Track the running expiry across payments
+        current_expiry: datetime | None = None
+
+        for i in range(num_payments):
+            # Build user mock reflecting current subscription state
+            if current_expiry and current_expiry > now:
+                user = _make_user_model(user_id=100, subscription="premium", sub_expires_at=current_expiry)
+            else:
+                user = _make_user_model(user_id=100, subscription="free", sub_expires_at=current_expiry)
+
+            session = _mock_session()
+            # We need the created sub to carry the correct expires_at; capture it from create() args
+            async def _fake_create(**kwargs):
+                sub = MagicMock()
+                sub.id = 20 + i
+                sub.expires_at = kwargs["expires_at"]
+                sub.amount_stars = kwargs.get("amount_stars", SUBSCRIPTION_PRICE_STARS)
+                sub.status = "active"
+                return sub
+
+            with patch.object(PaymentService, "__init__", lambda self, s: None):
+                service = PaymentService(session)
+                service._session = session
+                service._sub_repo = MagicMock()
+                service._sub_repo.get_by_charge_id = AsyncMock(return_value=None)
+                service._sub_repo.create = AsyncMock(side_effect=_fake_create)
+                service._user_repo = MagicMock()
+                service._user_repo.get_or_create = AsyncMock(return_value=(user, False))
+                service._user_repo.update = AsyncMock(return_value=user)
+
+                result = await service.activate_subscription(
+                    user_id=100, telegram_payment_charge_id=f"charge_multi_{i}",
+                )
+
+            assert result.success is True
+            assert result.already_active is False
+            current_expiry = result.expires_at
+
+        # After 3 payments the expiry should be ~90 days from now
+        expected_min = now + timedelta(days=SUBSCRIPTION_DAYS * num_payments - 1)
+        expected_max = now + timedelta(days=SUBSCRIPTION_DAYS * num_payments + 1)
+        assert expected_min <= current_expiry <= expected_max, (
+            f"After {num_payments} payments, expected expiry near "
+            f"{expected_min.isoformat()} – {expected_max.isoformat()}, "
+            f"got {current_expiry.isoformat()}"
+        )
+
+    @pytest.mark.asyncio
     async def test_payment_after_limit_reached(self):
         """Scenario: user hits limit, subscribes, then can query again."""
         from reviewmind.services.limit_service import LimitService

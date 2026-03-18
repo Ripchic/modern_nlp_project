@@ -1115,7 +1115,8 @@
         "Шаг 5: Админ видит метку в ответе бота (опционально)"
       ],
       "dependencies": ["TASK-036", "TASK-003"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Реализован AdminMiddleware в src/reviewmind/bot/middlewares.py — aiogram outer middleware для автоматической регистрации админов в PostgreSQL. При каждом update от пользователя с ID в config.admin_user_ids: (1) если user не существует в таблице users → create с is_admin=True, (2) если существует но is_admin=False → update is_admin=True, (3) если уже admin → skip. _seen set предотвращает повторные DB-запросы в рамках процесса. Lazy config loading: admin_user_ids и database_url загружаются из config при первом обращении. DB failure non-fatal: ошибка записи не блокирует обработку update. Engine создаётся и dispose() каждый раз (не держит long-lived connection). _extract_user_id() хелпер извлекает user_id из message или callback_query. Модуль-level imports: build_engine, build_session_factory, UserRepository. Зарегистрирован в bot/main.py как второй outer middleware (после LoggingMiddleware). LimitService._is_admin() (TASK-036) уже выполняет bypass лимитов для тех же admin_user_ids — теперь middleware гарантирует что user record с is_admin=True существует в DB. 36 unit-тестов в tests/unit/test_bot/test_admin_middleware.py: TestExtractUserId (4), TestAdminMiddlewareInit (6), TestAdminMiddlewareCall (6), TestEnsureAdminInDb (6), TestDispatcherWiring (2), TestAdminBypassIntegration (2), TestConfigAlignment (2), TestMiddlewareExports (3), TestIntegrationScenarios (5). ruff check — 0 ошибок, pytest — 2296 passed (2260 existing + 36 new), 9 pre-existing failures (4 test_config.py + 3 test_links.py + 2 test_ingest.py, не связаны с TASK-038)."
     },
     {
       "id": "TASK-039",

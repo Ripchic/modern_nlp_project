@@ -1616,4 +1616,33 @@
 
 ---
 
+## Итерация 25 — 2026-03-19
+**Фича:** TASK-038 — Admin whitelist: ADMIN_USER_IDS из .env обходят лимиты запросов
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `AdminMiddleware` в `src/reviewmind/bot/middlewares.py` — aiogram outer middleware
+- При update от admin: auto-create user с `is_admin=True` или update существующего
+- `_seen` set предотвращает повторные DB-запросы в рамках одного процесса
+- Lazy config loading: `admin_user_ids` и `database_url` из config при первом обращении
+- DB failure non-fatal: ошибка не блокирует обработку update пользователя
+- `_extract_user_id()` хелпер поддерживает message и callback_query
+- Зарегистрирован в `bot/main.py` как outer middleware (после LoggingMiddleware)
+- 36 unit-тестов в `tests/unit/test_bot/test_admin_middleware.py`
+- `ruff check .` — All checks passed
+- `pytest` — 2296 passed (2260 existing + 36 new), 9 pre-existing failures (не связаны)
+**Следующие шаги:**
+- TASK-025: Seed-данные для тестирования + RAG верификация (high)
+- TASK-030: /mode с Redis persistence (medium, может быть уже сделано в TASK-046)
+- TASK-039: Ежесуточный сброс лимитов (medium, возможно уже работает через date-based keys)
+- TASK-040: Curated KB seed script (medium)
+- TASK-050: Кнопка 📎 Источники (medium, частично сделано в TASK-048)
+**Заметки для следующей итерации:**
+- AdminMiddleware создаёт engine + session на каждый ensure_admin_in_db вызов (один раз на процесс благодаря _seen)
+- LimitService._is_admin() (TASK-036) уже делает bypass лимитов — middleware обеспечивает наличие DB record с is_admin=True
+- TASK-030 может быть фактически выполнена: mode.py уже persists в Redis (реализовано в TASK-046)
+- TASK-039 может быть фактически выполнена: limit_service использует date-based composite key (user_id + date)
+- TASK-050 может быть фактически выполнена: feedback.py уже обрабатывает кнопку 📎 (реализовано в TASK-048)
+
+---
+
 ---
