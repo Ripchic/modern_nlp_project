@@ -1,5 +1,7 @@
 """reviewmind/bot/keyboards.py — Inline-клавиатуры для Telegram-бота."""
 
+from __future__ import annotations
+
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 # ── Callback data constants ──────────────────────────────────
@@ -10,6 +12,9 @@ FEEDBACK_BAD = "feedback:bad"
 FEEDBACK_SOURCES = "feedback:sources"
 SUBSCRIBE_ACTION = "subscribe:start"
 SUBSCRIBE_WAIT = "subscribe:wait"
+
+# Callback data prefixes used by the feedback handler to parse query_log_id
+FEEDBACK_PREFIX = "feedback:"
 
 
 def mode_keyboard() -> InlineKeyboardMarkup:
@@ -24,14 +29,20 @@ def mode_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def feedback_keyboard() -> InlineKeyboardMarkup:
-    """Inline keyboard for feedback on bot responses."""
+def feedback_keyboard(query_log_id: int | None = None) -> InlineKeyboardMarkup:
+    """Inline keyboard for feedback on bot responses.
+
+    When *query_log_id* is provided, the ID is encoded into each callback
+    value so the feedback handler can update the exact ``query_logs`` row.
+    Format: ``feedback:useful:123`` / ``feedback:bad:123`` / ``feedback:sources:123``.
+    """
+    suffix = f":{query_log_id}" if query_log_id is not None else ""
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="👍 Полезно", callback_data=FEEDBACK_USEFUL),
-                InlineKeyboardButton(text="👎 Не то", callback_data=FEEDBACK_BAD),
-                InlineKeyboardButton(text="📎 Источники", callback_data=FEEDBACK_SOURCES),
+                InlineKeyboardButton(text="👍 Полезно", callback_data=f"{FEEDBACK_USEFUL}{suffix}"),
+                InlineKeyboardButton(text="👎 Не то", callback_data=f"{FEEDBACK_BAD}{suffix}"),
+                InlineKeyboardButton(text="📎 Источники", callback_data=f"{FEEDBACK_SOURCES}{suffix}"),
             ],
         ]
     )

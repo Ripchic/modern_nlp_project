@@ -86,3 +86,21 @@ class JobStatusResponse(BaseModel):
     created_at: str | None = Field(default=None, description="ISO timestamp when job was created")
     completed_at: str | None = Field(default=None, description="ISO timestamp when job completed (if done/failed)")
     progress: dict | None = Field(default=None, description="Optional progress information from Celery result")
+
+
+# ── Feedback schemas ──────────────────────────────────────────
+
+
+class FeedbackRequest(BaseModel):
+    """Request body for POST /feedback."""
+
+    query_log_id: int = Field(..., description="ID of the query log entry to rate")
+    rating: int = Field(..., ge=-1, le=1, description="Rating: 1 (👍) or -1 (👎)")
+
+
+class FeedbackResponse(BaseModel):
+    """Response body for POST /feedback."""
+
+    query_log_id: int = Field(..., description="ID of the rated query log entry")
+    rating: int = Field(..., description="The rating that was saved")
+    message: str = Field(default="Спасибо за отзыв!", description="Confirmation message")

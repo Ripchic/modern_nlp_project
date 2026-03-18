@@ -1360,7 +1360,8 @@
         "Шаг 5: POST /feedback с невалидным query_log_id → 404"
       ],
       "dependencies": ["TASK-007", "TASK-027", "TASK-009"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Реализована полная система обратной связи (TASK-048 + частично TASK-050 — кнопка 📎 Источники). Bot handler: src/reviewmind/bot/handlers/feedback.py — 3 callback handler'а: on_feedback_useful (👍, rating=1), on_feedback_bad (👎, rating=-1), on_feedback_sources (📎 — пронумерованный список с 📚 curated и ⚠️ sponsored бейджами). parse_query_log_id() — парсинг ID из callback data (формат feedback:useful:42). format_sources_list() — форматирование sources_used JSON. Fallback: при отсутствии query_log_id ищет последний query_log пользователя. API endpoint: src/reviewmind/api/endpoints/feedback.py — POST /feedback {query_log_id, rating} → update query_logs.rating через QueryLogRepository.update_rating(). 404 при несуществующем ID, 503 при отсутствии DB, 422 для невалидных данных. Pydantic schemas: FeedbackRequest (rating ge=-1 le=1), FeedbackResponse (query_log_id, rating, message). Обновлён keyboards.py: feedback_keyboard(query_log_id?) — опциональное кодирование ID в callback data. Обновлён bot/main.py — feedback_router зарегистрирован между mode_router и links_router. Обновлён api/router.py — feedback_router подключён с тегом 'feedback'. 61 unit-тест в tests/unit/test_bot/test_feedback.py: TestConstants (5), TestParseQueryLogId (7), TestFormatSourcesList (10), TestFeedbackKeyboard (5), TestOnFeedbackUseful (4), TestOnFeedbackBad (3), TestOnFeedbackSources (5), TestFeedbackSchemas (7), TestApiFeedbackEndpoint (5), TestRouterWiring (3), TestSchemaExports (3), TestFullApp (1), TestIntegrationScenarios (4). ruff check — 0 ошибок, pytest — 2020 passed (1959 existing + 61 new), 7 pre-existing failures (4 test_config.py docker-URLs + 3 test_links.py dispatcher wiring, не связаны с TASK-048)."
     },
     {
       "id": "TASK-049",

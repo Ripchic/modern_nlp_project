@@ -1386,3 +1386,44 @@
 - 4 pre-existing failures в test_config.py не связаны с TASK-036
 
 ---
+
+## Итерация 21 — 2026-03-18
+**Фича:** TASK-048 — Система обратной связи: кнопки 👍/👎, POST /feedback, сохранение в query_logs
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/bot/handlers/feedback.py` — 3 callback handler'а:
+  - `on_feedback_useful` (👍, rating=1) → сохраняет rating через QueryLogRepository.update_rating
+  - `on_feedback_bad` (👎, rating=-1) → аналогично
+  - `on_feedback_sources` (📎) → выгружает sources_used из query_logs и форматирует с бейджами 📚/⚠️
+- Хелперы: `parse_query_log_id(callback_data)` — парсит ID из callback data (формат feedback:action:42), `format_sources_list(sources)` — форматирование JSON-списка в пронумерованный текст с бейджами
+- Fallback при отсутствии query_log_id — ищет последний query_log пользователя через `list_by_user(limit=1)`
+- Реализован `src/reviewmind/api/endpoints/feedback.py` — POST /feedback endpoint:
+  - Input: FeedbackRequest {query_log_id, rating (-1..1)}
+  - Output: FeedbackResponse {query_log_id, rating, message}
+  - 404 при несуществующем query_log_id, 503 при недоступной DB, 422 при невалидном теле
+- Добавлены Pydantic schemas в `api/schemas.py`: FeedbackRequest, FeedbackResponse
+- Обновлён `bot/keyboards.py`: `feedback_keyboard(query_log_id?)` — кодирует ID в callback data
+- Обновлён `bot/main.py` — feedback_router между mode_router и links_router
+- Обновлён `api/router.py` — feedback_router с тегом 'feedback'
+- 61 unit-тест в `tests/unit/test_bot/test_feedback.py`:
+  - TestConstants(5), TestParseQueryLogId(7), TestFormatSourcesList(10), TestFeedbackKeyboard(5)
+  - TestOnFeedbackUseful(4), TestOnFeedbackBad(3), TestOnFeedbackSources(5)
+  - TestFeedbackSchemas(7), TestApiFeedbackEndpoint(5), TestRouterWiring(3)
+  - TestSchemaExports(3), TestFullApp(1), TestIntegrationScenarios(4)
+- `ruff check .` — All checks passed
+- `pytest` — 2020 passed (+61 new), 7 pre-existing failures (4 test_config + 3 test_links dispatcher)
+
+**Следующие шаги:**
+- TASK-050: Кнопка 📎 Источники — фактически реализована в рамках TASK-048, можно отметить done
+- TASK-030: /mode переключение — depends on TASK-007 ✅, TASK-011 ✅
+- TASK-035: Celery Beat schedule — depends on TASK-031 ✅
+- TASK-046: Multi-turn диалог — depends on TASK-011 ✅, TASK-024 ✅
+- TASK-049: GDPR /delete_my_data — depends on TASK-007 ✅, TASK-009 ✅, TASK-011 ✅
+
+**Заметки для следующей итерации:**
+- feedback_keyboard() backward compatible — без query_log_id работает как раньше
+- aiogram routers can only be attached to one Dispatcher — тесты dispatcher wiring используют inspect.getsource() вместо create_dispatcher()
+- conftest.py в test_bot/ патчит _check_user_limit и _increment_user_limit (query + links handlers)
+- TASK-050 (📎 Источники) полностью покрыта on_feedback_sources handler + format_sources_list
+
+---
