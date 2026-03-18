@@ -1577,4 +1577,43 @@
 
 ---
 
+## Итерация 30 — 2026-03-18
+**Фича:** TASK-037 — Telegram Stars: интеграция оплаты подписки через Telegram Payments API (XTR)
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/services/payment_service.py` — PaymentService для Telegram Stars
+  - `activate_subscription(user_id, charge_id, amount_stars?)` → ActivationResult
+  - Дедупликация по telegram_payment_charge_id (UNIQUE constraint)
+  - Продление подписки от текущего expiry если есть активная
+  - Создание subscriptions row + обновление users.subscription='premium'
+  - ActivationResult с message property (HTML)
+- Реализован `src/reviewmind/bot/handlers/payment.py` — 4 handler'а:
+  - /subscribe → answer_invoice (currency=XTR)
+  - subscribe:start callback → answer_invoice
+  - pre_checkout_query → answer(ok=True)
+  - F.successful_payment → PaymentService + commit + user notification
+- Обновлён `bot/main.py` — payment_router зарегистрирован (gdpr→payment→feedback→links→query)
+- Обновлён `services/__init__.py` — 6 новых экспортов
+- Обновлён `/help` — добавлена команда /subscribe
+- 47 unit-тестов в `tests/unit/test_services/test_payment_service.py`:
+  - TestConstants (7), TestActivationResult (7), TestActivateSubscription (6)
+  - TestCmdSubscribe (4), TestSubscribeButton (1), TestPreCheckout (1)
+  - TestSuccessfulPayment (4), TestRouterWiring (3), TestServicesExports (5)
+  - TestHelpText (1), TestHandlerConstants (3), TestIntegrationScenarios (5)
+- `ruff check .` — All checks passed
+- `pytest` — 2259 passed (2212 existing + 47 new), 9 pre-existing failures (не связаны)
+**Следующие шаги:**
+- TASK-025: Seed-данные для тестирования + RAG верификация (high)
+- TASK-030: /mode с Redis persistence (medium)
+- TASK-038: Admin whitelist middleware (medium)
+- TASK-039: Ежесуточный сброс лимитов (medium)
+- TASK-050: Кнопка 📎 Источники (medium, частично сделано в TASK-048)
+**Заметки для следующей итерации:**
+- Telegram Stars API: currency='XTR', minimum amount=1, answer_invoice для отправки Invoice
+- pre_checkout_query всегда одобряем (ok=True) — дополнительная валидация пока не нужна
+- async session context manager в мок-тестах: __aenter__ mock должен возвращать объект с commit/rollback как AsyncMock
+- PaymentService использует тот же паттерн _get_db_session что и gdpr handler (lazy engine + session_factory)
+
+---
+
 ---

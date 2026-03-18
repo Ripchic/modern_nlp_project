@@ -15,6 +15,7 @@ from reviewmind.bot.handlers.feedback import router as feedback_router
 from reviewmind.bot.handlers.gdpr import router as gdpr_router
 from reviewmind.bot.handlers.links import router as links_router
 from reviewmind.bot.handlers.mode import router as mode_router
+from reviewmind.bot.handlers.payment import router as payment_router
 from reviewmind.bot.handlers.query import router as query_router
 from reviewmind.bot.handlers.start import router as start_router
 from reviewmind.bot.middlewares import LoggingMiddleware
@@ -50,11 +51,12 @@ def create_dispatcher() -> Dispatcher:
     dp.update.outer_middleware(LoggingMiddleware())
 
     # Register handlers — order matters: start/help first, then mode callbacks,
-    # then feedback callbacks, then links (URL messages),
-    # then query (catch-all for text messages) last.
+    # then payment (pre_checkout + successful_payment), then feedback callbacks,
+    # then links (URL messages), then query (catch-all for text messages) last.
     dp.include_router(start_router)
     dp.include_router(mode_router)
     dp.include_router(gdpr_router)
+    dp.include_router(payment_router)
     dp.include_router(feedback_router)
     dp.include_router(links_router)
     dp.include_router(query_router)
