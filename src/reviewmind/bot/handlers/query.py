@@ -19,7 +19,7 @@ from aiogram.enums import ChatAction
 from aiogram.types import Message
 from qdrant_client import AsyncQdrantClient
 
-from reviewmind.bot.keyboards import feedback_keyboard
+from reviewmind.bot.keyboards import feedback_keyboard, subscribe_keyboard
 from reviewmind.core.llm import LLMClient
 from reviewmind.core.rag import RAGPipeline
 from reviewmind.services.product_extractor import extract_product
@@ -207,6 +207,12 @@ async def on_text_message(message: Message) -> None:
     if message.bot:
         await message.bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.TYPING)
 
+    # ── Step 0: Check daily limit ────────────────────────────
+    limit_result = await _check_user_limit(user_id, log)
+    if limit_result is not None and not limit_result.allowed:
+        await message.answer(limit_result.message, reply_markup=subscribe_keyboard())
+        return
+
     # ── Step 1: Extract product name(s) ──────────────────────
     try:
         product_names = await extract_product(message.text)
@@ -242,6 +248,7 @@ async def on_text_message(message: Message) -> None:
     if rag_response and rag_response.confidence_met and rag_response.answer:
         answer = _truncate(rag_response.answer)
         await message.answer(answer, reply_markup=feedback_keyboard())
+        await _increment_user_limit(user_id, log)
         log.info(
             "auto_instant_rag_answer",
             answer_len=len(answer),
@@ -259,6 +266,7 @@ async def on_text_message(message: Message) -> None:
         # RAG already triggered Tavily fallback — use that answer
         answer = _truncate(rag_response.answer)
         await message.answer(answer, reply_markup=feedback_keyboard())
+        await _increment_user_limit(user_id, log)
         quick_answer_sent = True
         log.info("auto_tavily_quick_answer_sent", answer_len=len(answer))
 
@@ -312,6 +320,46 @@ async def _try_instant_rag(
         )
 
 
+async def _check_user_limit(user_id: int, log) -> object | None:
+    """Check daily limit for *user_id*.  Returns *None* if DB is unavailable."""
+    try:
+        from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine  # noqa: PLC0415
+
+        from reviewmind.config import settings  # noqa: PLC0415
+        from reviewmind.services.limit_service import LimitService  # noqa: PLC0415
+
+        engine = create_async_engine(settings.database_url, pool_pre_ping=True, echo=False)
+        session_factory = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+        async with session_factory() as session:
+            service = LimitService(session, admin_user_ids=settings.admin_user_ids)
+            result = await service.check_limit(user_id)
+            await session.commit()
+        await engine.dispose()
+        return result
+    except Exception as exc:
+        log.warning("limit_check_failed", error=str(exc))
+        return None
+
+
+async def _increment_user_limit(user_id: int, log) -> None:
+    """Increment the daily request counter for *user_id*.  Best-effort."""
+    try:
+        from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine  # noqa: PLC0415
+
+        from reviewmind.config import settings  # noqa: PLC0415
+        from reviewmind.services.limit_service import LimitService  # noqa: PLC0415
+
+        engine = create_async_engine(settings.database_url, pool_pre_ping=True, echo=False)
+        session_factory = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+        async with session_factory() as session:
+            service = LimitService(session, admin_user_ids=settings.admin_user_ids)
+            await service.increment(user_id)
+            await session.commit()
+        await engine.dispose()
+    except Exception as exc:
+        log.warning("limit_increment_failed", error=str(exc))
+
+
 async def _fallback_llm_answer(message: Message, user_id: int, log) -> None:
     """Send a direct LLM answer (no RAG) for non-product queries."""
     try:
@@ -330,6 +378,7 @@ async def _fallback_llm_answer(message: Message, user_id: int, log) -> None:
         answer += _NO_PRODUCT_FALLBACK_NOTE
 
     await message.answer(answer)
+    await _increment_user_limit(user_id, log)
     log.info(
         "auto_fallback_llm_answer",
         answer_len=len(answer),

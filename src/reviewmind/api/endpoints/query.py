@@ -15,6 +15,7 @@ from reviewmind.api.schemas import QueryRequest, QueryResponse
 from reviewmind.core.llm import LLMClient
 from reviewmind.core.rag import RAGPipeline
 from reviewmind.db.repositories.query_logs import QueryLogRepository
+from reviewmind.services.limit_service import LimitService
 from reviewmind.services.query_service import QueryService
 
 logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
@@ -69,12 +70,54 @@ async def _log_query(
         return None
 
 
+async def _check_limit(request: Request, user_id: int) -> object | None:
+    """Check daily limit.  Returns *None* when DB is unavailable."""
+    engine = getattr(request.app.state, "db_engine", None)
+    if engine is None:
+        return None
+    try:
+        session_factory = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+        async with session_factory() as session:
+            service = LimitService(session)
+            result = await service.check_limit(user_id)
+            await session.commit()
+        return result
+    except Exception as exc:
+        logger.warning("limit_check_failed", error=str(exc))
+        return None
+
+
+async def _increment_limit(request: Request, user_id: int) -> None:
+    """Increment daily counter.  Best-effort — never raises."""
+    engine = getattr(request.app.state, "db_engine", None)
+    if engine is None:
+        return
+    try:
+        session_factory = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+        async with session_factory() as session:
+            service = LimitService(session)
+            await service.increment(user_id)
+            await session.commit()
+    except Exception as exc:
+        logger.warning("limit_increment_failed", error=str(exc))
+
+
 @router.post("/query", response_model=QueryResponse)
 async def post_query(body: QueryRequest, request: Request) -> QueryResponse:
     """Accept a user query, run RAG pipeline, log result, and return the answer."""
     start_ms = time.monotonic()
     log = logger.bind(user_id=body.user_id, mode=body.mode, session_id=body.session_id)
     log.info("api_query_received", query_len=len(body.query))
+
+    # ── Check daily limit ────────────────────────────────────
+    limit_result = await _check_limit(request, body.user_id)
+    if limit_result is not None and not limit_result.allowed:
+        elapsed_ms = int((time.monotonic() - start_ms) * 1000)
+        return QueryResponse(
+            answer=limit_result.message,
+            response_time_ms=elapsed_ms,
+            error=True,
+        )
 
     qdrant = getattr(request.app.state, "qdrant", None)
 
@@ -98,6 +141,7 @@ async def post_query(body: QueryRequest, request: Request) -> QueryResponse:
                 response_time_ms=elapsed_ms,
                 used_tavily=False,
             )
+            await _increment_limit(request, body.user_id)
             return QueryResponse(
                 answer=result.answer,
                 response_time_ms=elapsed_ms,
@@ -158,6 +202,8 @@ async def post_query(body: QueryRequest, request: Request) -> QueryResponse:
         response_time_ms=elapsed_ms,
         used_tavily=rag_result.used_tavily,
     )
+
+    await _increment_limit(request, body.user_id)
 
     return QueryResponse(
         answer=answer,

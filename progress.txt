@@ -1338,4 +1338,51 @@
 - _schedule_background_job создаёт отдельный engine (не переиспользует app session) — для изоляции bot от DB lifecycle
 - 4 pre-existing failures в test_config.py не связаны с TASK-045
 
+## Итерация 31 — TASK-036: Лимиты запросов (3 req/day free, premium bypass)
+
+**Задача:** TASK-036 — Лимиты запросов: 3 req/day бесплатно, счётчик в PostgreSQL user_limits
+**Статус:** ✅ done
+
+**Что сделано:**
+- Создан `src/reviewmind/services/limit_service.py`:
+  - `LimitService(session, admin_user_ids?, daily_limit?)` — основной сервис
+  - `check_limit(user_id) → LimitCheckResult` — проверка лимита с bypass для admin/premium
+  - `increment(user_id) → int` — инкремент счётчика, возвращает новое значение
+  - `get_usage(user_id) → dict` — текущее использование
+  - `LimitCheckResult` dataclass: allowed, requests_used, requests_limit, reason, message
+  - Константы: `FREE_DAILY_LIMIT=3`, `PREMIUM_SUBSCRIPTION='premium'`, `LIMIT_REACHED_MSG` шаблон
+  - Admin bypass через `config.settings.admin_user_ids` (lazy)
+  - Premium bypass через `user.subscription == 'premium'`
+- Обновлён `src/reviewmind/services/__init__.py` — экспорт LimitService, LimitCheckResult, констант
+- Интеграция в `src/reviewmind/bot/handlers/query.py`:
+  - `_check_user_limit(user_id, log)` + `_increment_user_limit(user_id, log)` helpers
+  - Step 0 в `on_text_message` — проверка лимита до обработки, subscribe_keyboard при блокировке
+  - Инкремент после instant RAG, Tavily, и fallback LLM ответов
+- Интеграция в `src/reviewmind/bot/handlers/links.py`:
+  - Аналогичные helpers, проверка в `on_links_message`, инкремент в `_ingest_and_analyse`
+- Интеграция в `src/reviewmind/api/endpoints/query.py`:
+  - `_check_limit(request, user_id)` + `_increment_limit(request, user_id)` через app.state.db_engine
+  - Проверка в `post_query`, возврат QueryResponse с limit message при блокировке
+- 47 unit-тестов в `tests/unit/test_services/test_limit_service.py`:
+  - TestConstants(4), TestLimitCheckResult(5), TestLimitServiceInit(5)
+  - TestCheckLimitAdmin(2), TestCheckLimitPremium(3), TestCheckLimitFree(6)
+  - TestIncrement(2), TestGetUsage(1), TestTodayHelper(2)
+  - TestApiQueryLimitIntegration(3), TestBotQueryLimitIntegration(2), TestBotLinksLimitIntegration(1)
+  - TestSubscribeKeyboard(2), TestServicesExports(4), TestIntegrationScenarios(5)
+- Создан `tests/unit/test_bot/conftest.py` — autouse fixture `_bypass_user_limits` для совместимости существующих бот-тестов
+- Патч 2 тестов в `test_query_service.py` — добавлен bypass лимитов
+- `ruff check .` — All checks passed
+- `pytest` — 1962 passed (+47 new), 4 pre-existing failures (test_config.py)
+
+**Следующие шаги:**
+- TASK-038: Admin whitelist endpoint — medium — depends on TASK-036 ✅
+- TASK-039: Daily reset cron (Celery beat) — medium — depends on TASK-036 ✅
+- TASK-046: Multi-turn диалог — medium — all deps met
+
+**Заметки для следующей итерации:**
+- Helpers `_check_user_limit`/`_increment_user_limit` создают отдельный engine+session (изоляция от bot lifecycle)
+- conftest.py в test_bot/ — autouse fixture патчит оба handler модуля (query + links)
+- admin_user_ids загружается lazy из config.settings для избежания startup-ошибок
+- 4 pre-existing failures в test_config.py не связаны с TASK-036
+
 ---

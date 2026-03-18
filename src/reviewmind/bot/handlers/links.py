@@ -19,7 +19,7 @@ from aiogram.enums import ChatAction
 from aiogram.types import Message
 from qdrant_client import AsyncQdrantClient
 
-from reviewmind.bot.keyboards import feedback_keyboard
+from reviewmind.bot.keyboards import feedback_keyboard, subscribe_keyboard
 from reviewmind.core.rag import RAGPipeline
 from reviewmind.ingestion.pipeline import IngestionPipeline
 
@@ -109,6 +109,46 @@ def _create_qdrant_client() -> AsyncQdrantClient:
     return AsyncQdrantClient(url=settings.qdrant_url)
 
 
+async def _check_user_limit(user_id: int, log) -> object | None:
+    """Check daily limit for *user_id*.  Returns *None* if DB is unavailable."""
+    try:
+        from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine  # noqa: PLC0415
+
+        from reviewmind.config import settings  # noqa: PLC0415
+        from reviewmind.services.limit_service import LimitService  # noqa: PLC0415
+
+        engine = create_async_engine(settings.database_url, pool_pre_ping=True, echo=False)
+        session_factory = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+        async with session_factory() as session:
+            service = LimitService(session, admin_user_ids=settings.admin_user_ids)
+            result = await service.check_limit(user_id)
+            await session.commit()
+        await engine.dispose()
+        return result
+    except Exception as exc:
+        log.warning("limit_check_failed", error=str(exc))
+        return None
+
+
+async def _increment_user_limit(user_id: int, log) -> None:
+    """Increment the daily request counter for *user_id*.  Best-effort."""
+    try:
+        from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine  # noqa: PLC0415
+
+        from reviewmind.config import settings  # noqa: PLC0415
+        from reviewmind.services.limit_service import LimitService  # noqa: PLC0415
+
+        engine = create_async_engine(settings.database_url, pool_pre_ping=True, echo=False)
+        session_factory = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+        async with session_factory() as session:
+            service = LimitService(session, admin_user_ids=settings.admin_user_ids)
+            await service.increment(user_id)
+            await session.commit()
+        await engine.dispose()
+    except Exception as exc:
+        log.warning("limit_increment_failed", error=str(exc))
+
+
 @router.message(_message_has_url)
 async def on_links_message(message: Message) -> None:
     """Handle messages containing HTTP(S) URLs — ingest and analyse."""
@@ -126,6 +166,12 @@ async def on_links_message(message: Message) -> None:
     # Show typing indicator
     if message.bot:
         await message.bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.TYPING)
+
+    # Check daily limit
+    limit_result = await _check_user_limit(user_id, log)
+    if limit_result is not None and not limit_result.allowed:
+        await message.answer(limit_result.message, reply_markup=subscribe_keyboard())
+        return
 
     # Send processing status
     status_msg = await message.answer(
@@ -225,6 +271,10 @@ async def _ingest_and_analyse(
         answer,
         reply_markup=feedback_keyboard(),
     )
+
+    # Increment daily counter (best-effort)
+    user_id = message.from_user.id if message.from_user else 0
+    await _increment_user_limit(user_id, log)
 
     log.info(
         "links_analysis_sent",

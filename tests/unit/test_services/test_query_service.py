@@ -268,6 +268,8 @@ class TestBotQueryHandler:
         mock_client = _mock_llm_client("Buy Sony WH-1000XM5")
 
         with (
+            patch("reviewmind.bot.handlers.query._check_user_limit", new_callable=AsyncMock, return_value=None),
+            patch("reviewmind.bot.handlers.query._increment_user_limit", new_callable=AsyncMock),
             patch("reviewmind.bot.handlers.query.extract_product", new=AsyncMock(return_value=[])),
             patch("reviewmind.bot.handlers.query.LLMClient") as MockLLM,
         ):
@@ -287,6 +289,8 @@ class TestBotQueryHandler:
         msg = _make_bot_message("trigger error")
 
         with (
+            patch("reviewmind.bot.handlers.query._check_user_limit", new_callable=AsyncMock, return_value=None),
+            patch("reviewmind.bot.handlers.query._increment_user_limit", new_callable=AsyncMock),
             patch("reviewmind.bot.handlers.query.extract_product", new=AsyncMock(return_value=[])),
             patch("reviewmind.bot.handlers.query.LLMClient") as MockLLM,
         ):

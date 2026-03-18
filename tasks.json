@@ -1063,7 +1063,8 @@
         "Шаг 5: Проверить user_limits в PostgreSQL: requests_used=3"
       ],
       "dependencies": ["TASK-009", "TASK-027"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Реализован LimitService (check_limit, increment, get_usage) + LimitCheckResult. Константы: FREE_DAILY_LIMIT=3, PREMIUM_SUBSCRIPTION, LIMIT_REACHED_MSG. Обход лимитов для админов (config.admin_user_ids) и premium (user.subscription). Интегрировано в POST /query API, бот-обработчики query и links. Кнопка subscribe_keyboard при блокировке. 47 юнит-тестов. conftest.py для совместимости бот-тестов."
     },
     {
       "id": "TASK-037",
