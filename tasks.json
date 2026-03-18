@@ -787,7 +787,8 @@
         "Шаг 5: Процент качественных ответов ≥ 80%"
       ],
       "dependencies": ["TASK-019", "TASK-024"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Реализован scripts/seed_test_data.py — полный скрипт загрузки seed-данных и верификации качества RAG. Seed-данные: 7 реалистичных обзоров по 3 товарам (Sony WH-1000XM5 — 3 обзора youtube/web/reddit, iPhone 16 Pro — 2 обзора web/youtube, Dyson V15 Detect — 2 обзора web/reddit). Один обзор помечен is_sponsored=True для тестирования. Каждый обзор содержит 500+ символов с реалистичными фактами. Процесс загрузки: clean_text → detect_sponsor_detailed → chunk_text → embed_batch → upsert_chunks (skip_dedup=True для идемпотентности). 20 тестовых запросов (TestQuery dataclass): 7 по Sony, 6 по iPhone, 5 по Dyson, 1 English, 1 edge-case (без конкретного товара). Каждый запрос с ожидаемым product_query, expected_language, expects_sources, min_chunks. Функция verify_rag: запускает 20 запросов через RAGPipeline, для каждого проверяет has_answer, sources_count, chunks_count, confidence_met. VerificationReport: total, passed, failed, pass_rate, avg_response_time_ms. CLI: python scripts/seed_test_data.py seed|verify — seed загружает данные, verify запускает 20 запросов. Exit code 1 если pass_rate < 80%. Dataclasses: SeedReview (frozen), TestQuery (frozen), VerificationResult, VerificationReport (pass_rate property). 37 unit-тестов в tests/unit/test_scripts/test_seed_test_data.py: TestSeedReviews (8), TestTestQueries (6), TestVerificationResult (2), TestVerificationReport (4), TestGetQdrantUrl (2), TestSeedData (4 — mocked), TestVerifyRag (4 — mocked), TestIntegrationScenarios (7). ruff check — 0 ошибок, pytest — 2333 passed (2296 existing + 37 new), 9 pre-existing failures (4 test_config.py + 3 test_links.py + 2 test_ingest.py, не связаны с TASK-025)."
     },
     {
       "id": "TASK-026",

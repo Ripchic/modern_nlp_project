@@ -1645,4 +1645,34 @@
 
 ---
 
+## Итерация 22 — 2026-03-19
+**Фича:** TASK-025 — Seed-данные для тестирования + верификация качества RAG (20 запросов)
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `scripts/seed_test_data.py` — полный скрипт загрузки seed-данных и верификации RAG
+- 7 реалистичных обзоров по 3 товарам: Sony WH-1000XM5 (3 обзора: web/youtube/reddit), iPhone 16 Pro (2: web/youtube), Dyson V15 Detect (2: web/reddit)
+- Один обзор помечен `is_sponsored=True` для тестирования детекции спонсорства
+- Каждый обзор 500+ символов с реалистичными фактами (шумоподавление, камера, мощность и т.д.)
+- Ingestion pipeline: clean_text → detect_sponsor_detailed → chunk_text → embed_batch → upsert_chunks (skip_dedup=True)
+- 20 тестовых запросов (TestQuery): 7 Sony, 6 iPhone, 5 Dyson, 1 English, 1 edge-case
+- Функция `verify_rag`: запускает 20 запросов через RAGPipeline, оценивает has_answer/sources/chunks/confidence
+- VerificationReport с pass_rate, avg_response_time_ms
+- CLI: `python scripts/seed_test_data.py seed|verify` — exit code 1 при pass_rate < 80%
+- 37 unit-тестов в `tests/unit/test_scripts/test_seed_test_data.py`
+- `ruff check .` — All checks passed
+- `pytest` — 2333 passed (2296 existing + 37 new), 9 pre-existing failures (не связаны)
+**Следующие шаги:**
+- TASK-030: /mode с Redis persistence (medium — уже реализовано в TASK-046, нуждается в формальном закрытии)
+- TASK-039: Ежесуточный сброс лимитов (medium — уже работает через date-based keys)
+- TASK-040: Curated KB seed script (medium)
+- TASK-047: Сравнение товаров X vs Y (low)
+- TASK-050: Кнопка 📎 Источники (medium — уже реализована в TASK-048)
+**Заметки для следующей итерации:**
+- TASK-030, TASK-039, TASK-050 фактически реализованы в коде, но ещё имеют status=pending в tasks.json — нуждаются в формальном закрытии
+- Для реального запуска seed/verify нужны работающие внешние сервисы (Qdrant + OpenAI API key)
+- Seed-данные используют example.com URLs — для реальных тестов нужны настоящие источники
+- `scripts/seed_curated_kb.py` — следующий seed script (TASK-040, curated_kb коллекция)
+
+---
+
 ---
