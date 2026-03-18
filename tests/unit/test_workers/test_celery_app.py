@@ -272,7 +272,7 @@ class TestWorkersExports:
     def test_all_count(self):
         import reviewmind.workers as w
 
-        assert len(w.__all__) == 14
+        assert len(w.__all__) == 22
 
 
 # ── Test config fields ──────────────────────────────────────────────────────

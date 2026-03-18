@@ -40,6 +40,8 @@ def create_celery_app(
         backend=result_backend,
     )
 
+    from reviewmind.workers.beat_schedule import BEAT_SCHEDULE
+
     app.conf.update(
         # Serialisation
         task_serializer="json",
@@ -57,6 +59,8 @@ def create_celery_app(
         result_expires=86400,
         # Broker connection retry on startup
         broker_connection_retry_on_startup=True,
+        # Beat schedule
+        beat_schedule=BEAT_SCHEDULE,
     )
 
     logger.info(

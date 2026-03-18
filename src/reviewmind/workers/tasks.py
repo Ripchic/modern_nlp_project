@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import structlog
 from qdrant_client import AsyncQdrantClient
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from reviewmind.db.models import QueryLog, UserLimit
 from reviewmind.db.repositories.jobs import JobRepository
 from reviewmind.ingestion.pipeline import IngestionPipeline
 from reviewmind.workers.celery_app import celery_app
@@ -291,3 +293,143 @@ def ingest_sources_task(
             )
         )
         raise
+
+
+# ---------------------------------------------------------------------------
+# Periodic tasks (Celery Beat)
+# ---------------------------------------------------------------------------
+
+# ── Constants for periodic tasks ─────────────────────────────────────────────
+
+TOP_QUERIES_LIMIT: int = 50
+"""Number of top product queries to refresh during the monthly task."""
+
+
+async def _daily_reset_limits() -> dict:
+    """Reset ``requests_used`` to 0 for all user_limits with today's date.
+
+    This ensures stale counters from previous beat runs don't carry over.
+    In practice, limits are keyed by (user_id, date), so a new date yields
+    a fresh counter automatically.  This task explicitly resets *today's*
+    rows to handle scenarios where rows were pre-created (e.g. race
+    conditions or manual inserts).
+
+    Returns a summary dict with the number of rows reset.
+    """
+    from reviewmind.config import settings
+
+    engine = create_async_engine(settings.database_url, pool_pre_ping=True, echo=False)
+    session_factory = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+
+    today = date.today()
+    rows_reset = 0
+
+    try:
+        async with session_factory() as session:
+            result = await session.execute(
+                select(UserLimit).where(
+                    UserLimit.date == today,
+                    UserLimit.requests_used > 0,
+                )
+            )
+            rows = result.scalars().all()
+            for row in rows:
+                row.requests_used = 0
+                rows_reset += 1
+            await session.commit()
+        logger.info("daily_reset_limits_done", date=str(today), rows_reset=rows_reset)
+    except Exception as exc:
+        logger.error("daily_reset_limits_error", error=str(exc))
+    finally:
+        await engine.dispose()
+
+    return {"date": str(today), "rows_reset": rows_reset}
+
+
+async def _refresh_top_queries() -> dict:
+    """Fetch top-50 product queries from ``query_logs`` and re-ingest them.
+
+    Gathers the most frequent ``product_query`` values from the query_logs
+    table (non-NULL, grouped and ordered by count DESC), then enqueues
+    a background ingestion job for each via the Celery ingest task.
+
+    Returns a summary dict with the queries found and jobs enqueued.
+    """
+    from reviewmind.config import settings
+
+    engine = create_async_engine(settings.database_url, pool_pre_ping=True, echo=False)
+    session_factory = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+
+    queries_found: list[str] = []
+    jobs_enqueued = 0
+
+    try:
+        async with session_factory() as session:
+            # Find top-N product queries by frequency
+            stmt = (
+                select(
+                    QueryLog.query_text,
+                    func.count(QueryLog.id).label("cnt"),
+                )
+                .where(QueryLog.query_text.isnot(None))
+                .group_by(QueryLog.query_text)
+                .order_by(func.count(QueryLog.id).desc())
+                .limit(TOP_QUERIES_LIMIT)
+            )
+            result = await session.execute(stmt)
+            rows = result.all()
+            queries_found = [row[0] for row in rows if row[0]]
+
+        logger.info("refresh_top_queries_found", count=len(queries_found))
+
+        # Enqueue ingestion for each top query (via existing Celery task)
+        for query_text in queries_found:
+            try:
+                job_id = str(uuid.uuid4())
+                ingest_sources_task.apply_async(
+                    kwargs={
+                        "job_id": job_id,
+                        "user_id": 0,  # system-level job
+                        "product_query": query_text,
+                        "urls": [],  # auto-search will find URLs
+                    },
+                )
+                jobs_enqueued += 1
+            except Exception as exc:
+                logger.warning(
+                    "refresh_top_queries_enqueue_failed",
+                    query=query_text,
+                    error=str(exc),
+                )
+
+        logger.info("refresh_top_queries_done", queries=len(queries_found), jobs_enqueued=jobs_enqueued)
+    except Exception as exc:
+        logger.error("refresh_top_queries_error", error=str(exc))
+    finally:
+        await engine.dispose()
+
+    return {
+        "queries_found": len(queries_found),
+        "jobs_enqueued": jobs_enqueued,
+        "top_queries": queries_found[:10],  # return first 10 for logging
+    }
+
+
+@celery_app.task(name="reviewmind.daily_reset_limits", bind=True, max_retries=0)
+def daily_reset_limits_task(self: object) -> dict:
+    """Celery Beat task: reset all user_limits.requests_used for today.
+
+    Scheduled to run daily at 00:00 UTC.
+    """
+    logger.info("daily_reset_limits_task_start")
+    return _run_async(_daily_reset_limits())
+
+
+@celery_app.task(name="reviewmind.refresh_top_queries", bind=True, max_retries=0)
+def refresh_top_queries_task(self: object) -> dict:
+    """Celery Beat task: refresh top-50 product queries.
+
+    Scheduled to run on the 1st of every month at 03:00 UTC.
+    """
+    logger.info("refresh_top_queries_task_start")
+    return _run_async(_refresh_top_queries())

@@ -1468,3 +1468,43 @@
 - conftest.py autouse fixture патчит _create_session_manager в query+links и _persist_mode в mode
 
 ---
+
+## Итерация 32 — 2026-03-18
+**Фича:** TASK-035 — Celery Beat: расписание периодических задач (сброс лимитов, обновление кэша)
+**Статус:** Завершено
+**Что сделано:**
+- Реализован `src/reviewmind/workers/beat_schedule.py`:
+  - DAILY_RESET_LIMITS_TASK = 'reviewmind.daily_reset_limits'
+  - REFRESH_TOP_QUERIES_TASK = 'reviewmind.refresh_top_queries'
+  - DAILY_RESET_SCHEDULE = crontab(minute=0, hour=0) — каждый день в 00:00 UTC
+  - REFRESH_TOP_QUERIES_SCHEDULE = crontab(minute=0, hour=3, day_of_month=1) — 1-го каждого месяца в 03:00 UTC
+  - BEAT_SCHEDULE dict с обоими задачами + options={queue: 'default'}
+- Интеграция в `celery_app.py`: import BEAT_SCHEDULE, app.conf.update(beat_schedule=BEAT_SCHEDULE)
+- 2 новые Celery-задачи в `workers/tasks.py`:
+  - `daily_reset_limits_task` — async _daily_reset_limits(): SELECT user_limits WHERE date=today AND requests_used > 0, reset to 0, commit, dispose engine
+  - `refresh_top_queries_task` — async _refresh_top_queries(): SELECT query_text GROUP BY query_text ORDER BY COUNT DESC LIMIT 50, для каждого enqueue ingest_sources_task.apply_async()
+  - Обе: max_retries=0, bind=True, graceful error handling, engine.dispose() в finally
+- Обновлён `workers/__init__.py`: 8 новых экспортов, __all__ = 22 элемента
+- Docker Compose beat сервис уже настроен: celery -A reviewmind.workers.celery_app beat --loglevel=info
+- 57 unit-тестов в `tests/unit/test_workers/test_beat_schedule.py`:
+  - TestBeatScheduleConstants (5), TestBeatScheduleDict (8), TestCrontabSchedules (3)
+  - TestCeleryAppBeatIntegration (4), TestTaskRegistration (6)
+  - TestDailyResetLimits (5), TestRefreshTopQueries (7)
+  - TestSyncWrappers (2), TestWorkersExports (10)
+  - TestDockerComposeAlignment (2), TestIntegrationScenarios (5)
+- `ruff check .` — All checks passed
+- `pytest` — 2120 passed (2063 existing + 57 new), 4 pre-existing failures в test_config.py
+**Следующие шаги:**
+- TASK-039: Ежесуточный сброс лимитов (зависит от TASK-035 ✅ — РАЗБЛОКИРОВАНА)
+- TASK-025: Seed-данные для тестирования + RAG верификация
+- TASK-049: GDPR /delete_my_data
+- TASK-037: Telegram Stars оплата
+**Заметки для следующей итерации:**
+- TASK-035 ✅ завершает Stage 6 (Celery Async) — все 4 задачи Stage 6 выполнены
+- TASK-039 (daily limit reset) теперь разблокирована — зависит от TASK-035 ✅ + TASK-036 ✅
+- beat_schedule.py импортируется внутри create_celery_app() — BEAT_SCHEDULE передаётся в conf
+- _daily_reset_limits и _refresh_top_queries — async функции, вызываемые через _run_async (asyncio.run)
+- refresh_top_queries enqueue'ит ingest_sources_task.apply_async с user_id=0 (system-level job)
+- Предупреждения о «coroutine never awaited» при pytest — cosmetic, от Celery task discovery при import
+
+---
