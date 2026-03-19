@@ -1675,4 +1675,37 @@
 
 ---
 
+## Итерация 23 — 2026-03-19
+**Фича:** TASK-039 — Ежесуточный сброс лимитов (Celery Beat задача, 00:00 UTC)
+**Статус:** Завершено
+**Что сделано:**
+- Основной механизм: date-based keying — `user_limits` таблица имеет composite PK `(user_id, date)`, новый UTC-день автоматически даёт свежий счётчик (`requests_used=0`, т.к. строка не существует)
+- Исправлен timezone bug в `_daily_reset_limits()`: `date.today()` (local time) → `datetime.now(timezone.utc).date()` (UTC), приведено в соответствие с `LimitService._today()`
+- Celery Beat задача `daily_reset_limits_task` (00:00 UTC) — safety net для pre-created rows (race conditions, manual inserts)
+- Старые записи `user_limits` НЕ удаляются — сохраняются для аналитики
+- Premium/admin bypass без изменений — работает на всех днях
+- Обновлены docstrings в `workers/tasks.py` для ясности двухуровневого механизма
+- Удалён неиспользуемый import `date` из `workers/tasks.py` (ruff)
+- 26 новых unit-тестов в `tests/unit/test_services/test_daily_reset.py`:
+  - TestDateBasedKeying (4): no_row → 0 usage, exhausted→fresh, UTC, per-user
+  - TestMidnightTransition (3): mock day change, correct date queried, increment date
+  - TestOldRowsPreserved (2): two days two rows, no deletion
+  - TestPremiumNotAffected (2): bypass every day, no repo touched
+  - TestDailyResetLimitsTask (5): UTC date, resets today only, no rows, DB error, engine disposed
+  - TestTaskRegistration (4): task name, max_retries, beat schedule, midnight crontab
+  - TestIntegrationScenarios (7): all 5 PRD test_steps + admin bypass + UTC check
+- `ruff check .` — All checks passed  
+- `pytest` — 2359 passed (2333 existing + 26 new), 9 pre-existing failures (не связаны)
+**Следующие шаги:**
+- TASK-030: /mode с Redis persistence (medium)
+- TASK-040: Curated KB seed script (medium)
+- TASK-047: Сравнение товаров X vs Y (low)
+- TASK-050: Кнопка 📎 Источники (medium)
+**Заметки для следующей итерации:**
+- TASK-030 и TASK-050 могут быть фактически реализованы (нуждаются в проверке + формальном закрытии)
+- Оставшиеся pending задачи: TASK-030, TASK-040, TASK-047, TASK-050
+- Все монетизационные задачи Stage 7 теперь done (TASK-036, TASK-037, TASK-038, TASK-039)
+
+---
+
 ---

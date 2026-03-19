@@ -1140,7 +1140,8 @@
         "Шаг 5: У premium пользователя лимит не действует ни в какой день"
       ],
       "dependencies": ["TASK-035", "TASK-036"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Реализован ежесуточный сброс лимитов через date-based keying (primary) + Celery Beat safety net (secondary). Основной механизм: LimitService использует (user_id, date) composite PK — новый UTC-день автоматически даёт свежий счётчик (requests_used=0, т.к. row не существует). Исправлен timezone bug в _daily_reset_limits(): date.today() (local time) → datetime.now(timezone.utc).date() (UTC), согласовано с LimitService._today(). Celery Beat задача daily_reset_limits_task (00:00 UTC) — safety net для pre-created rows. Старые записи user_limits НЕ удаляются (сохраняются для аналитики). Premium/admin bypass работает на всех днях. 26 unit-тестов в tests/unit/test_services/test_daily_reset.py: TestDateBasedKeying (4), TestMidnightTransition (3), TestOldRowsPreserved (2), TestPremiumNotAffected (2), TestDailyResetLimitsTask (5 — UTC date, resets today only, no rows, DB error, engine disposed), TestTaskRegistration (4), TestIntegrationScenarios (7 — все 5 test steps из PRD + admin + UTC check). ruff check — 0 ошибок, pytest — 2359 passed (2333 existing + 26 new), 9 pre-existing failures (4 test_config.py + 3 test_links.py + 2 test_ingest.py, не связаны с TASK-039)."
     },
     {
       "id": "TASK-040",

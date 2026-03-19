@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 
 import structlog
 from qdrant_client import AsyncQdrantClient
@@ -306,13 +306,18 @@ TOP_QUERIES_LIMIT: int = 50
 
 
 async def _daily_reset_limits() -> dict:
-    """Reset ``requests_used`` to 0 for all user_limits with today's date.
+    """Safety-net reset for ``user_limits`` at midnight UTC.
 
-    This ensures stale counters from previous beat runs don't carry over.
-    In practice, limits are keyed by (user_id, date), so a new date yields
-    a fresh counter automatically.  This task explicitly resets *today's*
-    rows to handle scenarios where rows were pre-created (e.g. race
-    conditions or manual inserts).
+    The primary daily-reset mechanism is **date-based keying**: each
+    ``user_limits`` row is keyed by ``(user_id, date)``, so a new UTC day
+    automatically yields a fresh counter (``requests_used`` starts at 0)
+    with no explicit reset needed.
+
+    This Beat task runs at 00:00 UTC as a **safety net** — it zeros out
+    any ``requests_used`` values for the *new* day's rows that might have
+    been pre-created (e.g. race conditions at midnight, manual inserts, or
+    clock-skew).  Old rows for previous dates are **preserved** for
+    analytics.
 
     Returns a summary dict with the number of rows reset.
     """
@@ -321,7 +326,7 @@ async def _daily_reset_limits() -> dict:
     engine = create_async_engine(settings.database_url, pool_pre_ping=True, echo=False)
     session_factory = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
 
-    today = date.today()
+    today = datetime.now(timezone.utc).date()
     rows_reset = 0
 
     try:
@@ -417,7 +422,12 @@ async def _refresh_top_queries() -> dict:
 
 @celery_app.task(name="reviewmind.daily_reset_limits", bind=True, max_retries=0)
 def daily_reset_limits_task(self: object) -> dict:
-    """Celery Beat task: reset all user_limits.requests_used for today.
+    """Celery Beat task: safety-net reset of user_limits at midnight UTC.
+
+    The primary mechanism is **date-based keying** — each new UTC day
+    the ``LimitService`` reads the counter for today's date, which starts
+    at 0 (no row exists yet).  This task is a safety net that zeros out
+    any rows pre-created for today.  Old rows are preserved for analytics.
 
     Scheduled to run daily at 00:00 UTC.
     """
