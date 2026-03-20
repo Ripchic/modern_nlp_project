@@ -1743,3 +1743,31 @@
 ---
 
 ---
+
+## Итерация: TASK-040 — Curated KB seed script
+
+**Задача:** TASK-040 (medium, Stage 8: Extra Features) — Curated KB seed script: загрузка кураторских материалов по 7 категориям гаджетов.
+
+**Что сделано:**
+- scripts/seed_curated_kb.py — полноценная реализация (был 2-строчный placeholder)
+  - 14 экспертных статей (2 на категорию): smartphones (iPhone 16 Pro, Galaxy S25 Ultra), headphones (Sony XM5, AirPods Max 2), laptops (MacBook Pro M4, ASUS ROG G16), smartwatches (Apple Watch Ultra 3, Galaxy Watch 7), tablets (iPad Pro M4, Galaxy Tab S10 Ultra), speakers (Sonos Era 300, JBL Charge 6), smart_tvs (LG OLED C4, Samsung QN90D)
+  - Источники: RTINGS, Wirecutter
+  - CuratedArticle frozen dataclass, SeedResult, VerifyResult dataclasses
+  - _is_article_fresh() — проверка свежести (MAX_AGE_DAYS=365)
+  - seed_curated_kb(): ensure_collections → clean_text → detect_sponsor → chunk_text → embed_batch → upsert_chunks в curated_kb с is_curated=True, source_type="curated", category
+  - verify_curated_kb(): проверка коллекции, количества точек, категорий, is_curated флага
+  - Дедупликация через deterministic UUID5 point IDs (generate_point_id)
+  - CLI: seed/verify
+- tests/unit/test_scripts/test_seed_curated_kb.py — 45 unit-тестов
+  - TestConstants (5), TestCuratedArticle (7), TestIsArticleFresh (7), TestGetQdrantUrl (2)
+  - TestSeedResult (2), TestVerifyResult (2)
+  - TestSeedCuratedKb (6 async mocked), TestVerifyCuratedKb (4 async mocked)
+  - TestPayloadCoverage (3), TestIntegrationScenarios (7)
+- `ruff check .` — All checks passed
+- `pytest` — 2441 passed (2396 existing + 45 new), 9 pre-existing failures (не связаны)
+
+**Следующие шаги:**
+- TASK-047: Сравнение товаров X vs Y (low, Cross-cutting)
+- TASK-050: Кнопка 📎 Источники — возможно уже реализована в TASK-048 (проверить + закрыть)
+
+---

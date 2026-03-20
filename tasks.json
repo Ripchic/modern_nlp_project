@@ -1167,7 +1167,8 @@
         "Шаг 5: Проверить payload: category, updated_at, is_curated=true"
       ],
       "dependencies": ["TASK-019", "TASK-010"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Реализован scripts/seed_curated_kb.py — полноценный скрипт загрузки кураторской базы знаний. 14 экспертных статей (2 на категорию) по 7 категориям гаджетов (smartphones, headphones, laptops, smartwatches, tablets, speakers, smart_tvs). Источники: RTINGS, Wirecutter. Скрипт: (1) проверяет свежесть статей (MAX_AGE_DAYS=365), (2) clean_text + detect_sponsor_detailed, (3) chunk_text + embed_batch, (4) upsert в Qdrant curated_kb с is_curated=True, source_type='curated', category в payload. Дедупликация через deterministic UUID5 point IDs (generate_point_id). CLI: seed/verify. Dataclasses: CuratedArticle (frozen), SeedResult, VerifyResult. verify_curated_kb() проверяет коллекцию, количество точек, категории, is_curated флаг. 45 unit-тестов в tests/unit/test_scripts/test_seed_curated_kb.py: TestConstants (5), TestCuratedArticle (7), TestIsArticleFresh (7), TestGetQdrantUrl (2), TestSeedResult (2), TestVerifyResult (2), TestSeedCuratedKb (6 async mocked), TestVerifyCuratedKb (4 async mocked), TestPayloadCoverage (3), TestIntegrationScenarios (7). ruff check — 0 ошибок, pytest — 2441 passed (2396 existing + 45 new), 9 pre-existing failures."
     },
     {
       "id": "TASK-041",
