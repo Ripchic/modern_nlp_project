@@ -1,0 +1,28 @@
+# Production override — uses pre-built GHCR image instead of local build.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Set IMAGE_TAG env var to deploy a specific commit (defaults to "latest").
+services:
+  api:
+    build: !reset null
+    image: ghcr.io/ripchic/modern_nlp_project:${IMAGE_TAG:-latest}
+    ports:
+      - "8000:8000"
+
+  bot:
+    build: !reset null
+    image: ghcr.io/ripchic/modern_nlp_project:${IMAGE_TAG:-latest}
+
+  worker:
+    build: !reset null
+    image: ghcr.io/ripchic/modern_nlp_project:${IMAGE_TAG:-latest}
+
+  beat:
+    build: !reset null
+    image: ghcr.io/ripchic/modern_nlp_project:${IMAGE_TAG:-latest}
+
+  flower:
+    build: !reset null
+    image: ghcr.io/ripchic/modern_nlp_project:${IMAGE_TAG:-latest}
+    ports:
+      - "5555:5555"
