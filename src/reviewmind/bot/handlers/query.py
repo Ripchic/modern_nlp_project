@@ -297,11 +297,45 @@ async def on_text_message(message: Message) -> None:
 
     log.info("auto_product_extracted", products=product_names)
 
-    # No product detected → direct LLM fallback
+    # No product detected → try RAG+Tavily first, then plain LLM fallback
     if not product_names:
-        await _fallback_llm_answer(message, user_id, log, chat_history=chat_history)
-        # Store user + assistant messages in history
-        await _store_exchange(session_mgr, user_id, message.text, log=log)
+        rag_response = None
+        try:
+            qdrant = _create_qdrant_client()
+            try:
+                rag_response = await _try_instant_rag(
+                    qdrant, message.text, None, log, chat_history=chat_history
+                )
+            finally:
+                await qdrant.close()
+        except Exception as exc:
+            log.warning("no_product_rag_failed", error=str(exc))
+
+        if rag_response and rag_response.answer:
+            answer = _truncate(rag_response.answer)
+            # Add tip only when Tavily was NOT used (meaning LLM answered from
+            # its own knowledge) so user knows to name a specific product next.
+            if not rag_response.used_tavily and len(answer) + len(_NO_PRODUCT_FALLBACK_NOTE) <= _MAX_ANSWER_LENGTH:
+                answer += _NO_PRODUCT_FALLBACK_NOTE
+            log_id = await _save_query_log(
+                user_id, message.text, answer,
+                sources=rag_response.sources,
+                used_tavily=rag_response.used_tavily,
+            )
+            await message.answer(answer, reply_markup=feedback_keyboard(query_log_id=log_id))
+            await _increment_user_limit(user_id, log)
+            await _store_exchange(session_mgr, user_id, message.text, answer, log)
+            log.info(
+                "no_product_tavily_answer",
+                used_tavily=rag_response.used_tavily,
+                answer_len=len(answer),
+                sources=len(rag_response.sources),
+            )
+        else:
+            # Tavily unavailable or returned no content — plain LLM as last resort
+            await _fallback_llm_answer(message, user_id, log, chat_history=chat_history)
+            await _store_exchange(session_mgr, user_id, message.text, log=log)
+
         await _close_redis(redis_client)
         return
 
@@ -481,7 +515,7 @@ async def _handle_comparison(
 async def _try_instant_rag(
     qdrant: AsyncQdrantClient,
     user_query: str,
-    product_query: str,
+    product_query: str | None,
     log,
     *,
     chat_history: list[dict[str, str]] | None = None,
@@ -490,6 +524,8 @@ async def _try_instant_rag(
 
     Returns the :class:`~reviewmind.core.rag.RAGResponse` or ``None``.
     The RAG pipeline includes Tavily fallback when confidence is not met.
+    When *product_query* is ``None`` (no specific product detected), the
+    pipeline still runs and Tavily is triggered on low Qdrant confidence.
     """
     async with RAGPipeline(qdrant_client=qdrant) as rag:
         return await rag.query(
