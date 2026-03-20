@@ -8,7 +8,7 @@ RUN pip install --no-cache-dir uv==0.5.26
 
 # Copy dependency manifest first for better cache utilisation
 COPY pyproject.toml ./
-COPY README.md ./
+RUN touch README.md
 
 # Create virtual environment and install all production dependencies
 RUN uv venv .venv && \
@@ -30,6 +30,7 @@ COPY --from=builder /app/.venv /app/.venv
 COPY src/ ./src/
 COPY alembic/ ./alembic/
 COPY alembic.ini ./
+COPY scripts/ ./scripts/
 
 # Make the venv the default Python
 ENV PATH="/app/.venv/bin:$PATH" \

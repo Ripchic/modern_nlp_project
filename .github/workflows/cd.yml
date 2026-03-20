@@ -73,19 +73,17 @@ jobs:
             set -e
             cd ${{ secrets.DEPLOY_PATH || '~/reviewmind' }}
 
-            # Pull latest compose files from repo
+            # Pull latest code
             git pull --ff-only
 
-            # Log in to GHCR and pull the new image
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-            export IMAGE_TAG=${{ github.sha }}
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+            # Build images on the server
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml build --pull
 
             # Run DB migrations (one-off container)
             docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm api alembic upgrade head
 
-            # Restart all services with the new image
+            # Restart all services
             docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
 
-            # Cleanup old images
+            # Cleanup dangling images
             docker image prune -f
