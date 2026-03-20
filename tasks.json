@@ -1345,7 +1345,8 @@
         "Шаг 5: Проверить, что время ответа разумное (< 10 сек для двух RAG)"
       ],
       "dependencies": ["TASK-024", "TASK-043"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Implemented comparison_service.py with detect_comparison(), compare_products(), parallel RAG via asyncio.gather, ComparisonResult/ProductRAGResult dataclasses, and COMPARISON_PROMPT_TEMPLATE. Integrated in bot/handlers/query.py. 51 unit tests passing."
     },
     {
       "id": "TASK-048",

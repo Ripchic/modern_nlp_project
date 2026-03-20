@@ -1800,3 +1800,28 @@
 - Все 50 задач завершены за исключением TASK-047 (low priority, product comparison)
 
 ---
+
+## Итерация 23 -- 2026-03-20
+**Фича:** TASK-047 -- Сравнение товаров: X vs Y -> параллельный RAG + таблица сравнения
+**Статус:** Завершено
+**Что сделано:**
+- Создан src/reviewmind/services/comparison_service.py:
+  - detect_comparison(query) -- определяет запрос-сравнение
+  - compare_products(query, qdrant_client, ...) -- основная точка входа
+  - _parallel_rag() -- параллельный RAG через asyncio.gather для каждого товара
+  - _build_comparison_prompt() -- промпт с секциями по каждому товару
+  - Датаклассы: ComparisonResult, ProductRAGResult
+  - COMPARISON_PROMPT_TEMPLATE -- шаблон с таблицей сравнения
+  - Lazy-импорты для избежания циклических зависимостей
+- Обновлен services/__init__.py -- 10 новых экспортов
+- Интеграция в bot/handlers/query.py:
+  - Step 1b: detect_comparison -> _handle_comparison() перед обычным RAG
+  - _handle_comparison(): Qdrant-клиент, compare_products, feedback_keyboard
+- acceptance criteria -- все выполнены
+- 51 unit-тест в test_comparison_service.py (все проходят)
+- ruff check . -- All checks passed
+- pytest -- 2492 passed, 9 pre-existing failures
+**Следующие шаги:**
+- Все 50 задач завершены! Проект полностью выполнен.
+
+---

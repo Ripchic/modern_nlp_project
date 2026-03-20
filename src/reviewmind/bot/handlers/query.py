@@ -23,6 +23,7 @@ from reviewmind.bot.keyboards import feedback_keyboard, subscribe_keyboard
 from reviewmind.cache.redis import SessionManager
 from reviewmind.core.llm import LLMClient
 from reviewmind.core.rag import RAGPipeline
+from reviewmind.services.comparison_service import compare_products, detect_comparison
 from reviewmind.services.product_extractor import extract_product
 from reviewmind.services.query_service import QueryService
 
@@ -256,6 +257,20 @@ async def on_text_message(message: Message) -> None:
         await _close_redis(redis_client)
         return
 
+    # ── Step 1b: Comparison detection ────────────────────────
+    if len(product_names) >= 2 and detect_comparison(message.text):
+        log.info("comparison_query_detected", products=product_names)
+        await _handle_comparison(
+            message=message,
+            product_names=product_names,
+            user_id=user_id,
+            log=log,
+            chat_history=chat_history,
+            session_mgr=session_mgr,
+            redis_client=redis_client,
+        )
+        return
+
     product_query = ", ".join(product_names)
 
     # ── Step 2: Try instant RAG from Qdrant ──────────────────
@@ -337,6 +352,65 @@ async def on_text_message(message: Message) -> None:
 
     # Store user message in history (answer may come later via push)
     await _store_exchange(session_mgr, user_id, message.text, log=log)
+    await _close_redis(redis_client)
+
+
+async def _handle_comparison(
+    *,
+    message: Message,
+    product_names: list[str],
+    user_id: int,
+    log,
+    chat_history: list[dict[str, str]] | None = None,
+    session_mgr: SessionManager | None = None,
+    redis_client=None,
+) -> None:
+    """Handle a comparison query by running parallel RAG and generating a table."""
+    try:
+        qdrant = _create_qdrant_client()
+    except Exception as exc:
+        log.error("comparison_qdrant_connect_failed", error=str(exc))
+        await message.answer(_SERVICE_UNAVAILABLE_MSG)
+        await _close_redis(redis_client)
+        return
+
+    try:
+        result = await compare_products(
+            query=message.text,
+            qdrant_client=qdrant,
+            chat_history=chat_history,
+        )
+    except Exception as exc:
+        log.error("comparison_failed", error=str(exc))
+        await message.answer(_UNEXPECTED_ERROR_MSG)
+        await _store_exchange(session_mgr, user_id, message.text, log=log)
+        await _close_redis(redis_client)
+        await qdrant.close()
+        return
+    finally:
+        try:
+            await qdrant.close()
+        except Exception:
+            pass
+
+    if result.answer:
+        answer = _truncate(result.answer)
+        await message.answer(answer, reply_markup=feedback_keyboard())
+        await _increment_user_limit(user_id, log)
+        await _store_exchange(session_mgr, user_id, message.text, answer, log)
+        log.info(
+            "comparison_answer_sent",
+            answer_len=len(answer),
+            products=result.products,
+            total_chunks=result.total_chunks,
+            sources=len(result.sources),
+        )
+    else:
+        # Comparison failed — fall back to direct LLM
+        log.warning("comparison_empty_answer", error=result.error)
+        await _fallback_llm_answer(message, user_id, log, chat_history=chat_history)
+        await _store_exchange(session_mgr, user_id, message.text, log=log)
+
     await _close_redis(redis_client)
 
 
