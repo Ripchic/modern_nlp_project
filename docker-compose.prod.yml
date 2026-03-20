@@ -8,3 +8,19 @@ services:
   flower:
     ports:
       - "5555:5555"
+
+  bot:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - HTTPS_PROXY=http://host.docker.internal:1081
+      - HTTP_PROXY=http://host.docker.internal:1081
+      - NO_PROXY=localhost,127.0.0.1,postgres,redis,qdrant
+
+  worker:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - HTTPS_PROXY=http://host.docker.internal:1081
+      - HTTP_PROXY=http://host.docker.internal:1081
+      - NO_PROXY=localhost,127.0.0.1,postgres,redis,qdrant
