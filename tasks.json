@@ -1421,7 +1421,8 @@
         "Шаг 5: URL кликабельны (Telegram auto-linkify)"
       ],
       "dependencies": ["TASK-027", "TASK-007"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "TASK-050 была полностью реализована в рамках TASK-048. Кнопка [📎 Источники] включена в feedback_keyboard() (keyboards.py) с callback data 'feedback:sources[:query_log_id]'. Callback handler on_feedback_sources (feedback.py): парсит query_log_id → загружает sources_used из query_logs через QueryLogRepository → форматирует через format_sources_list(). format_sources_list(): нумерованный список (1. 2. 3. ...), бейдж 📚 для curated источников, ⚠️ [sponsored] для спонсорских, поддержка plain URL строк и dict с ключами url/source_url/is_curated/is_sponsored. Длинные списки (>200 символов) отправляются как message.answer, короткие — через callback.answer(show_alert=True). Fallback при отсутствии query_log_id: _get_latest_query_log_id ищет последний log пользователя. При отсутствии источников: 'Источники не найдены.' Graceful error handling для DB-ошибок. 61 unit-тест в tests/unit/test_bot/test_feedback.py покрывает все acceptance criteria: TestFormatSourcesList (10 — empty, string URLs, dict, badges, mixed, numbering), TestOnFeedbackSources (5 — shows sources, long as message, no sources, None sources, no query_log_id), TestFeedbackKeyboard (5 — 3 buttons including 📎). ruff check — 0 ошибок, pytest — 2441 passed, 9 pre-existing failures (4 test_config.py + 3 test_links.py + 2 test_ingest.py, не связаны с TASK-050)."
     }
   ]
 }

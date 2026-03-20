@@ -1771,3 +1771,32 @@
 - TASK-050: Кнопка 📎 Источники — возможно уже реализована в TASK-048 (проверить + закрыть)
 
 ---
+
+## Итерация 22 — 2026-03-20
+**Фича:** TASK-050 — Кнопка 📎 Источники: вывод списка источников с бейджами 📚 (curated) и ⚠️ (sponsored)
+**Статус:** Завершено
+**Что сделано:**
+- Верификация: TASK-050 была полностью реализована в рамках TASK-048 (feedback system)
+- Код уже содержит все компоненты:
+  - feedback_keyboard() в keyboards.py: 3 кнопки [👍] [👎] [📎 Источники] с кодированием query_log_id
+  - on_feedback_sources() в feedback.py: callback handler для 📎 кнопки
+  - format_sources_list(): нумерованный список с бейджами 📚 (curated) и ⚠️ [sponsored]
+  - Поддержка plain URL строк и dict с ключами url/source_url/is_curated/is_sponsored
+  - Длинные списки (>200 символов) → message.answer, короткие → callback.answer(show_alert=True)
+  - Fallback на последний query_log пользователя при отсутствии query_log_id
+  - "Источники не найдены." при пустом списке
+- Все acceptance criteria подтверждены:
+  - ✅ Кнопка [📎 Источники] под каждым RAG-ответом
+  - ✅ Нажатие → список источников с URL
+  - ✅ Curated помечены 📚, Sponsored помечены ⚠️ [sponsored]
+  - ✅ Нумерованный список (1. 2. 3. ...)
+  - ✅ При отсутствии — "Источники не найдены."
+- 61 unit-тест в test_feedback.py покрывает все TASK-050 функциональности
+- `ruff check .` — All checks passed
+- `pytest` — 2441 passed, 9 pre-existing failures (не связаны)
+**Следующие шаги:**
+- TASK-047: Сравнение товаров X vs Y (единственная оставшаяся pending задача, low priority)
+**Заметки для следующей итерации:**
+- Все 50 задач завершены за исключением TASK-047 (low priority, product comparison)
+
+---
