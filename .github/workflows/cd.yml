@@ -68,7 +68,7 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: 22
+          port: 10202
           script: |
             set -e
             cd ${{ secrets.DEPLOY_PATH || '~/reviewmind' }}
