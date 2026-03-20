@@ -915,7 +915,8 @@
         "Шаг 5: Проверить Redis: session:{user_id}:mode обновлён, session:{user_id}:history сохранён"
       ],
       "dependencies": ["TASK-007", "TASK-011"],
-      "status": "pending"
+      "status": "done",
+      "completed_note": "Расширен src/reviewmind/bot/handlers/mode.py — команда /mode теперь показывает текущий режим и визуально выделяет его в клавиатуре. Добавлен _get_current_mode(user_id) — читает режим из Redis через SessionManager.get_mode(), graceful error handling (Redis down → None). Добавлен _MODE_TO_NAME mapping (internal mode → human-readable label), DEFAULT_MODE='auto'. cmd_mode() теперь: (1) читает текущий режим из Redis, (2) отображает 'Текущий режим: <b>{label}</b>' в сообщении (или fallback 'Выбери режим работы:' если режим не установлен), (3) передаёт current_mode в mode_keyboard() для подсветки. Расширен keyboards.py: mode_keyboard(current_mode?) — при передаче текущего режима добавляет ✅ prefix к активной кнопке. Добавлены _MODE_LABELS dict, _INTERNAL_TO_CALLBACK mapping. Callback data не меняется при подсветке. Chat history НЕ сбрасывается при переключении (set_mode + refresh_ttl, без clear_history/clear_session). Обновлён conftest.py — _bypass_session_manager патчит _get_current_mode для совместимости существующих тестов. 37 unit-тестов в tests/unit/test_bot/test_mode_switch.py: TestModeKeyboardHighlighting (10), TestGetCurrentMode (5), TestCmdModeShowsCurrent (7), TestOnModeSelectedPersistence (3), TestModeConstants (6), TestIntegrationScenarios (6 — все 5 PRD шагов + visual highlight). ruff check — 0 ошибок, pytest — 2396 passed (2359 existing + 37 new), 9 pre-existing failures (4 test_config.py + 3 test_links.py + 2 test_ingest.py, не связаны с TASK-030)."
     },
     {
       "id": "TASK-031",

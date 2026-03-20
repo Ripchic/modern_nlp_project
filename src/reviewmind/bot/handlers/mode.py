@@ -21,6 +21,12 @@ _CALLBACK_TO_MODE = {
     MODE_LINKS: "links",
 }
 
+# Reverse: internal mode → human-readable label
+_MODE_TO_NAME = {
+    "auto": "🔍 Авто-поиск",
+    "links": "🔗 Свои ссылки",
+}
+
 MODE_NAMES = {
     MODE_AUTO: "🔍 Авто-поиск",
     MODE_LINKS: "🔗 Свои ссылки",
@@ -38,6 +44,28 @@ MODE_DESCRIPTIONS = {
         "и я проанализирую их содержимое."
     ),
 }
+
+# Default mode when Redis has no record
+DEFAULT_MODE = "auto"
+
+
+async def _get_current_mode(user_id: int) -> str | None:
+    """Read the user's current mode from Redis.  Returns ``None`` on failure."""
+    try:
+        from redis.asyncio import from_url as redis_from_url  # noqa: PLC0415
+
+        from reviewmind.cache.redis import SessionManager  # noqa: PLC0415
+        from reviewmind.config import settings  # noqa: PLC0415
+
+        client = redis_from_url(settings.redis_url, decode_responses=True)
+        try:
+            sm = SessionManager(client)
+            return await sm.get_mode(user_id)
+        finally:
+            await client.aclose()
+    except Exception as exc:
+        logger.warning("mode_read_failed", user_id=user_id, error=str(exc))
+        return None
 
 
 async def _persist_mode(user_id: int, mode: str) -> None:
@@ -63,21 +91,30 @@ async def on_mode_selected(callback: CallbackQuery) -> None:
     """Handle inline button press for mode selection."""
     mode = callback.data
     description = MODE_DESCRIPTIONS.get(mode, "Режим выбран.")
+    internal_mode = _CALLBACK_TO_MODE.get(mode, "auto")
 
     await callback.message.edit_text(description, parse_mode="HTML")  # type: ignore[union-attr]
     await callback.answer(f"Выбран режим: {MODE_NAMES.get(mode, mode)}")
 
     # Persist mode to Redis (does NOT clear chat history)
     user_id = callback.from_user.id if callback.from_user else 0
-    internal_mode = _CALLBACK_TO_MODE.get(mode, "auto")
     await _persist_mode(user_id, internal_mode)
 
 
 @router.message(Command("mode"))
 async def cmd_mode(message: Message) -> None:
-    """Handle /mode command — show mode selection keyboard."""
+    """Handle /mode command — show mode selection keyboard with current mode highlighted."""
+    user_id = message.from_user.id if message.from_user else 0
+    current_mode = await _get_current_mode(user_id)
+
+    current_label = _MODE_TO_NAME.get(current_mode or "", None)
+    if current_label:
+        text = f"Текущий режим: <b>{current_label}</b>\n\nВыбери режим работы:"
+    else:
+        text = "Выбери режим работы:"
+
     await message.answer(
-        "Выбери режим работы:",
-        reply_markup=mode_keyboard(),
+        text,
+        reply_markup=mode_keyboard(current_mode=current_mode),
         parse_mode="HTML",
     )

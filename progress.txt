@@ -1708,4 +1708,38 @@
 
 ---
 
+## Итерация 21 — 2026-03-20
+**Фича:** TASK-030 — Команда /mode: переключение авто/ссылки без сброса сессии
+**Статус:** Завершено
+**Что сделано:**
+- Расширен `src/reviewmind/bot/handlers/mode.py`:
+  - Добавлен `_get_current_mode(user_id)` — читает текущий режим из Redis через SessionManager.get_mode(), graceful error handling (Redis down → None)
+  - Добавлен `_MODE_TO_NAME` mapping (internal mode → human-readable label), `DEFAULT_MODE='auto'`
+  - `cmd_mode()` теперь: (1) читает текущий режим из Redis, (2) отображает "Текущий режим: **{label}**" в сообщении, (3) передаёт current_mode в mode_keyboard() для подсветки
+- Расширен `src/reviewmind/bot/keyboards.py`:
+  - `mode_keyboard(current_mode?)` — при передаче текущего режима добавляет ✅ prefix к активной кнопке
+  - Callback data не меняется при подсветке (совместимость с обработчиками)
+  - Добавлены `_MODE_LABELS`, `_INTERNAL_TO_CALLBACK` mapping'и
+- Chat history НЕ сбрасывается при переключении (_persist_mode: set_mode + refresh_ttl, без clear_history)
+- Обновлён `tests/unit/test_bot/conftest.py` — _bypass_session_manager патчит _get_current_mode для совместимости существующих тестов
+- 37 unit-тестов в `tests/unit/test_bot/test_mode_switch.py`:
+  - TestModeKeyboardHighlighting (10): no highlight, auto highlight, links highlight, callback data unchanged, unknown mode
+  - TestGetCurrentMode (5): returns auto/links/None, Redis error → None, client closed
+  - TestCmdModeShowsCurrent (7): shows auto/links label, fallback text, keyboard highlighted, HTML parse mode, correct user_id
+  - TestOnModeSelectedPersistence (3): persist auto/links, history NOT cleared
+  - TestModeConstants (6): _CALLBACK_TO_MODE, _MODE_TO_NAME, DEFAULT_MODE, _MODE_LABELS, _INTERNAL_TO_CALLBACK, router name
+  - TestIntegrationScenarios (6): все 5 PRD test_steps + visual highlight test
+- `ruff check .` — All checks passed
+- `pytest` — 2396 passed (2359 existing + 37 new), 9 pre-existing failures (не связаны)
+**Следующие шаги:**
+- TASK-040: Curated KB seed script (medium, Stage 8)
+- TASK-047: Сравнение товаров X vs Y (low, Cross-cutting)
+- TASK-050: Кнопка 📎 Источники — возможно уже реализована в TASK-048 (проверить + закрыть)
+**Заметки для следующей итерации:**
+- TASK-050 фактически реализована в TASK-048 (callback handler on_feedback_sources, format_sources_list с бейджами 📚/⚠️, keyboard с кнопкой 📎) — нужно формально закрыть
+- Оставшиеся pending задачи: TASK-040, TASK-047, TASK-050
+- Stage 5 (Manual Mode) теперь полностью завершён (TASK-026..TASK-030 all done)
+
+---
+
 ---

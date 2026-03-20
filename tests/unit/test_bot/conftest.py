@@ -53,5 +53,6 @@ def _bypass_session_manager():
             return_value=noop_sm_links,
         ),
         patch("reviewmind.bot.handlers.mode._persist_mode", new_callable=AsyncMock),
+        patch("reviewmind.bot.handlers.mode._get_current_mode", new_callable=AsyncMock, return_value=None),
     ):
         yield

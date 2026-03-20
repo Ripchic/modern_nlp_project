@@ -17,16 +17,34 @@ SUBSCRIBE_WAIT = "subscribe:wait"
 FEEDBACK_PREFIX = "feedback:"
 
 
-def mode_keyboard() -> InlineKeyboardMarkup:
-    """Inline keyboard for choosing analysis mode (auto-search or manual links)."""
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="🔍 Авто-поиск", callback_data=MODE_AUTO),
-                InlineKeyboardButton(text="🔗 Свои ссылки", callback_data=MODE_LINKS),
-            ],
-        ]
-    )
+_MODE_LABELS: dict[str, str] = {
+    MODE_AUTO: "🔍 Авто-поиск",
+    MODE_LINKS: "🔗 Свои ссылки",
+}
+
+# Internal mode string → callback constant
+_INTERNAL_TO_CALLBACK: dict[str, str] = {
+    "auto": MODE_AUTO,
+    "links": MODE_LINKS,
+}
+
+
+def mode_keyboard(current_mode: str | None = None) -> InlineKeyboardMarkup:
+    """Inline keyboard for choosing analysis mode (auto-search or manual links).
+
+    Parameters
+    ----------
+    current_mode:
+        Internal mode string (``"auto"`` or ``"links"``).  When provided, the
+        active mode button gets a ``✅`` prefix so the user can see which mode
+        is currently selected.
+    """
+    active_callback = _INTERNAL_TO_CALLBACK.get(current_mode or "")
+    buttons: list[InlineKeyboardButton] = []
+    for cb_data, label in _MODE_LABELS.items():
+        text = f"✅ {label}" if cb_data == active_callback else label
+        buttons.append(InlineKeyboardButton(text=text, callback_data=cb_data))
+    return InlineKeyboardMarkup(inline_keyboard=[buttons])
 
 
 def feedback_keyboard(query_log_id: int | None = None) -> InlineKeyboardMarkup:
