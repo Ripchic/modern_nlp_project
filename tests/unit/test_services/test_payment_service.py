@@ -126,7 +126,7 @@ class TestConstants:
         assert SUBSCRIPTION_DAYS == 30
 
     def test_subscription_price_stars(self):
-        assert SUBSCRIPTION_PRICE_STARS == 1
+        assert SUBSCRIPTION_PRICE_STARS == 75
 
     def test_subscription_price_label_not_empty(self):
         assert len(SUBSCRIPTION_PRICE_LABEL) > 0
@@ -617,7 +617,7 @@ class TestServicesExports:
     def test_subscription_price_stars_exported(self):
         from reviewmind.services import SUBSCRIPTION_PRICE_STARS
 
-        assert SUBSCRIPTION_PRICE_STARS == 1
+        assert SUBSCRIPTION_PRICE_STARS == 75
 
     def test_subscription_msgs_exported(self):
         from reviewmind.services import SUBSCRIPTION_ACTIVATED_MSG, SUBSCRIPTION_ERROR_MSG

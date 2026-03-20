@@ -66,6 +66,7 @@ class Settings(BaseSettings):
 
     # ── YouTube ───────────────────────────────────────────────
     youtube_api_key: str = ""
+    youtube_cookies_path: str = ""
 
     # ── Reddit ────────────────────────────────────────────────
     reddit_client_id: str = ""
@@ -105,6 +106,8 @@ class Settings(BaseSettings):
     @classmethod
     def parse_admin_user_ids(cls, v: object) -> list[int]:
         """Parse comma-separated string of user IDs into a list of ints."""
+        if isinstance(v, int):
+            return [v]
         if isinstance(v, str):
             if not v.strip():
                 return []

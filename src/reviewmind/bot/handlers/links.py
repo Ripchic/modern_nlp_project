@@ -74,16 +74,34 @@ def extract_urls(text: str) -> list[str]:
     return urls
 
 
+# Common filler phrases users type around a URL (Russian + English).
+# If the remaining text after URL removal matches one of these — it carries
+# no analytical intent, so we fall back to the default analysis query.
+_FILLER_RE = re.compile(
+    r"^[\.,:;!?\-–—\s]*"
+    r"(ссылка|ссылку|обзор|вот|смотри|видео|линк|link|review|check|here)"
+    r"[\s]*"
+    r"(на|к|для|по|this|the|a)?"
+    r"[\s]*"
+    r"(обзор|товар|видео|ссылку|ссылка|review|video|link)?"
+    r"[:.;!?\-–—\s]*$",
+    re.IGNORECASE,
+)
+
+
 def extract_query_text(text: str, urls: list[str]) -> str:
     """Return the non-URL portion of *text* as a user query.
 
-    If the remaining text is empty, falls back to :data:`_DEFAULT_QUERY`.
+    If the remaining text is empty or is a common filler phrase around a link
+    (e.g. "Ссылка на обзор:"), falls back to :data:`_DEFAULT_QUERY`.
     """
     query = text
     for url in urls:
         query = query.replace(url, "")
     query = re.sub(r"\s+", " ", query).strip()
-    return query or _DEFAULT_QUERY
+    if not query or _FILLER_RE.match(query):
+        return _DEFAULT_QUERY
+    return query
 
 
 def _pluralize_links(count: int) -> str:
@@ -191,6 +209,46 @@ async def _increment_user_limit(user_id: int, log) -> None:
         log.warning("limit_increment_failed", error=str(exc))
 
 
+async def _save_query_log(
+    user_id: int,
+    query_text: str,
+    response_text: str,
+    sources: list[str] | None = None,
+    *,
+    mode: str = "links",
+    used_tavily: bool = False,
+) -> int | None:
+    """Persist a QueryLog row and return its id.  Best-effort."""
+    try:
+        from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine  # noqa: PLC0415
+
+        from reviewmind.config import settings  # noqa: PLC0415
+        from reviewmind.db.repositories.query_logs import QueryLogRepository  # noqa: PLC0415
+        from reviewmind.db.repositories.users import UserRepository  # noqa: PLC0415
+
+        engine = create_async_engine(settings.database_url, pool_pre_ping=True, echo=False)
+        session_factory = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+        try:
+            async with session_factory() as session:
+                await UserRepository(session).get_or_create(user_id)
+                repo = QueryLogRepository(session)
+                log_entry = await repo.create(
+                    user_id=user_id,
+                    mode=mode,
+                    query_text=query_text,
+                    response_text=response_text,
+                    sources_used=sources,
+                    used_tavily=used_tavily,
+                )
+                await session.commit()
+                return log_entry.id
+        finally:
+            await engine.dispose()
+    except Exception as exc:
+        logger.warning("query_log_save_failed", error=str(exc), user_id=user_id)
+        return None
+
+
 @router.message(_message_has_url)
 async def on_links_message(message: Message) -> None:
     """Handle messages containing HTTP(S) URLs — ingest and analyse."""
@@ -203,7 +261,12 @@ async def on_links_message(message: Message) -> None:
     user_id = message.from_user.id if message.from_user else 0
     query_text = extract_query_text(text, urls)
     log = logger.bind(user_id=user_id, url_count=len(urls))
-    log.info("links_received", urls=urls[:5])
+    log.info(
+        "links_received",
+        urls=urls[:5],
+        raw_text=text[:200],
+        query_text=query_text,
+    )
 
     # Show typing indicator
     if message.bot:
@@ -302,12 +365,37 @@ async def _ingest_and_analyse(
         return None
 
     # ── Step 2: RAG query ────────────────────────────────────
+    # NOTE: Do NOT pass product_query as a Qdrant filter here.
+    # In links mode the "product_query" is the user's free-text question
+    # (e.g. "Сравни шлемы из видео"), not an exact product name.
+    # Using it as an exact-match payload filter would return 0 results
+    # whenever the text doesn't match what was stored during ingestion.
+    # Vector similarity on user_query is sufficient to find relevant chunks.
+    log.info(
+        "links_rag_query_start",
+        query_text=query_text,
+        product_query=product_query or None,
+    )
+    # Pass ALL user URLs for direct retrieval — chunks from previous
+    # ingestion runs are still in Qdrant and should be used even if
+    # this scrape attempt failed (e.g. YouTube IP block).
     async with RAGPipeline(qdrant_client=qdrant) as rag:
         rag_response = await rag.query(
             user_query=query_text,
-            product_query=product_query or None,
+            product_query=None,
             chat_history=chat_history or None,
+            source_urls=urls,
         )
+    log.info(
+        "links_rag_query_done",
+        answer_preview=rag_response.answer[:150] if rag_response.answer else "<empty>",
+        sources_count=len(rag_response.sources),
+        confidence_met=rag_response.confidence_met,
+        chunks_count=rag_response.chunks_count,
+        chunks_found=rag_response.chunks_found,
+        used_tavily=rag_response.used_tavily,
+        error=rag_response.error,
+    )
 
     # ── Step 3: Build final answer ───────────────────────────
     parts: list[str] = []
@@ -331,13 +419,24 @@ async def _ingest_and_analyse(
     if len(answer) > _MAX_ANSWER_LENGTH:
         answer = answer[: _MAX_ANSWER_LENGTH - 3] + "..."
 
+    # ── Step 4: Persist query log so sources button works ─────
+    user_id = message.from_user.id if message.from_user else 0
+    query_log_id = await _save_query_log(
+        user_id=user_id,
+        query_text=query_text,
+        response_text=answer,
+        sources=rag_response.sources,
+        mode="links",
+        used_tavily=rag_response.used_tavily,
+    )
+    log.info("links_query_log_saved", query_log_id=query_log_id)
+
     await status_msg.edit_text(
         answer,
-        reply_markup=feedback_keyboard(),
+        reply_markup=feedback_keyboard(query_log_id),
     )
 
     # Increment daily counter (best-effort)
-    user_id = message.from_user.id if message.from_user else 0
     await _increment_user_limit(user_id, log)
 
     log.info(
@@ -345,6 +444,7 @@ async def _ingest_and_analyse(
         answer_len=len(answer),
         sources=rag_response.sources,
         confidence_met=rag_response.confidence_met,
+        query_log_id=query_log_id,
     )
 
     return answer

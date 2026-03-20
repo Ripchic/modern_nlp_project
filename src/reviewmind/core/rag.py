@@ -23,7 +23,7 @@ from reviewmind.core.llm import LLMClient, LLMError
 from reviewmind.core.prompts import ChunkContext
 from reviewmind.core.reranker import DEFAULT_RERANK_TOP_K, rerank
 from reviewmind.services.language import detect_language
-from reviewmind.vectorstore.search import SearchResult, hybrid_search
+from reviewmind.vectorstore.search import SearchResult, hybrid_search, scroll_by_source_urls
 
 logger = structlog.get_logger("reviewmind.core.rag")
 
@@ -220,6 +220,7 @@ class RAGPipeline:
         chat_history: list[dict[str, str]] | None = None,
         product_query: str | None = None,
         session_id: str | None = None,
+        source_urls: list[str] | None = None,
     ) -> RAGResponse:
         """Execute the full RAG pipeline end-to-end.
 
@@ -285,6 +286,25 @@ class RAGPipeline:
                 error=f"Search error: {exc}",
             )
 
+        # ── Step 2b: Source-URL retrieval (links mode) ────
+        if source_urls:
+            try:
+                url_results = await scroll_by_source_urls(
+                    client=self._qdrant,
+                    source_urls=source_urls,
+                )
+            except Exception as exc:
+                log.warning("rag_source_url_scroll_error", error=str(exc))
+                url_results = []
+
+            if url_results:
+                search_results = url_results + search_results
+                log.info(
+                    "rag_source_url_results_merged",
+                    url_chunks=len(url_results),
+                    total=len(search_results),
+                )
+
         log.info(
             "rag_search_done",
             results_count=len(search_results),
@@ -313,9 +333,9 @@ class RAGPipeline:
             min_required=CONFIDENCE_MIN_CHUNKS,
         )
 
-        # ── Step 4b: Tavily fallback ────────────────────────
+        # ── Step 4b: Tavily fallback (skip when source URLs provided) ───
         used_tavily = False
-        if not confidence_met:
+        if not confidence_met and not source_urls:
             tavily_results = await self._tavily_fallback(user_query, log)
             if tavily_results:
                 used_tavily = True

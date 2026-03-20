@@ -13,13 +13,17 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from http.cookiejar import MozillaCookieJar
+from pathlib import Path
 from typing import ClassVar
 
 import httpx
 import structlog
+from requests import Session
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import (
     NoTranscriptFound,
+    RequestBlocked,
     TranscriptsDisabled,
     VideoUnavailable,
 )
@@ -126,10 +130,34 @@ class YouTubeScraper:
         *,
         languages: tuple[str, ...] | list[str] = DEFAULT_LANGUAGES,
         min_word_count: int = MIN_WORD_COUNT,
+        cookie_path: str | Path | None = None,
     ) -> None:
         self._languages = tuple(languages)
         self._min_word_count = min_word_count
-        self._api = YouTubeTranscriptApi()
+        self._api = self._build_api(cookie_path)
+
+    @staticmethod
+    def _build_api(cookie_path: str | Path | None) -> YouTubeTranscriptApi:
+        """Create API instance, optionally loading cookies for auth."""
+        if cookie_path is not None:
+            path = Path(cookie_path)
+            if path.is_file():
+                jar = MozillaCookieJar(str(path))
+                jar.load(ignore_discard=True, ignore_expires=True)
+                session = Session()
+                session.cookies = jar
+                session.headers.update({
+                    "User-Agent": (
+                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/134.0.0.0 Safari/537.36"
+                    ),
+                    "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
+                })
+                logger.info("youtube.cookies_loaded", path=str(path), count=len(jar))
+                return YouTubeTranscriptApi(http_client=session)
+            logger.warning("youtube.cookies_not_found", path=str(path))
+        return YouTubeTranscriptApi()
 
     # ── Public API ────────────────────────────────────────────
 
@@ -201,6 +229,13 @@ class YouTubeScraper:
         except VideoUnavailable:
             logger.info("youtube.video_unavailable", video_id=video_id)
             return None
+        except RequestBlocked:
+            logger.error(
+                "youtube.request_blocked",
+                video_id=video_id,
+                hint="IP blocked by YouTube. Re-export cookies.txt from browser.",
+            )
+            return None
         except Exception:
             logger.exception("youtube.unexpected_error", video_id=video_id)
             return None
@@ -234,23 +269,22 @@ class YouTubeScraper:
         *,
         languages: tuple[str, ...] | list[str] | None = None,
     ) -> TranscriptResult | None:
-        """Convenience method: extract video ID from *url* and fetch transcript.
-
-        Args:
-            url: A YouTube video URL.
-            languages: Override default language preference.
-
-        Returns:
-            A :class:`TranscriptResult`, or ``None`` if the URL is invalid
-            or the transcript is unavailable/too short.
-
-        Raises:
-            ValueError: If *url* is not a recognised YouTube URL format.
-        """
+        """Convenience method: extract video ID from *url* and fetch transcript."""
+        logger.info("youtube.get_transcript_by_url_start", url=url)
         video_id = self.extract_video_id(url)
+        logger.info("youtube.video_id_extracted", video_id=video_id, url=url)
         result = self.get_transcript(video_id, languages=languages)
         if result is not None:
             result.source_url = url.strip()
+            logger.info(
+                "youtube.transcript_ok",
+                video_id=video_id,
+                word_count=result.word_count,
+                language=result.language_code,
+                is_generated=result.is_generated,
+            )
+        else:
+            logger.warning("youtube.transcript_failed", video_id=video_id, url=url)
         return result
 
     def search_videos(

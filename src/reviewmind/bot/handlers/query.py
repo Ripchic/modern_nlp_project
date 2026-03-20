@@ -56,6 +56,50 @@ def _truncate(text: str, limit: int = _MAX_ANSWER_LENGTH) -> str:
     return text
 
 
+async def _save_query_log(
+    user_id: int,
+    query_text: str,
+    response_text: str,
+    sources: list[str] | None = None,
+    *,
+    mode: str = "auto",
+    used_tavily: bool = False,
+) -> int | None:
+    """Persist a QueryLog row and return its id.  Best-effort."""
+    try:
+        from sqlalchemy.ext.asyncio import (  # noqa: PLC0415
+            AsyncSession,
+            async_sessionmaker,
+            create_async_engine,
+        )
+
+        from reviewmind.config import settings  # noqa: PLC0415
+        from reviewmind.db.repositories.query_logs import QueryLogRepository  # noqa: PLC0415
+        from reviewmind.db.repositories.users import UserRepository  # noqa: PLC0415
+
+        engine = create_async_engine(settings.database_url, pool_pre_ping=True, echo=False)
+        session_factory = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+        try:
+            async with session_factory() as session:
+                await UserRepository(session).get_or_create(user_id)
+                repo = QueryLogRepository(session)
+                log_entry = await repo.create(
+                    user_id=user_id,
+                    mode=mode,
+                    query_text=query_text,
+                    response_text=response_text,
+                    sources_used=sources,
+                    used_tavily=used_tavily,
+                )
+                await session.commit()
+                return log_entry.id
+        finally:
+            await engine.dispose()
+    except Exception as exc:
+        logger.warning("query_log_save_failed", error=str(exc), user_id=user_id)
+        return None
+
+
 def _create_qdrant_client() -> AsyncQdrantClient:
     """Create an ``AsyncQdrantClient`` from the application settings."""
     from reviewmind.config import settings  # noqa: PLC0415
@@ -95,7 +139,11 @@ async def _collect_source_urls(product_names: list[str]) -> list[str]:
     try:
         from reviewmind.scrapers.youtube import YouTubeScraper  # noqa: PLC0415
 
-        yt = YouTubeScraper()
+        from reviewmind.config import get_settings as _get_settings  # noqa: PLC0415
+
+        yt = YouTubeScraper(
+            cookie_path=_get_settings().youtube_cookies_path or None,
+        )
         videos = yt.search_videos(search_query, max_results=5)
         for v in videos:
             if v.url and v.url not in seen:
@@ -293,7 +341,12 @@ async def on_text_message(message: Message) -> None:
     # ── Step 3: If confidence met → instant answer ───────────
     if rag_response and rag_response.confidence_met and rag_response.answer:
         answer = _truncate(rag_response.answer)
-        await message.answer(answer, reply_markup=feedback_keyboard())
+        log_id = await _save_query_log(
+            user_id, message.text, answer,
+            sources=rag_response.sources,
+            used_tavily=getattr(rag_response, 'used_tavily', False),
+        )
+        await message.answer(answer, reply_markup=feedback_keyboard(query_log_id=log_id))
         await _increment_user_limit(user_id, log)
         # Store user + assistant messages in history
         await _store_exchange(session_mgr, user_id, message.text, answer, log)
@@ -303,6 +356,7 @@ async def on_text_message(message: Message) -> None:
             answer_len=len(answer),
             chunks=rag_response.chunks_count,
             sources=len(rag_response.sources),
+            query_log_id=log_id,
         )
         return
 
@@ -314,10 +368,15 @@ async def on_text_message(message: Message) -> None:
     if rag_response and rag_response.answer and rag_response.used_tavily:
         # RAG already triggered Tavily fallback — use that answer
         answer = _truncate(rag_response.answer)
-        await message.answer(answer, reply_markup=feedback_keyboard())
+        log_id = await _save_query_log(
+            user_id, message.text, answer,
+            sources=rag_response.sources,
+            used_tavily=True,
+        )
+        await message.answer(answer, reply_markup=feedback_keyboard(query_log_id=log_id))
         await _increment_user_limit(user_id, log)
         quick_answer_sent = True
-        log.info("auto_tavily_quick_answer_sent", answer_len=len(answer))
+        log.info("auto_tavily_quick_answer_sent", answer_len=len(answer), query_log_id=log_id)
 
     # 4b: Collect source URLs from YouTube + Reddit
     source_urls = await _collect_source_urls(product_names)
@@ -395,7 +454,11 @@ async def _handle_comparison(
 
     if result.answer:
         answer = _truncate(result.answer)
-        await message.answer(answer, reply_markup=feedback_keyboard())
+        log_id = await _save_query_log(
+            user_id, message.text, answer,
+            sources=result.sources,
+        )
+        await message.answer(answer, reply_markup=feedback_keyboard(query_log_id=log_id))
         await _increment_user_limit(user_id, log)
         await _store_exchange(session_mgr, user_id, message.text, answer, log)
         log.info(
@@ -404,6 +467,7 @@ async def _handle_comparison(
             products=result.products,
             total_chunks=result.total_chunks,
             sources=len(result.sources),
+            query_log_id=log_id,
         )
     else:
         # Comparison failed — fall back to direct LLM

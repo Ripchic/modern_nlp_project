@@ -114,8 +114,8 @@ class TestDateBasedKeying:
 
         today = service._today()
 
-        # User 100: 3 used → blocked
-        service._limit_repo.get = AsyncMock(return_value=_limit_row(100, used=3, row_date=today))
+        # User 100: 10 used → blocked
+        service._limit_repo.get = AsyncMock(return_value=_limit_row(100, used=10, row_date=today))
         r1 = await service.check_limit(100)
         assert r1.allowed is False
 
@@ -143,9 +143,9 @@ class TestMidnightTransition:
         day1 = date(2026, 3, 18)
         day2 = date(2026, 3, 19)
 
-        # Day 1: 3 requests used → blocked
+        # Day 1: 10 requests used → blocked
         service._today = lambda: day1  # type: ignore[assignment]
-        service._limit_repo.get = AsyncMock(return_value=_limit_row(100, used=3, row_date=day1))
+        service._limit_repo.get = AsyncMock(return_value=_limit_row(100, used=10, row_date=day1))
         r1 = await service.check_limit(100)
         assert r1.allowed is False
 
@@ -205,7 +205,7 @@ class TestOldRowsPreserved:
 
         # Day 1 query
         service._today = lambda: day1  # type: ignore[assignment]
-        service._limit_repo.get = AsyncMock(return_value=_limit_row(100, used=3, row_date=day1))
+        service._limit_repo.get = AsyncMock(return_value=_limit_row(100, used=10, row_date=day1))
         r1 = await service.check_limit(100)
         assert r1.allowed is False
 
@@ -466,19 +466,19 @@ class TestIntegrationScenarios:
     """End-to-end scenario tests matching TASK-039 test_steps."""
 
     @pytest.mark.asyncio
-    async def test_step1_exhaust_limit_4th_blocked(self):
-        """Step 1: 3 requests → all pass; 4th → blocked."""
+    async def test_step1_exhaust_limit_11th_blocked(self):
+        """Step 1: 10 requests → all pass; 11th → blocked."""
         session = _mock_session()
         service = LimitService(session, admin_user_ids=[])
         service._user_repo.get_by_id = AsyncMock(return_value=_free_user(100))
 
-        for used in range(3):
+        for used in range(10):
             service._limit_repo.get = AsyncMock(return_value=_limit_row(100, used=used))
             r = await service.check_limit(100)
             assert r.allowed is True, f"Request #{used + 1} should be allowed"
 
-        # 4th → blocked
-        service._limit_repo.get = AsyncMock(return_value=_limit_row(100, used=3))
+        # 11th → blocked
+        service._limit_repo.get = AsyncMock(return_value=_limit_row(100, used=10))
         r = await service.check_limit(100)
         assert r.allowed is False
         assert r.reason == "limit_reached"
@@ -495,7 +495,7 @@ class TestIntegrationScenarios:
 
         # Day 1: blocked
         service._today = lambda: day1  # type: ignore[assignment]
-        service._limit_repo.get = AsyncMock(return_value=_limit_row(100, used=3, row_date=day1))
+        service._limit_repo.get = AsyncMock(return_value=_limit_row(100, used=10, row_date=day1))
         r = await service.check_limit(100)
         assert r.allowed is False
 

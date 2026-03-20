@@ -10,6 +10,7 @@ import structlog
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.types import BotCommand
 
 from reviewmind.bot.handlers.feedback import router as feedback_router
 from reviewmind.bot.handlers.gdpr import router as gdpr_router
@@ -75,6 +76,18 @@ def create_bot(token: str) -> Bot:
     )
 
 
+async def _set_commands(bot: Bot) -> None:
+    """Register the bot command menu shown in the Telegram UI."""
+    commands = [
+        BotCommand(command="start", description="Запустить бота / главное меню"),
+        BotCommand(command="help", description="Помощь и список команд"),
+        BotCommand(command="subscribe", description="Оформить Premium-подписку"),
+        BotCommand(command="myid", description="Узнать свой Telegram ID"),
+        BotCommand(command="delete_my_data", description="Удалить мои данные (GDPR)"),
+    ]
+    await bot.set_my_commands(commands)
+
+
 async def run_bot() -> None:
     """Run the bot with long polling."""
     from reviewmind.config import settings
@@ -85,6 +98,8 @@ async def run_bot() -> None:
     dp = create_dispatcher()
 
     logger.info("bot_starting", mode="long_polling")
+
+    await _set_commands(bot)
 
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())

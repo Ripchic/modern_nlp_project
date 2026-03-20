@@ -76,7 +76,7 @@ def _limit_row(user_id: int, used: int = 0) -> MagicMock:
 
 class TestConstants:
     def test_free_daily_limit_value(self):
-        assert FREE_DAILY_LIMIT == 3
+        assert FREE_DAILY_LIMIT == 10
 
     def test_premium_subscription_value(self):
         assert PREMIUM_SUBSCRIPTION == "premium"
@@ -86,8 +86,8 @@ class TestConstants:
         assert "{limit}" in LIMIT_REACHED_MSG
 
     def test_limit_reached_msg_format(self):
-        msg = LIMIT_REACHED_MSG.format(used=3, limit=3)
-        assert "3/3" in msg
+        msg = LIMIT_REACHED_MSG.format(used=10, limit=10)
+        assert "10/10" in msg
 
 
 # ══════════════════════════════════════════════════════════════
@@ -97,27 +97,27 @@ class TestConstants:
 
 class TestLimitCheckResult:
     def test_allowed_result(self):
-        r = LimitCheckResult(allowed=True, requests_used=1, requests_limit=3, reason="ok")
+        r = LimitCheckResult(allowed=True, requests_used=1, requests_limit=10, reason="ok")
         assert r.allowed is True
         assert r.requests_used == 1
-        assert r.requests_limit == 3
+        assert r.requests_limit == 10
         assert r.reason == "ok"
 
     def test_denied_result(self):
-        r = LimitCheckResult(allowed=False, requests_used=3, requests_limit=3, reason="limit_reached")
+        r = LimitCheckResult(allowed=False, requests_used=10, requests_limit=10, reason="limit_reached")
         assert r.allowed is False
-        assert r.requests_used == 3
+        assert r.requests_used == 10
 
     def test_message_when_allowed(self):
-        r = LimitCheckResult(allowed=True, requests_used=0, requests_limit=3)
+        r = LimitCheckResult(allowed=True, requests_used=0, requests_limit=10)
         assert r.message == ""
 
     def test_message_when_denied(self):
-        r = LimitCheckResult(allowed=False, requests_used=3, requests_limit=3)
-        assert "3/3" in r.message
+        r = LimitCheckResult(allowed=False, requests_used=10, requests_limit=10)
+        assert "10/10" in r.message
 
     def test_repr(self):
-        r = LimitCheckResult(allowed=True, requests_used=0, requests_limit=3, reason="admin")
+        r = LimitCheckResult(allowed=True, requests_used=0, requests_limit=10, reason="admin")
         assert "admin" in repr(r)
         assert "allowed=True" in repr(r)
 
@@ -241,7 +241,7 @@ class TestCheckLimitFree:
         session = _mock_session()
         service = LimitService(session, admin_user_ids=[])
         service._user_repo.get_by_id = AsyncMock(return_value=_free_user(100))
-        service._limit_repo.get = AsyncMock(return_value=_limit_row(100, used=3))
+        service._limit_repo.get = AsyncMock(return_value=_limit_row(100, used=10))
         result = await service.check_limit(100)
         assert result.allowed is False
         assert result.reason == "limit_reached"
@@ -251,10 +251,10 @@ class TestCheckLimitFree:
         session = _mock_session()
         service = LimitService(session, admin_user_ids=[])
         service._user_repo.get_by_id = AsyncMock(return_value=_free_user(100))
-        service._limit_repo.get = AsyncMock(return_value=_limit_row(100, used=5))
+        service._limit_repo.get = AsyncMock(return_value=_limit_row(100, used=11))
         result = await service.check_limit(100)
         assert result.allowed is False
-        assert result.requests_used == 5
+        assert result.requests_used == 11
 
     @pytest.mark.asyncio
     async def test_no_usage_today(self):
@@ -564,7 +564,7 @@ class TestServicesExports:
     def test_constants_importable(self):
         from reviewmind.services import FREE_DAILY_LIMIT, LIMIT_REACHED_MSG, PREMIUM_SUBSCRIPTION
 
-        assert FREE_DAILY_LIMIT == 3
+        assert FREE_DAILY_LIMIT == 10
         assert PREMIUM_SUBSCRIPTION == "premium"
         assert "{used}" in LIMIT_REACHED_MSG
 
@@ -585,20 +585,20 @@ class TestIntegrationScenarios:
     """End-to-end scenario tests matching task acceptance criteria."""
 
     @pytest.mark.asyncio
-    async def test_3_requests_allowed_4th_blocked(self):
-        """Free user: 3 queries allowed, 4th rejected."""
+    async def test_10_requests_allowed_11th_blocked(self):
+        """Free user: 10 queries allowed, 11th rejected."""
         session = _mock_session()
         service = LimitService(session, admin_user_ids=[])
         service._user_repo.get_by_id = AsyncMock(return_value=_free_user(100))
 
-        # Requests 1-3: allowed
-        for i in range(3):
+        # Requests 1-10: allowed
+        for i in range(10):
             service._limit_repo.get = AsyncMock(return_value=_limit_row(100, used=i))
             result = await service.check_limit(100)
             assert result.allowed is True, f"Request {i + 1} should be allowed"
 
-        # Request 4: blocked
-        service._limit_repo.get = AsyncMock(return_value=_limit_row(100, used=3))
+        # Request 11: blocked
+        service._limit_repo.get = AsyncMock(return_value=_limit_row(100, used=10))
         result = await service.check_limit(100)
         assert result.allowed is False
 
@@ -630,9 +630,9 @@ class TestIntegrationScenarios:
         session = _mock_session()
         service = LimitService(session, admin_user_ids=[])
         service._user_repo.get_by_id = AsyncMock(return_value=_free_user(100))
-        service._limit_repo.get = AsyncMock(return_value=_limit_row(100, used=3))
+        service._limit_repo.get = AsyncMock(return_value=_limit_row(100, used=10))
         result = await service.check_limit(100)
-        assert "3/3" in result.message
+        assert "10/10" in result.message
         assert "безлимитный" in result.message.lower() or "подпиш" in result.message.lower()
 
     @pytest.mark.asyncio

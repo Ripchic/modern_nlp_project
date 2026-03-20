@@ -26,6 +26,7 @@ HELP_TEXT = (
     "/start — Начать заново, выбрать режим\n"
     "/mode — Переключить режим (авто-поиск / свои ссылки)\n"
     "/subscribe — Оформить подписку Premium\n"
+    "/myid — Показать мой Telegram ID\n"
     "/help — Показать эту справку\n"
     "/delete_my_data — Удалить все мои данные\n\n"
     "<b>Поддерживаемые источники:</b>\n"
@@ -48,3 +49,10 @@ async def cmd_start(message: Message) -> None:
 async def cmd_help(message: Message) -> None:
     """Handle /help command — send help and usage instructions."""
     await message.answer(HELP_TEXT, parse_mode="HTML")
+
+
+@router.message(Command("myid"))
+async def cmd_myid(message: Message) -> None:
+    """Handle /myid command — show the user's Telegram ID."""
+    user_id = message.from_user.id if message.from_user else 0
+    await message.answer(f"🆔 Ваш Telegram ID: <code>{user_id}</code>", parse_mode="HTML")

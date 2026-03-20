@@ -838,9 +838,9 @@ class TestAutoModeAnswerStructure:
             for row in markup.inline_keyboard
             for btn in row
         ]
-        assert FEEDBACK_USEFUL in button_data
-        assert FEEDBACK_BAD in button_data
-        assert FEEDBACK_SOURCES in button_data
+        assert any(d.startswith(FEEDBACK_USEFUL) for d in button_data)
+        assert any(d.startswith(FEEDBACK_BAD) for d in button_data)
+        assert any(d.startswith(FEEDBACK_SOURCES) for d in button_data)
 
     @pytest.mark.asyncio
     async def test_no_product_answer_includes_tip(self):

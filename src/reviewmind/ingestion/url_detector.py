@@ -116,7 +116,11 @@ def route_to_scraper(url: str) -> ScraperType:
     url_type = detect_url_type(url)
 
     if url_type == SourceType.YOUTUBE.value:
-        return YouTubeScraper()
+        from reviewmind.config import get_settings  # noqa: PLC0415
+
+        return YouTubeScraper(
+            cookie_path=get_settings().youtube_cookies_path or None,
+        )
     if url_type == SourceType.REDDIT.value:
         return RedditScraper()
     return WebScraper()

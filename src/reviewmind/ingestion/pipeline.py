@@ -26,6 +26,7 @@ from reviewmind.scrapers.web import WebScraper
 from reviewmind.scrapers.youtube import YouTubeScraper
 from reviewmind.vectorstore.client import ChunkPayload, UpsertResult, upsert_chunks
 from reviewmind.vectorstore.collections import COLLECTION_AUTO_CRAWLED, SourceType
+from reviewmind.vectorstore.search import scroll_by_source_urls
 
 logger = structlog.get_logger(__name__)
 
@@ -128,7 +129,11 @@ class IngestionPipeline:
 
     def _get_youtube(self) -> YouTubeScraper:
         if self._youtube is None:
-            self._youtube = YouTubeScraper()
+            from reviewmind.config import get_settings  # noqa: PLC0415
+
+            self._youtube = YouTubeScraper(
+                cookie_path=get_settings().youtube_cookies_path or None,
+            )
         return self._youtube
 
     def _get_reddit(self) -> RedditScraper:
@@ -169,6 +174,27 @@ class IngestionPipeline:
 
         source_type = detect_url_type(url)
         log = log.bind(source_type=source_type)
+        log.info("ingest_url_start")
+
+        # ------ step 0: check if already in Qdrant ------
+        try:
+            existing = await scroll_by_source_urls(
+                client=self._qdrant,
+                source_urls=[url],
+                collection=self._collection,
+                limit=1,
+            )
+            if existing:
+                log.info("ingest_url_already_exists", url=url)
+                return SourceIngestionResult(
+                    url=url,
+                    success=True,
+                    source_type=source_type,
+                    chunks_count=0,
+                )
+        except Exception as exc:  # noqa: BLE001
+            log.debug("ingest_exists_check_failed", error=str(exc))
+            # Fall through to normal ingestion on check failure
 
         # ------ step 1: scrape ------
         try:
@@ -178,16 +204,24 @@ class IngestionPipeline:
             return SourceIngestionResult(url=url, success=False, source_type=source_type, error=f"Scrape failed: {exc}")
 
         if not raw_text:
-            log.info("scrape_empty")
+            log.warning("scrape_empty", metadata=metadata)
             return SourceIngestionResult(url=url, success=False, source_type=source_type, error="No text extracted")
+
+        log.info(
+            "scrape_ok",
+            raw_text_len=len(raw_text),
+            language=metadata.get("language"),
+            author=metadata.get("author"),
+        )
 
         # ------ step 2: clean ------
         cleaned = clean_text(raw_text)
         if not cleaned:
-            log.info("clean_empty")
+            log.warning("clean_empty", raw_text_preview=raw_text[:200])
             return SourceIngestionResult(
                 url=url, success=False, source_type=source_type, error="Text too short after cleaning",
             )
+        log.debug("clean_ok", cleaned_len=len(cleaned))
 
         # ------ step 3: sponsor detection ------
         sponsor_result = detect_sponsor_detailed(cleaned)
@@ -209,10 +243,11 @@ class IngestionPipeline:
 
         chunks: list[Chunk] = chunk_text(cleaned, metadata=chunk_metadata)
         if not chunks:
-            log.info("no_chunks")
+            log.warning("no_chunks", cleaned_len=len(cleaned))
             return SourceIngestionResult(url=url, success=False, source_type=source_type, error="No chunks produced")
 
         log = log.bind(chunks_count=len(chunks))
+        log.info("chunks_ok")
 
         # ------ step 5: embed ------
         try:

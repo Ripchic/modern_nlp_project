@@ -23,8 +23,8 @@ logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 SUBSCRIPTION_DAYS: int = 30
 """Duration of a single subscription period in days."""
 
-SUBSCRIPTION_PRICE_STARS: int = 1
-"""Price in Telegram Stars (XTR). Minimum value allowed by Telegram."""
+SUBSCRIPTION_PRICE_STARS: int = 75
+"""Price in Telegram Stars (XTR). ~299 RUB at current rate."""
 
 SUBSCRIPTION_PRICE_LABEL: str = "ReviewMind Premium (30 дней)"
 """Label displayed in the Telegram payment invoice."""

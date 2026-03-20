@@ -20,7 +20,7 @@ logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
 # ── Constants ────────────────────────────────────────────────────────────────
 
-FREE_DAILY_LIMIT: int = 3
+FREE_DAILY_LIMIT: int = 10
 """Maximum number of queries per day for free-tier users."""
 
 PREMIUM_SUBSCRIPTION: str = "premium"

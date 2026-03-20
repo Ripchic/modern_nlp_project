@@ -127,6 +127,9 @@ ipython_config.py
 # PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
 __pypackages__/
 
+# Cookies (auth tokens – never commit)
+cookies.txt
+
 # Celery stuff
 celerybeat-schedule
 celerybeat.pid
@@ -213,8 +216,8 @@ __marimo__/
 FULL_README.md
 saas_sample/
 
-tasks.json
-progress.txt
+# tasks.json
+# progress.txt
 progress.md
 
 PRD-ReviewMind.md

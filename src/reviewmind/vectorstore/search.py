@@ -14,6 +14,7 @@ from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import (
     FieldCondition,
     Filter,
+    MatchAny,
     MatchValue,
     ScoredPoint,
 )
@@ -302,3 +303,67 @@ async def hybrid_search(
     )
 
     return deduplicated
+
+
+# ── Source-URL based retrieval ───────────────────────────────────────────────
+
+
+async def scroll_by_source_urls(
+    client: AsyncQdrantClient,
+    source_urls: list[str],
+    *,
+    collection: str = COLLECTION_AUTO_CRAWLED,
+    limit: int = 50,
+) -> list[SearchResult]:
+    """Retrieve all chunks matching *source_urls* via Qdrant scroll.
+
+    Unlike vector search this is an exact payload filter — it returns every
+    chunk whose ``source_url`` field is in the given list, regardless of
+    embedding similarity.  Useful in links-mode where user explicitly
+    provided the URLs, so relevance is guaranteed.
+    """
+    url_filter = Filter(
+        must=[
+            FieldCondition(
+                key="source_url",
+                match=MatchAny(any=source_urls),
+            ),
+        ],
+    )
+
+    try:
+        records, _next_offset = await client.scroll(
+            collection_name=collection,
+            scroll_filter=url_filter,
+            limit=limit,
+            with_payload=True,
+            with_vectors=False,
+        )
+    except Exception:
+        logger.exception("scroll_by_source_urls_error", urls=source_urls[:3])
+        return []
+
+    results = [
+        SearchResult(
+            text=(r.payload or {}).get("text", ""),
+            score=1.0,  # exact match → maximum relevance
+            source_url=(r.payload or {}).get("source_url", ""),
+            source_type=(r.payload or {}).get("source_type", ""),
+            is_curated=bool((r.payload or {}).get("is_curated", False)),
+            is_sponsored=bool((r.payload or {}).get("is_sponsored", False)),
+            collection=collection,
+            product_query=(r.payload or {}).get("product_query", ""),
+            language=(r.payload or {}).get("language", ""),
+            chunk_index=int((r.payload or {}).get("chunk_index", 0)),
+            point_id=r.id,
+        )
+        for r in records
+        if (r.payload or {}).get("text")
+    ]
+
+    logger.info(
+        "scroll_by_source_urls_done",
+        requested_urls=len(source_urls),
+        results_count=len(results),
+    )
+    return results

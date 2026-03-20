@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from aiogram.types import Chat, InlineKeyboardMarkup, Message, User
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -58,6 +59,7 @@ class FakeRAGResponse:
     chunks_count: int = 0
     chunks_found: int = 0
     used_sponsored: bool = False
+    used_tavily: bool = False
     error: str | None = None
 
 
@@ -170,6 +172,31 @@ class TestExtractQueryText:
 
         result = extract_query_text("test  https://a.com  review", ["https://a.com"])
         assert "  " not in result
+
+    def test_filler_phrase_returns_default(self):
+        """Common filler phrases around URLs should fall back to default query."""
+        from reviewmind.bot.handlers.links import _DEFAULT_QUERY, extract_query_text
+
+        filler_examples = [
+            "Ссылка на обзор:",
+            "ссылка на видео",
+            "Вот ссылка:",
+            "обзор:",
+            "Видео",
+            "link",
+            "смотри видео",
+        ]
+        for phrase in filler_examples:
+            text = f"{phrase} https://example.com"
+            result = extract_query_text(text, ["https://example.com"])
+            assert result == _DEFAULT_QUERY, f"Filler phrase {phrase!r} was not detected"
+
+    def test_meaningful_text_preserved(self):
+        """Meaningful product names should NOT be treated as filler."""
+        from reviewmind.bot.handlers.links import extract_query_text
+
+        result = extract_query_text("Sony WH-1000XM5 https://example.com", ["https://example.com"])
+        assert "Sony WH-1000XM5" in result
 
 
 # ══════════════════════════════════════════════════════════════
@@ -396,6 +423,15 @@ class TestOnLinksMessage:
 
 class TestIngestAndAnalyse:
     """Tests for the _ingest_and_analyse helper."""
+
+    @pytest.fixture(autouse=True)
+    def _patch_db_calls(self):
+        """Patch DB helpers that are not relevant to most _ingest_and_analyse tests."""
+        with (
+            patch("reviewmind.bot.handlers.links._save_query_log", new_callable=AsyncMock, return_value=42),
+            patch("reviewmind.bot.handlers.links._increment_user_limit", new_callable=AsyncMock),
+        ):
+            yield
 
     def _make_status_msg(self) -> MagicMock:
         status = MagicMock(spec=Message)
@@ -853,6 +889,15 @@ class TestConstants:
 
 class TestIntegrationScenarios:
     """End-to-end-like scenarios using mocked services."""
+
+    @pytest.fixture(autouse=True)
+    def _patch_db_calls(self):
+        """Patch DB helpers that are not relevant to integration scenario tests."""
+        with (
+            patch("reviewmind.bot.handlers.links._save_query_log", new_callable=AsyncMock, return_value=42),
+            patch("reviewmind.bot.handlers.links._increment_user_limit", new_callable=AsyncMock),
+        ):
+            yield
 
     async def test_youtube_url_flow(self):
         """A YouTube URL should be ingested and analysed."""
