@@ -14,6 +14,7 @@ class TestAdminUserIdsParsing:
             telegram_bot_token="test-token",
             openai_api_key="test-key",
             admin_user_ids="123,456",
+            _env_file=None,
         )
         assert s.admin_user_ids == [123, 456]
 
@@ -22,6 +23,7 @@ class TestAdminUserIdsParsing:
             telegram_bot_token="test-token",
             openai_api_key="test-key",
             admin_user_ids="789",
+            _env_file=None,
         )
         assert s.admin_user_ids == [789]
 
@@ -30,6 +32,7 @@ class TestAdminUserIdsParsing:
             telegram_bot_token="test-token",
             openai_api_key="test-key",
             admin_user_ids="",
+            _env_file=None,
         )
         assert s.admin_user_ids == []
 
@@ -38,6 +41,7 @@ class TestAdminUserIdsParsing:
             telegram_bot_token="test-token",
             openai_api_key="test-key",
             admin_user_ids=" 123 , 456 , 789 ",
+            _env_file=None,
         )
         assert s.admin_user_ids == [123, 456, 789]
 
@@ -45,6 +49,7 @@ class TestAdminUserIdsParsing:
         s = Settings(
             telegram_bot_token="test-token",
             openai_api_key="test-key",
+            _env_file=None,
         )
         assert s.admin_user_ids == []
 
@@ -53,6 +58,7 @@ class TestAdminUserIdsParsing:
             telegram_bot_token="test-token",
             openai_api_key="test-key",
             admin_user_ids=[111, 222],
+            _env_file=None,
         )
         assert s.admin_user_ids == [111, 222]
 
@@ -64,6 +70,7 @@ class TestSettingsDefaults:
         defaults = {
             "telegram_bot_token": "test-token",
             "openai_api_key": "test-key",
+            "_env_file": None,
         }
         defaults.update(overrides)
         return Settings(**defaults)
@@ -158,6 +165,7 @@ class TestSettingsFromEnv:
         s = Settings(
             telegram_bot_token="t",
             openai_api_key="k",
+            _env_file=None,
         )
         dump = s.model_dump()
         expected_keys = {

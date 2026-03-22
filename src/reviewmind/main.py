@@ -72,6 +72,30 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         qdrant = AsyncQdrantClient(url=settings.qdrant_url, timeout=5)
         app.state.qdrant = qdrant
         log.info("qdrant_client_created")
+
+        # Ensure collections exist on every startup (idempotent)
+        try:
+            from reviewmind.vectorstore.collections import ensure_all_collections
+
+            await ensure_all_collections(qdrant)
+            log.info("qdrant_collections_ensured")
+        except Exception as exc:
+            log.warning("qdrant_ensure_collections_failed", error=str(exc))
+
+        # Log collection point counts for diagnostics
+        try:
+            from reviewmind.vectorstore.collections import COLLECTION_SPECS
+
+            for spec in COLLECTION_SPECS:
+                info = await qdrant.get_collection(spec.name)
+                log.info(
+                    "qdrant_collection_stats",
+                    collection=spec.name,
+                    points_count=info.points_count,
+                    vectors_count=info.vectors_count,
+                )
+        except Exception as exc:
+            log.warning("qdrant_stats_failed", error=str(exc))
     except Exception as exc:
         log.warning("qdrant_init_failed", error=str(exc))
         app.state.qdrant = None

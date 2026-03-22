@@ -454,10 +454,13 @@ class TestRAGPipelineQuery:
 
     @pytest.mark.asyncio
     async def test_pipeline_no_results(self, mock_qdrant, mock_embedding, mock_llm):
-        with patch(
-            "reviewmind.core.rag.hybrid_search",
-            new_callable=AsyncMock,
-            return_value=[],
+        with (
+            patch(
+                "reviewmind.core.rag.hybrid_search",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch.object(RAGPipeline, "_tavily_fallback", new_callable=AsyncMock, return_value=[]),
         ):
             pipeline = RAGPipeline(mock_qdrant, mock_embedding, mock_llm)
             resp = await pipeline.query("no data product")
@@ -842,10 +845,13 @@ class TestRAGPipelineIntegration:
 
         qdrant = AsyncMock()
 
-        with patch(
-            "reviewmind.core.rag.hybrid_search",
-            new_callable=AsyncMock,
-            return_value=[],
+        with (
+            patch(
+                "reviewmind.core.rag.hybrid_search",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch.object(RAGPipeline, "_tavily_fallback", new_callable=AsyncMock, return_value=[]),
         ):
             pipeline = RAGPipeline(qdrant, embed, llm)
             resp = await pipeline.query("Unknown Gadget X review")
@@ -941,10 +947,13 @@ class TestRAGPipelineIntegration:
 
         qdrant = AsyncMock()
 
-        with patch(
-            "reviewmind.core.rag.hybrid_search",
-            new_callable=AsyncMock,
-            return_value=results,
+        with (
+            patch(
+                "reviewmind.core.rag.hybrid_search",
+                new_callable=AsyncMock,
+                return_value=results,
+            ),
+            patch.object(RAGPipeline, "_tavily_fallback", new_callable=AsyncMock, return_value=[]),
         ):
             pipeline = RAGPipeline(qdrant, embed, llm)
             await pipeline.query("test")

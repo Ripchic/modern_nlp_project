@@ -122,13 +122,18 @@ class Settings(BaseSettings):
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         """Use graceful env source that handles comma-separated lists."""
+        # Respect _env_file override (e.g. _env_file=None in tests)
+        env_file = getattr(dotenv_settings, "env_file", cls.model_config.get("env_file", ".env"))
+        env_file_encoding = getattr(
+            dotenv_settings, "env_file_encoding", cls.model_config.get("env_file_encoding", "utf-8"),
+        )
         return (
             init_settings,
             _GracefulEnvSource(settings_cls),
             _GracefulDotEnvSource(
                 settings_cls,
-                env_file=cls.model_config.get("env_file", ".env"),
-                env_file_encoding=cls.model_config.get("env_file_encoding", "utf-8"),
+                env_file=env_file,
+                env_file_encoding=env_file_encoding,
             ),
             file_secret_settings,
         )

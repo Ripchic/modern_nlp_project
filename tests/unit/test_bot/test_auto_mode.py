@@ -646,6 +646,11 @@ class TestAutoModeNoProduct:
                 "reviewmind.bot.handlers.query.extract_product",
                 new=AsyncMock(return_value=[]),
             ),
+            patch(
+                "reviewmind.bot.handlers.query._try_instant_rag",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
             patch("reviewmind.bot.handlers.query.LLMClient") as MockLLM,
         ):
             instance = MockLLM.return_value
@@ -669,6 +674,11 @@ class TestAutoModeNoProduct:
             patch(
                 "reviewmind.bot.handlers.query.extract_product",
                 new=AsyncMock(side_effect=RuntimeError("extract fail")),
+            ),
+            patch(
+                "reviewmind.bot.handlers.query._try_instant_rag",
+                new_callable=AsyncMock,
+                return_value=None,
             ),
             patch("reviewmind.bot.handlers.query.LLMClient") as MockLLM,
         ):
@@ -849,6 +859,11 @@ class TestAutoModeAnswerStructure:
             patch(
                 "reviewmind.bot.handlers.query.extract_product",
                 new=AsyncMock(return_value=[]),
+            ),
+            patch(
+                "reviewmind.bot.handlers.query._try_instant_rag",
+                new_callable=AsyncMock,
+                return_value=None,
             ),
             patch("reviewmind.bot.handlers.query.LLMClient") as MockLLM,
         ):

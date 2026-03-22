@@ -336,6 +336,49 @@ def ingest_sources_task(
 TOP_QUERIES_LIMIT: int = 50
 """Number of top product queries to refresh during the monthly task."""
 
+MAX_REFRESH_URLS: int = 10
+"""Maximum number of URLs to collect per query during refresh."""
+
+
+async def _collect_urls_for_refresh(query_text: str) -> list[str]:
+    """Search YouTube + Reddit for review URLs for a product query.
+
+    Returns up to :data:`MAX_REFRESH_URLS` unique URLs, or an empty list
+    if both searches fail.
+    """
+    urls: list[str] = []
+    seen: set[str] = set()
+    search_query = query_text + " review"
+
+    try:
+        from reviewmind.config import get_settings  # noqa: PLC0415
+        from reviewmind.scrapers.youtube import YouTubeScraper  # noqa: PLC0415
+
+        yt = YouTubeScraper(
+            cookie_path=get_settings().youtube_cookies_path or None,
+        )
+        videos = yt.search_videos(search_query, max_results=5)
+        for v in videos:
+            if v.url and v.url not in seen:
+                seen.add(v.url)
+                urls.append(v.url)
+    except Exception as exc:
+        logger.warning("refresh_youtube_search_failed", query=query_text, error=str(exc))
+
+    try:
+        from reviewmind.scrapers.reddit import RedditScraper  # noqa: PLC0415
+
+        reddit = RedditScraper()
+        posts = reddit.search_posts(search_query, limit=5)
+        for p in posts:
+            if p.url and p.url not in seen:
+                seen.add(p.url)
+                urls.append(p.url)
+    except Exception as exc:
+        logger.warning("refresh_reddit_search_failed", query=query_text, error=str(exc))
+
+    return urls[:MAX_REFRESH_URLS]
+
 
 async def _daily_reset_limits() -> dict:
     """Safety-net reset for ``user_limits`` at midnight UTC.
@@ -387,8 +430,9 @@ async def _refresh_top_queries() -> dict:
     """Fetch top-50 product queries from ``query_logs`` and re-ingest them.
 
     Gathers the most frequent ``product_query`` values from the query_logs
-    table (non-NULL, grouped and ordered by count DESC), then enqueues
-    a background ingestion job for each via the Celery ingest task.
+    table (non-NULL, grouped and ordered by count DESC), then for each
+    query collects source URLs via YouTube + Reddit search before enqueuing
+    an ingestion job.  Queries yielding zero URLs are skipped.
 
     Returns a summary dict with the queries found and jobs enqueued.
     """
@@ -399,6 +443,7 @@ async def _refresh_top_queries() -> dict:
 
     queries_found: list[str] = []
     jobs_enqueued = 0
+    skipped_no_urls = 0
 
     try:
         async with session_factory() as session:
@@ -422,13 +467,20 @@ async def _refresh_top_queries() -> dict:
         # Enqueue ingestion for each top query (via existing Celery task)
         for query_text in queries_found:
             try:
+                # Collect source URLs via YouTube + Reddit search
+                urls = await _collect_urls_for_refresh(query_text)
+                if not urls:
+                    skipped_no_urls += 1
+                    logger.info("refresh_top_queries_skip_no_urls", query=query_text)
+                    continue
+
                 job_id = str(uuid.uuid4())
                 ingest_sources_task.apply_async(
                     kwargs={
                         "job_id": job_id,
                         "user_id": 0,  # system-level job
                         "product_query": query_text,
-                        "urls": [],  # auto-search will find URLs
+                        "urls": urls,
                     },
                 )
                 jobs_enqueued += 1
@@ -439,7 +491,12 @@ async def _refresh_top_queries() -> dict:
                     error=str(exc),
                 )
 
-        logger.info("refresh_top_queries_done", queries=len(queries_found), jobs_enqueued=jobs_enqueued)
+        logger.info(
+            "refresh_top_queries_done",
+            queries=len(queries_found),
+            jobs_enqueued=jobs_enqueued,
+            skipped_no_urls=skipped_no_urls,
+        )
     except Exception as exc:
         logger.error("refresh_top_queries_error", error=str(exc))
     finally:
@@ -448,6 +505,7 @@ async def _refresh_top_queries() -> dict:
     return {
         "queries_found": len(queries_found),
         "jobs_enqueued": jobs_enqueued,
+        "skipped_no_urls": skipped_no_urls,
         "top_queries": queries_found[:10],  # return first 10 for logging
     }
 

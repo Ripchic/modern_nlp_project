@@ -349,6 +349,11 @@ class TestQueryHandlerSessionIntegration:
                 return_value=[],
             ),
             patch(
+                "reviewmind.bot.handlers.query._try_instant_rag",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+            patch(
                 "reviewmind.bot.handlers.query._fallback_llm_answer",
                 new_callable=AsyncMock,
             ) as mock_fallback,
@@ -945,6 +950,11 @@ class TestIntegrationScenarios:
                 "reviewmind.bot.handlers.query.extract_product",
                 new_callable=AsyncMock,
                 return_value=[],
+            ),
+            patch(
+                "reviewmind.bot.handlers.query._try_instant_rag",
+                new_callable=AsyncMock,
+                return_value=None,
             ),
             patch(
                 "reviewmind.bot.handlers.query._fallback_llm_answer",

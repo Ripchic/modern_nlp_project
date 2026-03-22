@@ -271,6 +271,7 @@ class TestBotQueryHandler:
             patch("reviewmind.bot.handlers.query._check_user_limit", new_callable=AsyncMock, return_value=None),
             patch("reviewmind.bot.handlers.query._increment_user_limit", new_callable=AsyncMock),
             patch("reviewmind.bot.handlers.query.extract_product", new=AsyncMock(return_value=[])),
+            patch("reviewmind.bot.handlers.query._try_instant_rag", new_callable=AsyncMock, return_value=None),
             patch("reviewmind.bot.handlers.query.LLMClient") as MockLLM,
         ):
             instance = MockLLM.return_value
@@ -292,6 +293,7 @@ class TestBotQueryHandler:
             patch("reviewmind.bot.handlers.query._check_user_limit", new_callable=AsyncMock, return_value=None),
             patch("reviewmind.bot.handlers.query._increment_user_limit", new_callable=AsyncMock),
             patch("reviewmind.bot.handlers.query.extract_product", new=AsyncMock(return_value=[])),
+            patch("reviewmind.bot.handlers.query._try_instant_rag", new_callable=AsyncMock, return_value=None),
             patch("reviewmind.bot.handlers.query.LLMClient") as MockLLM,
         ):
             instance = MockLLM.return_value

@@ -402,6 +402,11 @@ class TestRefreshTopQueries:
             patch("reviewmind.workers.tasks.async_sessionmaker", return_value=mock_session_factory),
             patch("reviewmind.workers.tasks.AsyncSession"),
             patch("reviewmind.workers.tasks.ingest_sources_task") as mock_ingest,
+            patch(
+                "reviewmind.workers.tasks._collect_urls_for_refresh",
+                new_callable=AsyncMock,
+                return_value=["https://example.com/review"],
+            ),
         ):
             mock_session_factory.return_value = mock_session
             mock_ingest.apply_async = MagicMock()
@@ -492,6 +497,11 @@ class TestRefreshTopQueries:
             patch("reviewmind.workers.tasks.async_sessionmaker", return_value=mock_session_factory),
             patch("reviewmind.workers.tasks.AsyncSession"),
             patch("reviewmind.workers.tasks.ingest_sources_task") as mock_ingest,
+            patch(
+                "reviewmind.workers.tasks._collect_urls_for_refresh",
+                new_callable=AsyncMock,
+                return_value=["https://example.com/review"],
+            ),
         ):
             mock_session_factory.return_value = mock_session
             # First call fails, second succeeds
