@@ -114,47 +114,70 @@ class TestIsArticleFresh:
 
     def test_no_date_is_fresh(self):
         a = CuratedArticle(
-            category="test", product_query="x", source_url="https://x.com",
-            source_name="X", text="t" * 300,
+            category="test",
+            product_query="x",
+            source_url="https://x.com",
+            source_name="X",
+            text="t" * 300,
         )
         assert _is_article_fresh(a) is True
 
     def test_recent_date_is_fresh(self):
         recent = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
         a = CuratedArticle(
-            category="test", product_query="x", source_url="https://x.com",
-            source_name="X", text="t" * 300, date=recent,
+            category="test",
+            product_query="x",
+            source_url="https://x.com",
+            source_name="X",
+            text="t" * 300,
+            date=recent,
         )
         assert _is_article_fresh(a) is True
 
     def test_old_date_is_stale(self):
         old = (datetime.now(timezone.utc) - timedelta(days=400)).strftime("%Y-%m-%d")
         a = CuratedArticle(
-            category="test", product_query="x", source_url="https://x.com",
-            source_name="X", text="t" * 300, date=old,
+            category="test",
+            product_query="x",
+            source_url="https://x.com",
+            source_name="X",
+            text="t" * 300,
+            date=old,
         )
         assert _is_article_fresh(a) is False
 
     def test_exactly_max_age(self):
         exact = (datetime.now(timezone.utc) - timedelta(days=MAX_AGE_DAYS)).strftime("%Y-%m-%d")
         a = CuratedArticle(
-            category="test", product_query="x", source_url="https://x.com",
-            source_name="X", text="t" * 300, date=exact,
+            category="test",
+            product_query="x",
+            source_url="https://x.com",
+            source_name="X",
+            text="t" * 300,
+            date=exact,
         )
         assert _is_article_fresh(a) is True
 
     def test_invalid_date_format(self):
         a = CuratedArticle(
-            category="test", product_query="x", source_url="https://x.com",
-            source_name="X", text="t" * 300, date="not-a-date",
+            category="test",
+            product_query="x",
+            source_url="https://x.com",
+            source_name="X",
+            text="t" * 300,
+            date="not-a-date",
         )
         assert _is_article_fresh(a) is True  # unparseable → assume fresh
 
     def test_custom_max_age(self):
         recent = (datetime.now(timezone.utc) - timedelta(days=10)).strftime("%Y-%m-%d")
         a = CuratedArticle(
-            category="test", product_query="x", source_url="https://x.com",
-            source_name="X", text="t" * 300, date=recent,
+            category="test",
+            product_query="x",
+            source_url="https://x.com",
+            source_name="X",
+            text="t" * 300,
+            date=recent,
         )
         assert _is_article_fresh(a, max_age_days=5) is False
 
@@ -266,7 +289,8 @@ class TestSeedCuratedKb:
             patch("reviewmind.vectorstore.collections.ensure_all_collections", new_callable=AsyncMock) as mock_ensure,
             patch(
                 "reviewmind.vectorstore.client.upsert_chunks",
-                new_callable=AsyncMock, return_value=mock_upsert_result,
+                new_callable=AsyncMock,
+                return_value=mock_upsert_result,
             ),
             patch("reviewmind.ingestion.cleaner.clean_text", return_value="cleaned text " * 50),
             patch("reviewmind.ingestion.chunker.chunk_text", return_value=[MagicMock(text="chunk", chunk_index=0)]),
@@ -354,7 +378,8 @@ class TestSeedCuratedKb:
             patch("reviewmind.vectorstore.collections.ensure_all_collections", new_callable=AsyncMock),
             patch(
                 "reviewmind.vectorstore.client.upsert_chunks",
-                new_callable=AsyncMock, return_value=mock_upsert_result,
+                new_callable=AsyncMock,
+                return_value=mock_upsert_result,
             ),
             patch("seed_curated_kb._is_article_fresh", return_value=False),
         ):

@@ -18,10 +18,7 @@ SPONSORED_MARKER = "[sponsored]"
 CURATED_MARKER = "📚"
 
 #: Message injected as the context block when no chunks are available.
-NO_CONTEXT_TEXT = (
-    "Контекст по данному запросу отсутствует. "
-    "Информация из внешних источников ещё не была загружена."
-)
+NO_CONTEXT_TEXT = "Контекст по данному запросу отсутствует. Информация из внешних источников ещё не была загружена."
 
 #: Message injected into chat history slot when history is empty.
 NO_HISTORY_TEXT = "История диалога отсутствует."
@@ -68,7 +65,7 @@ SYSTEM_PROMPT_TEMPLATE = """\
 #: Fallback system prompt used when there are NO retrieved chunks at all
 #: (e.g. direct-LLM mode or before RAG pipeline is ready).
 FALLBACK_SYSTEM_PROMPT = """\
-Ты — ReviewMind, профессиональный AI-помощник по выбору товаров. 
+Ты — ReviewMind, профессиональный AI-помощник по выбору товаров.
 Сейчас ты работаешь в режиме общих знаний (без актуального контекста из интернета).
 
 Твоя задача — помогать с общими вопросами по выбору товаров, давать советы и ориентировать в брендах/моделях.

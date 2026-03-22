@@ -325,18 +325,14 @@ class TestOnFeedbackSources:
     @pytest.mark.asyncio
     async def test_no_sources(self):
         cb = _make_callback("feedback:sources:30")
-        with patch(
-            "reviewmind.bot.handlers.feedback._get_sources_for_log", new_callable=AsyncMock, return_value=[]
-        ):
+        with patch("reviewmind.bot.handlers.feedback._get_sources_for_log", new_callable=AsyncMock, return_value=[]):
             await on_feedback_sources(cb)
             cb.answer.assert_awaited_once_with(NO_SOURCES_MSG, show_alert=True)
 
     @pytest.mark.asyncio
     async def test_sources_none(self):
         cb = _make_callback("feedback:sources:30")
-        with patch(
-            "reviewmind.bot.handlers.feedback._get_sources_for_log", new_callable=AsyncMock, return_value=None
-        ):
+        with patch("reviewmind.bot.handlers.feedback._get_sources_for_log", new_callable=AsyncMock, return_value=None):
             await on_feedback_sources(cb)
             cb.answer.assert_awaited_once_with(NO_SOURCES_MSG, show_alert=True)
 
@@ -406,12 +402,8 @@ class TestApiFeedbackEndpoint:
 
         app = _make_api_app(db_engine=_mock_engine())
         with (
-            patch(
-                "reviewmind.api.endpoints.feedback.async_sessionmaker"
-            ) as mock_sm,
-            patch(
-                "reviewmind.api.endpoints.feedback.QueryLogRepository"
-            ) as mock_repo_cls,
+            patch("reviewmind.api.endpoints.feedback.async_sessionmaker") as mock_sm,
+            patch("reviewmind.api.endpoints.feedback.QueryLogRepository") as mock_repo_cls,
         ):
             mock_session = AsyncMock()
             mock_sm.return_value = MagicMock(__aenter__=AsyncMock(return_value=mock_session), __aexit__=AsyncMock())

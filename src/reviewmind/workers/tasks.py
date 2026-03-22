@@ -35,6 +35,7 @@ def ping(self: object) -> dict:
 # Ingestion task
 # ---------------------------------------------------------------------------
 
+
 def _run_async(coro):
     """Run an async coroutine from a sync Celery task."""
     return asyncio.run(coro)

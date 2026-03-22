@@ -41,13 +41,14 @@ async def _message_has_url(message: Message) -> bool:
     at the start (F.text.regexp uses re.match which only checks the start).
     """
     return bool(_URL_RE.search(message.text or ""))
+
+
 _DEFAULT_QUERY = "Проанализируй эти обзоры"
 
 _PROCESSING_TEMPLATE = "🔄 Обрабатываю {count} {word}...\nЭто может занять некоторое время."
 _NO_SUCCESS_MSG = "❌ Не удалось обработать ни одну ссылку."
 _ANALYSIS_ERROR_MSG = (
-    "⚠️ Ссылки успешно обработаны, но не удалось сгенерировать анализ. "
-    "Попробуйте задать вопрос по этим ссылкам."
+    "⚠️ Ссылки успешно обработаны, но не удалось сгенерировать анализ. Попробуйте задать вопрос по этим ссылкам."
 )
 _SERVICE_UNAVAILABLE_MSG = "⚠️ Сервис анализа временно недоступен. Попробуйте позже."
 _UNEXPECTED_ERROR_MSG = "⚠️ Произошла ошибка при обработке ссылок. Попробуйте ещё раз."
@@ -291,9 +292,7 @@ async def on_links_message(message: Message) -> None:
         log.warning("session_history_load_failed", error=str(exc))
 
     # Send processing status
-    status_msg = await message.answer(
-        _PROCESSING_TEMPLATE.format(count=len(urls), word=_pluralize_links(len(urls)))
-    )
+    status_msg = await message.answer(_PROCESSING_TEMPLATE.format(count=len(urls), word=_pluralize_links(len(urls))))
 
     # Create Qdrant client
     try:

@@ -134,9 +134,18 @@ class TestChunkPayload:
         p = _make_payload()
         d = p.to_dict()
         expected_keys = {
-            "text", "source_url", "source_type", "product_query",
-            "chunk_index", "language", "is_sponsored", "is_curated",
-            "source_id", "author", "date", "session_id",
+            "text",
+            "source_url",
+            "source_type",
+            "product_query",
+            "chunk_index",
+            "language",
+            "is_sponsored",
+            "is_curated",
+            "source_id",
+            "author",
+            "date",
+            "session_id",
         }
         assert set(d.keys()) == expected_keys
 
@@ -158,9 +167,18 @@ class TestChunkPayload:
         p = _make_payload()
         d = p.to_dict()
         required_fields = [
-            "text", "source_url", "source_type", "product_query",
-            "chunk_index", "language", "is_sponsored", "is_curated",
-            "source_id", "author", "date", "session_id",
+            "text",
+            "source_url",
+            "source_type",
+            "product_query",
+            "chunk_index",
+            "language",
+            "is_sponsored",
+            "is_curated",
+            "source_id",
+            "author",
+            "date",
+            "session_id",
         ]
         for field_name in required_fields:
             assert field_name in d, f"Missing PRD field: {field_name}"
@@ -249,9 +267,7 @@ class TestCheckDuplicates:
         """Empty search results → not a duplicate."""
         client = AsyncMock()
         client.query_points = AsyncMock(return_value=_make_query_response([]))
-        result = await _check_duplicates(
-            client, "auto_crawled", DUMMY_VECTOR, "https://example.com"
-        )
+        result = await _check_duplicates(client, "auto_crawled", DUMMY_VECTOR, "https://example.com")
         assert result is False
 
     @pytest.mark.asyncio
@@ -259,12 +275,8 @@ class TestCheckDuplicates:
         """A match with score ≥ threshold → duplicate."""
         point = _make_scored_point(score=0.96)
         client = AsyncMock()
-        client.query_points = AsyncMock(
-            return_value=_make_query_response([point])
-        )
-        result = await _check_duplicates(
-            client, "auto_crawled", DUMMY_VECTOR, "https://example.com"
-        )
+        client.query_points = AsyncMock(return_value=_make_query_response([point]))
+        result = await _check_duplicates(client, "auto_crawled", DUMMY_VECTOR, "https://example.com")
         assert result is True
 
     @pytest.mark.asyncio
@@ -273,7 +285,10 @@ class TestCheckDuplicates:
         client = AsyncMock()
         client.query_points = AsyncMock(return_value=_make_query_response([]))
         result = await _check_duplicates(
-            client, "auto_crawled", DUMMY_VECTOR, "https://example.com",
+            client,
+            "auto_crawled",
+            DUMMY_VECTOR,
+            "https://example.com",
             threshold=0.95,
         )
         assert result is False
@@ -284,7 +299,10 @@ class TestCheckDuplicates:
         client = AsyncMock()
         client.query_points = AsyncMock(return_value=_make_query_response([]))
         await _check_duplicates(
-            client, "auto_crawled", DUMMY_VECTOR, "https://example.com",
+            client,
+            "auto_crawled",
+            DUMMY_VECTOR,
+            "https://example.com",
             threshold=0.99,
         )
         call_kwargs = client.query_points.call_args.kwargs
@@ -295,9 +313,7 @@ class TestCheckDuplicates:
         """Dedup check should filter by source_url."""
         client = AsyncMock()
         client.query_points = AsyncMock(return_value=_make_query_response([]))
-        await _check_duplicates(
-            client, "auto_crawled", DUMMY_VECTOR, "https://example.com/review"
-        )
+        await _check_duplicates(client, "auto_crawled", DUMMY_VECTOR, "https://example.com/review")
         call_kwargs = client.query_points.call_args.kwargs
         qf = call_kwargs["query_filter"]
         assert isinstance(qf, Filter)
@@ -312,9 +328,7 @@ class TestCheckDuplicates:
         """On error, proceed with upsert (don't block on dedup failure)."""
         client = AsyncMock()
         client.query_points = AsyncMock(side_effect=Exception("network error"))
-        result = await _check_duplicates(
-            client, "auto_crawled", DUMMY_VECTOR, "https://example.com"
-        )
+        result = await _check_duplicates(client, "auto_crawled", DUMMY_VECTOR, "https://example.com")
         assert result is False
 
     @pytest.mark.asyncio
@@ -322,9 +336,7 @@ class TestCheckDuplicates:
         """Verify correct query parameters are sent."""
         client = AsyncMock()
         client.query_points = AsyncMock(return_value=_make_query_response([]))
-        await _check_duplicates(
-            client, "test_collection", DUMMY_VECTOR, "https://example.com"
-        )
+        await _check_duplicates(client, "test_collection", DUMMY_VECTOR, "https://example.com")
         call_kwargs = client.query_points.call_args.kwargs
         assert call_kwargs["collection_name"] == "test_collection"
         assert call_kwargs["query"] == DUMMY_VECTOR
@@ -449,9 +461,7 @@ class TestUpsertChunksDedup:
         client = AsyncMock()
         # Every dedup check returns a high-score match
         dup_point = _make_scored_point(score=0.98)
-        client.query_points = AsyncMock(
-            return_value=_make_query_response([dup_point])
-        )
+        client.query_points = AsyncMock(return_value=_make_query_response([dup_point]))
         client.upsert = AsyncMock()
 
         vectors = [DUMMY_VECTOR] * 3
@@ -474,7 +484,7 @@ class TestUpsertChunksDedup:
         client.query_points = AsyncMock(
             side_effect=[
                 _make_query_response([dup_point]),  # idx 0: dup
-                _make_query_response([]),             # idx 1: new
+                _make_query_response([]),  # idx 1: new
                 _make_query_response([dup_point]),  # idx 2: dup
             ]
         )
@@ -520,9 +530,7 @@ class TestUpsertChunksDedup:
         vectors = [DUMMY_VECTOR] * 3
         payloads = [_make_payload(chunk_index=i) for i in range(3)]
 
-        result = await upsert_chunks(
-            client, "auto_crawled", vectors, payloads, skip_dedup=True
-        )
+        result = await upsert_chunks(client, "auto_crawled", vectors, payloads, skip_dedup=True)
 
         assert result.total == 3
         assert result.inserted == 3
@@ -540,9 +548,7 @@ class TestUpsertChunksDedup:
         vectors = [DUMMY_VECTOR]
         payloads = [_make_payload()]
 
-        await upsert_chunks(
-            client, "auto_crawled", vectors, payloads, dedup_threshold=0.99
-        )
+        await upsert_chunks(client, "auto_crawled", vectors, payloads, dedup_threshold=0.99)
 
         call_kwargs = client.query_points.call_args.kwargs
         assert call_kwargs["score_threshold"] == 0.99
@@ -563,9 +569,7 @@ class TestUpsertChunksDedup:
 
         # Second call: data exists → all skipped via dedup
         dup_point = _make_scored_point(score=0.99)
-        client.query_points = AsyncMock(
-            return_value=_make_query_response([dup_point])
-        )
+        client.query_points = AsyncMock(return_value=_make_query_response([dup_point]))
         client.upsert.reset_mock()
 
         result2 = await upsert_chunks(client, "auto_crawled", vectors, payloads)
@@ -591,9 +595,7 @@ class TestUpsertChunksBatching:
         vectors = [DUMMY_VECTOR] * 5
         payloads = [_make_payload(chunk_index=i) for i in range(5)]
 
-        await upsert_chunks(
-            client, "auto_crawled", vectors, payloads, batch_size=10
-        )
+        await upsert_chunks(client, "auto_crawled", vectors, payloads, batch_size=10)
 
         assert client.upsert.await_count == 1
         points = client.upsert.call_args.kwargs["points"]
@@ -609,9 +611,7 @@ class TestUpsertChunksBatching:
         vectors = [DUMMY_VECTOR] * 7
         payloads = [_make_payload(chunk_index=i) for i in range(7)]
 
-        result = await upsert_chunks(
-            client, "auto_crawled", vectors, payloads, batch_size=3
-        )
+        result = await upsert_chunks(client, "auto_crawled", vectors, payloads, batch_size=3)
 
         # 7 chunks / batch_size=3 → 3 batches (3, 3, 1)
         assert client.upsert.await_count == 3
@@ -627,9 +627,7 @@ class TestUpsertChunksBatching:
         vectors = [DUMMY_VECTOR] * 6
         payloads = [_make_payload(chunk_index=i) for i in range(6)]
 
-        await upsert_chunks(
-            client, "auto_crawled", vectors, payloads, batch_size=3
-        )
+        await upsert_chunks(client, "auto_crawled", vectors, payloads, batch_size=3)
 
         # 6 / 3 = 2 batches
         assert client.upsert.await_count == 2
@@ -644,9 +642,7 @@ class TestUpsertChunksBatching:
         vectors = [DUMMY_VECTOR] * 3
         payloads = [_make_payload(chunk_index=i) for i in range(3)]
 
-        await upsert_chunks(
-            client, "auto_crawled", vectors, payloads, batch_size=1
-        )
+        await upsert_chunks(client, "auto_crawled", vectors, payloads, batch_size=1)
 
         assert client.upsert.await_count == 3
 
@@ -664,18 +660,14 @@ class TestUpsertChunksErrors:
         """Vectors and payloads of different lengths → ValueError."""
         client = AsyncMock()
         with pytest.raises(ValueError, match="same length"):
-            await upsert_chunks(
-                client, "auto_crawled", [DUMMY_VECTOR], []
-            )
+            await upsert_chunks(client, "auto_crawled", [DUMMY_VECTOR], [])
 
     @pytest.mark.asyncio
     async def test_mismatched_lengths_reverse(self):
         """More payloads than vectors → ValueError."""
         client = AsyncMock()
         with pytest.raises(ValueError, match="same length"):
-            await upsert_chunks(
-                client, "auto_crawled", [], [_make_payload()]
-            )
+            await upsert_chunks(client, "auto_crawled", [], [_make_payload()])
 
     @pytest.mark.asyncio
     async def test_upsert_exception_propagates(self):
@@ -685,9 +677,7 @@ class TestUpsertChunksErrors:
         client.upsert = AsyncMock(side_effect=Exception("Qdrant error"))
 
         with pytest.raises(Exception, match="Qdrant error"):
-            await upsert_chunks(
-                client, "auto_crawled", [DUMMY_VECTOR], [_make_payload()]
-            )
+            await upsert_chunks(client, "auto_crawled", [DUMMY_VECTOR], [_make_payload()])
 
     @pytest.mark.asyncio
     async def test_dedup_error_does_not_block_upsert(self):
@@ -696,9 +686,7 @@ class TestUpsertChunksErrors:
         client.query_points = AsyncMock(side_effect=Exception("network"))
         client.upsert = AsyncMock()
 
-        result = await upsert_chunks(
-            client, "auto_crawled", [DUMMY_VECTOR], [_make_payload()]
-        )
+        result = await upsert_chunks(client, "auto_crawled", [DUMMY_VECTOR], [_make_payload()])
 
         # Dedup error → not a dup → proceed with upsert
         assert result.inserted == 1
@@ -735,9 +723,7 @@ class TestUpsertPayloadCoverage:
             session_id="sess-xyz",
         )
 
-        await upsert_chunks(
-            client, "auto_crawled", [DUMMY_VECTOR], [payload], skip_dedup=True
-        )
+        await upsert_chunks(client, "auto_crawled", [DUMMY_VECTOR], [payload], skip_dedup=True)
 
         stored = client.upsert.call_args.kwargs["points"][0].payload
         assert stored["text"] == "Review text here"
@@ -760,9 +746,7 @@ class TestUpsertPayloadCoverage:
         client.upsert = AsyncMock()
 
         payload = _make_payload(is_curated=True, source_type="curated")
-        await upsert_chunks(
-            client, "curated_kb", [DUMMY_VECTOR], [payload], skip_dedup=True
-        )
+        await upsert_chunks(client, "curated_kb", [DUMMY_VECTOR], [payload], skip_dedup=True)
 
         stored = client.upsert.call_args.kwargs["points"][0].payload
         assert stored["is_curated"] is True
@@ -775,9 +759,7 @@ class TestUpsertPayloadCoverage:
         client.upsert = AsyncMock()
 
         payload = _make_payload(is_sponsored=True)
-        await upsert_chunks(
-            client, "auto_crawled", [DUMMY_VECTOR], [payload], skip_dedup=True
-        )
+        await upsert_chunks(client, "auto_crawled", [DUMMY_VECTOR], [payload], skip_dedup=True)
 
         stored = client.upsert.call_args.kwargs["points"][0].payload
         assert stored["is_sponsored"] is True
@@ -793,33 +775,43 @@ class TestVectorstoreUpsertExports:
 
     def test_chunk_payload_exported(self):
         from reviewmind.vectorstore import ChunkPayload as CP
+
         assert CP is ChunkPayload
 
     def test_upsert_result_exported(self):
         from reviewmind.vectorstore import UpsertResult as UR
+
         assert UR is UpsertResult
 
     def test_upsert_chunks_exported(self):
         from reviewmind.vectorstore import upsert_chunks as uc
+
         assert uc is upsert_chunks
 
     def test_generate_point_id_exported(self):
         from reviewmind.vectorstore import generate_point_id as gp
+
         assert gp is generate_point_id
 
     def test_dedup_threshold_exported(self):
         from reviewmind.vectorstore import DEDUP_SIMILARITY_THRESHOLD as dt
+
         assert dt == 0.95
 
     def test_batch_size_exported(self):
         from reviewmind.vectorstore import DEFAULT_UPSERT_BATCH_SIZE as bs
+
         assert bs == 64
 
     def test_all_exports_in___all__(self):
         import reviewmind.vectorstore as vs
+
         for name in [
-            "ChunkPayload", "UpsertResult", "upsert_chunks",
-            "generate_point_id", "DEDUP_SIMILARITY_THRESHOLD",
+            "ChunkPayload",
+            "UpsertResult",
+            "upsert_chunks",
+            "generate_point_id",
+            "DEDUP_SIMILARITY_THRESHOLD",
             "DEFAULT_UPSERT_BATCH_SIZE",
         ]:
             assert name in vs.__all__, f"{name} not in __all__"
@@ -862,9 +854,7 @@ class TestIntegrationScenarios:
         """Re-processing the same URL → all chunks skipped (dedup)."""
         client = AsyncMock()
         dup_point = _make_scored_point(score=0.99)
-        client.query_points = AsyncMock(
-            return_value=_make_query_response([dup_point])
-        )
+        client.query_points = AsyncMock(return_value=_make_query_response([dup_point]))
         client.upsert = AsyncMock()
 
         vectors = [DUMMY_VECTOR] * 5
@@ -930,8 +920,12 @@ class TestIntegrationScenarios:
         ]
 
         result = await upsert_chunks(
-            client, "curated_kb", vectors, payloads,
-            skip_dedup=True, batch_size=4,
+            client,
+            "curated_kb",
+            vectors,
+            payloads,
+            skip_dedup=True,
+            batch_size=4,
         )
 
         assert result.total == 10
@@ -952,9 +946,7 @@ class TestIntegrationScenarios:
         vectors = [DUMMY_VECTOR] * n
         payloads = [_make_payload(chunk_index=i) for i in range(n)]
 
-        result = await upsert_chunks(
-            client, "auto_crawled", vectors, payloads, batch_size=64
-        )
+        result = await upsert_chunks(client, "auto_crawled", vectors, payloads, batch_size=64)
 
         assert result.inserted == n
         # 150 / 64 → 3 batches (64, 64, 22)

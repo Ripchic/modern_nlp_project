@@ -27,9 +27,7 @@ _HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 
 # Timestamps — common formats from YouTube / SRT / VTT
 # Examples: 00:01:23, 0:12, 12:34:56.789, [00:01], (12:34)
-_TIMESTAMP_RE = re.compile(
-    r"[\[\(]?\d{0,2}:?\d{1,2}:\d{2}(?:[.,]\d{1,3})?[\]\)]?"
-)
+_TIMESTAMP_RE = re.compile(r"[\[\(]?\d{0,2}:?\d{1,2}:\d{2}(?:[.,]\d{1,3})?[\]\)]?")
 
 # YouTube auto-caption artefacts: [Music], [Applause], [Laughter], etc.
 _BRACKET_ARTEFACT_RE = re.compile(
@@ -44,9 +42,7 @@ _URL_RE = re.compile(r"https?://\S+|ftp://\S+", re.IGNORECASE)
 _EMAIL_RE = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
 
 # Zero-width and invisible Unicode characters
-_INVISIBLE_CHARS_RE = re.compile(
-    r"[\u200b\u200c\u200d\u200e\u200f\ufeff\u00ad\u2060\u2061\u2062\u2063\u2064]"
-)
+_INVISIBLE_CHARS_RE = re.compile(r"[\u200b\u200c\u200d\u200e\u200f\ufeff\u00ad\u2060\u2061\u2062\u2063\u2064]")
 
 # Runs of whitespace (spaces and tabs only — newlines handled separately)
 _HORIZONTAL_WS_RE = re.compile(r"[^\S\n]+")

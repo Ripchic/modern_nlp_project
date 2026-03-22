@@ -112,22 +112,37 @@ class TestTranscriptResult:
 
     def test_default_source_url(self):
         r = TranscriptResult(
-            video_id="x", text="t", language="en", language_code="en",
-            is_generated=False, word_count=1, snippet_count=1,
+            video_id="x",
+            text="t",
+            language="en",
+            language_code="en",
+            is_generated=False,
+            word_count=1,
+            snippet_count=1,
         )
         assert r.source_url == ""
 
     def test_default_extra_metadata(self):
         r = TranscriptResult(
-            video_id="x", text="t", language="en", language_code="en",
-            is_generated=False, word_count=1, snippet_count=1,
+            video_id="x",
+            text="t",
+            language="en",
+            language_code="en",
+            is_generated=False,
+            word_count=1,
+            snippet_count=1,
         )
         assert r.extra_metadata == {}
 
     def test_source_url_settable(self):
         r = TranscriptResult(
-            video_id="x", text="t", language="en", language_code="en",
-            is_generated=False, word_count=1, snippet_count=1,
+            video_id="x",
+            text="t",
+            language="en",
+            language_code="en",
+            is_generated=False,
+            word_count=1,
+            snippet_count=1,
         )
         r.source_url = "https://youtube.com/watch?v=x"
         assert r.source_url == "https://youtube.com/watch?v=x"
@@ -374,7 +389,10 @@ class TestGetTranscriptSuccess:
         scraper = YouTubeScraper(min_word_count=5)
         snippets = _make_long_snippets(600)
         fake_result = FakeFetchedTranscript(
-            snippets, language="Russian", language_code="ru", is_generated=False,
+            snippets,
+            language="Russian",
+            language_code="ru",
+            is_generated=False,
         )
 
         with patch.object(scraper._api, "fetch", return_value=fake_result):
@@ -445,9 +463,7 @@ class TestGetTranscriptErrors:
         from youtube_transcript_api._errors import TranscriptsDisabled
 
         scraper = YouTubeScraper()
-        with patch.object(
-            scraper._api, "fetch", side_effect=TranscriptsDisabled("abc12345678")
-        ):
+        with patch.object(scraper._api, "fetch", side_effect=TranscriptsDisabled("abc12345678")):
             result = scraper.get_transcript("abc12345678")
         assert result is None
 
@@ -467,17 +483,13 @@ class TestGetTranscriptErrors:
         from youtube_transcript_api._errors import VideoUnavailable
 
         scraper = YouTubeScraper()
-        with patch.object(
-            scraper._api, "fetch", side_effect=VideoUnavailable("abc12345678")
-        ):
+        with patch.object(scraper._api, "fetch", side_effect=VideoUnavailable("abc12345678")):
             result = scraper.get_transcript("abc12345678")
         assert result is None
 
     def test_unexpected_error_returns_none(self):
         scraper = YouTubeScraper()
-        with patch.object(
-            scraper._api, "fetch", side_effect=RuntimeError("network error")
-        ):
+        with patch.object(scraper._api, "fetch", side_effect=RuntimeError("network error")):
             result = scraper.get_transcript("abc12345678")
         assert result is None
 
@@ -506,9 +518,7 @@ class TestGetTranscriptByUrl:
         fake_result = FakeFetchedTranscript(snippets)
 
         with patch.object(scraper._api, "fetch", return_value=fake_result):
-            result = scraper.get_transcript_by_url(
-                "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-            )
+            result = scraper.get_transcript_by_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
 
         assert result is not None
         assert result.video_id == "dQw4w9WgXcQ"
@@ -520,9 +530,7 @@ class TestGetTranscriptByUrl:
         fake_result = FakeFetchedTranscript(snippets)
 
         with patch.object(scraper._api, "fetch", return_value=fake_result):
-            result = scraper.get_transcript_by_url(
-                "  https://youtu.be/dQw4w9WgXcQ  "
-            )
+            result = scraper.get_transcript_by_url("  https://youtu.be/dQw4w9WgXcQ  ")
 
         assert result is not None
         assert result.source_url == "https://youtu.be/dQw4w9WgXcQ"
@@ -536,12 +544,8 @@ class TestGetTranscriptByUrl:
         from youtube_transcript_api._errors import TranscriptsDisabled
 
         scraper = YouTubeScraper()
-        with patch.object(
-            scraper._api, "fetch", side_effect=TranscriptsDisabled("dQw4w9WgXcQ")
-        ):
-            result = scraper.get_transcript_by_url(
-                "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-            )
+        with patch.object(scraper._api, "fetch", side_effect=TranscriptsDisabled("dQw4w9WgXcQ")):
+            result = scraper.get_transcript_by_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
         assert result is None
 
     def test_custom_languages_forwarded(self):
@@ -573,9 +577,7 @@ class TestGetTranscriptByUrl:
         fake_result = FakeFetchedTranscript(snippets)
 
         with patch.object(scraper._api, "fetch", return_value=fake_result):
-            result = scraper.get_transcript_by_url(
-                "https://youtube.com/shorts/dQw4w9WgXcQ"
-            )
+            result = scraper.get_transcript_by_url("https://youtube.com/shorts/dQw4w9WgXcQ")
 
         assert result is not None
         assert result.video_id == "dQw4w9WgXcQ"
@@ -672,9 +674,7 @@ class TestIntegrationScenarios:
         fake_result = FakeFetchedTranscript(snippets, video_id="good_video_id")
 
         # First call fails
-        with patch.object(
-            scraper._api, "fetch", side_effect=VideoUnavailable("bad_video_id_")
-        ):
+        with patch.object(scraper._api, "fetch", side_effect=VideoUnavailable("bad_video_id_")):
             r1 = scraper.get_transcript("bad_video_id_")
         assert r1 is None
 

@@ -47,6 +47,7 @@ class WebPage:
 
 # ── Timeout helper ────────────────────────────────────────────
 
+
 class _TimeoutError(Exception):
     """Raised when a page download exceeds the configured timeout."""
 

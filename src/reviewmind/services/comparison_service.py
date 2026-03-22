@@ -76,10 +76,7 @@ class ProductRAGResult:
     @property
     def has_data(self) -> bool:
         """``True`` if there is a valid answer with chunks."""
-        return (
-            self.rag_response is not None
-            and self.rag_response.chunks_count > 0
-        )
+        return self.rag_response is not None and self.rag_response.chunks_count > 0
 
 
 @dataclass

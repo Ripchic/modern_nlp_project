@@ -137,9 +137,8 @@ async def _collect_source_urls(product_names: list[str]) -> list[str]:
 
     # ── YouTube search ───────────────────────────────────────
     try:
-        from reviewmind.scrapers.youtube import YouTubeScraper  # noqa: PLC0415
-
         from reviewmind.config import get_settings as _get_settings  # noqa: PLC0415
+        from reviewmind.scrapers.youtube import YouTubeScraper  # noqa: PLC0415
 
         yt = YouTubeScraper(
             cookie_path=_get_settings().youtube_cookies_path or None,
@@ -303,9 +302,7 @@ async def on_text_message(message: Message) -> None:
         try:
             qdrant = _create_qdrant_client()
             try:
-                rag_response = await _try_instant_rag(
-                    qdrant, message.text, None, log, chat_history=chat_history
-                )
+                rag_response = await _try_instant_rag(qdrant, message.text, None, log, chat_history=chat_history)
             finally:
                 await qdrant.close()
         except Exception as exc:
@@ -318,7 +315,9 @@ async def on_text_message(message: Message) -> None:
             if not rag_response.used_tavily and len(answer) + len(_NO_PRODUCT_FALLBACK_NOTE) <= _MAX_ANSWER_LENGTH:
                 answer += _NO_PRODUCT_FALLBACK_NOTE
             log_id = await _save_query_log(
-                user_id, message.text, answer,
+                user_id,
+                message.text,
+                answer,
                 sources=rag_response.sources,
                 used_tavily=rag_response.used_tavily,
             )
@@ -376,9 +375,11 @@ async def on_text_message(message: Message) -> None:
     if rag_response and rag_response.confidence_met and rag_response.answer:
         answer = _truncate(rag_response.answer)
         log_id = await _save_query_log(
-            user_id, message.text, answer,
+            user_id,
+            message.text,
+            answer,
             sources=rag_response.sources,
-            used_tavily=getattr(rag_response, 'used_tavily', False),
+            used_tavily=getattr(rag_response, "used_tavily", False),
         )
         await message.answer(answer, reply_markup=feedback_keyboard(query_log_id=log_id))
         await _increment_user_limit(user_id, log)
@@ -403,7 +404,9 @@ async def on_text_message(message: Message) -> None:
         # RAG already triggered Tavily fallback — use that answer
         answer = _truncate(rag_response.answer)
         log_id = await _save_query_log(
-            user_id, message.text, answer,
+            user_id,
+            message.text,
+            answer,
             sources=rag_response.sources,
             used_tavily=True,
         )
@@ -427,9 +430,7 @@ async def on_text_message(message: Message) -> None:
             if not quick_answer_sent:
                 await message.answer(_SEARCHING_MSG)
             else:
-                await message.answer(
-                    "🔍 Ищу дополнительные источники для более полного анализа..."
-                )
+                await message.answer("🔍 Ищу дополнительные источники для более полного анализа...")
             log.info("auto_background_job_scheduled", job_id=job_id)
         else:
             if not quick_answer_sent:
@@ -489,7 +490,9 @@ async def _handle_comparison(
     if result.answer:
         answer = _truncate(result.answer)
         log_id = await _save_query_log(
-            user_id, message.text, answer,
+            user_id,
+            message.text,
+            answer,
             sources=result.sources,
         )
         await message.answer(answer, reply_markup=feedback_keyboard(query_log_id=log_id))

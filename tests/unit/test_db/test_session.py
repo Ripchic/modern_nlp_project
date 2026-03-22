@@ -1,4 +1,5 @@
 """Unit tests for db/session.py (TASK-009)."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock

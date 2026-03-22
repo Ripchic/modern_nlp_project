@@ -293,9 +293,7 @@ class LLMClient:
                 raise LLMError(f"Unexpected error calling LLM: {exc}") from exc
 
         # All retries exhausted
-        raise LLMError(
-            f"LLM request failed after {self._max_retries} attempts: {last_error}"
-        )
+        raise LLMError(f"LLM request failed after {self._max_retries} attempts: {last_error}")
 
     @staticmethod
     def _extract_content(response: Any) -> str:

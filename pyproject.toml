@@ -46,9 +46,13 @@ dev = [
 [tool.ruff]
 line-length = 120
 target-version = "py311"
+exclude = ["scripts/"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/reviewmind/core/prompts.py" = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

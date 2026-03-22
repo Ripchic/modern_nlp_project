@@ -185,9 +185,7 @@ class TestSendTaskStarted:
         with patch("reviewmind.workers.notifications._create_bot", return_value=mock_bot):
             await send_task_started(bot_token="fake:token", chat_id=12345)
 
-        mock_bot.send_message.assert_awaited_once_with(
-            chat_id=12345, text=TASK_STARTED_MSG
-        )
+        mock_bot.send_message.assert_awaited_once_with(chat_id=12345, text=TASK_STARTED_MSG)
 
     @pytest.mark.asyncio
     async def test_closes_bot_session(self):
@@ -477,9 +475,7 @@ class TestSendTaskFailed:
         with patch("reviewmind.workers.notifications._create_bot", return_value=mock_bot):
             await send_task_failed(bot_token="fake:token", chat_id=12345)
 
-        mock_bot.send_message.assert_awaited_once_with(
-            chat_id=12345, text=TASK_FAILED_MSG
-        )
+        mock_bot.send_message.assert_awaited_once_with(chat_id=12345, text=TASK_FAILED_MSG)
 
     @pytest.mark.asyncio
     async def test_closes_bot_session(self):

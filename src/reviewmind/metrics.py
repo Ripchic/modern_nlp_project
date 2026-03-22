@@ -122,24 +122,16 @@ async def prometheus_middleware(request: Request, call_next):
     except Exception:
         # Record as 500 when an unhandled exception escapes
         duration = time.perf_counter() - start
-        HTTP_REQUEST_DURATION_SECONDS.labels(
-            endpoint=endpoint, method=method, status_code="500"
-        ).observe(duration)
-        HTTP_REQUESTS_TOTAL.labels(
-            endpoint=endpoint, method=method, status_code="500"
-        ).inc()
+        HTTP_REQUEST_DURATION_SECONDS.labels(endpoint=endpoint, method=method, status_code="500").observe(duration)
+        HTTP_REQUESTS_TOTAL.labels(endpoint=endpoint, method=method, status_code="500").inc()
         raise
     finally:
         HTTP_REQUESTS_IN_PROGRESS.labels(endpoint=endpoint).dec()
 
     duration = time.perf_counter() - start
     status = str(response.status_code)
-    HTTP_REQUEST_DURATION_SECONDS.labels(
-        endpoint=endpoint, method=method, status_code=status
-    ).observe(duration)
-    HTTP_REQUESTS_TOTAL.labels(
-        endpoint=endpoint, method=method, status_code=status
-    ).inc()
+    HTTP_REQUEST_DURATION_SECONDS.labels(endpoint=endpoint, method=method, status_code=status).observe(duration)
+    HTTP_REQUESTS_TOTAL.labels(endpoint=endpoint, method=method, status_code=status).inc()
 
     return response
 

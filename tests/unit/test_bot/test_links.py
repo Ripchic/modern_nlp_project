@@ -683,7 +683,8 @@ class TestIngestAndAnalyse:
         status_msg = self._make_status_msg()
 
         ingestion_result = FakeIngestionResult(
-            success_count=1, chunks_count=1,
+            success_count=1,
+            chunks_count=1,
             results=[FakeSourceResult(url="https://ok.com", success=True, chunks_count=1)],
         )
         rag_response = FakeRAGResponse(answer="Analysis", sources=[])
@@ -724,7 +725,8 @@ class TestIngestAndAnalyse:
         status_msg = self._make_status_msg()
 
         ingestion_result = FakeIngestionResult(
-            success_count=1, chunks_count=1,
+            success_count=1,
+            chunks_count=1,
             results=[FakeSourceResult(url="https://ok.com", success=True, chunks_count=1)],
         )
         rag_response = FakeRAGResponse(answer="Analysis", sources=[])
@@ -763,7 +765,8 @@ class TestIngestAndAnalyse:
         status_msg = self._make_status_msg()
 
         ingestion_result = FakeIngestionResult(
-            success_count=1, chunks_count=7,
+            success_count=1,
+            chunks_count=7,
             results=[FakeSourceResult(url="https://ok.com", success=True, chunks_count=7)],
         )
         rag_response = FakeRAGResponse(answer="Analysis", sources=[])
@@ -810,12 +813,14 @@ class TestDispatcherWiring:
             return cls._dp
         # Reset parent_router on all routers so they can be re-attached
         from reviewmind.bot.handlers.feedback import router as feedback_router
+        from reviewmind.bot.handlers.gdpr import router as gdpr_router
         from reviewmind.bot.handlers.links import router as links_router
         from reviewmind.bot.handlers.mode import router as mode_router
+        from reviewmind.bot.handlers.payment import router as payment_router
         from reviewmind.bot.handlers.query import router as query_router
         from reviewmind.bot.handlers.start import router as start_router
 
-        for r in (start_router, mode_router, links_router, query_router, feedback_router):
+        for r in (start_router, mode_router, gdpr_router, payment_router, feedback_router, links_router, query_router):
             r._parent_router = None
 
         from reviewmind.bot.main import create_dispatcher
@@ -908,11 +913,14 @@ class TestIntegrationScenarios:
         status_msg.edit_text = AsyncMock()
 
         ingestion_result = FakeIngestionResult(
-            success_count=1, chunks_count=10,
+            success_count=1,
+            chunks_count=10,
             results=[
                 FakeSourceResult(
-                    url="https://youtube.com/watch?v=abc123", success=True,
-                    source_type="youtube", chunks_count=10,
+                    url="https://youtube.com/watch?v=abc123",
+                    success=True,
+                    source_type="youtube",
+                    chunks_count=10,
                 ),
             ],
         )
@@ -965,7 +973,8 @@ class TestIntegrationScenarios:
         status_msg.edit_text = AsyncMock()
 
         ingestion_result = FakeIngestionResult(
-            success_count=3, chunks_count=15,
+            success_count=3,
+            chunks_count=15,
             results=[
                 FakeSourceResult(url=urls[0], success=True, source_type="youtube", chunks_count=5),
                 FakeSourceResult(url=urls[1], success=True, source_type="reddit", chunks_count=4),
@@ -1011,7 +1020,9 @@ class TestIntegrationScenarios:
         status_msg.edit_text = AsyncMock()
 
         ingestion_result = FakeIngestionResult(
-            success_count=1, failed_count=1, chunks_count=5,
+            success_count=1,
+            failed_count=1,
+            chunks_count=5,
             failed_urls=["https://broken.invalid"],
             results=[
                 FakeSourceResult(url=urls[0], success=True, chunks_count=5),

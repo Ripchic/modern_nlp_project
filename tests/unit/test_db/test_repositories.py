@@ -1,4 +1,5 @@
 """Unit tests for repositories with mocked AsyncSession (TASK-009)."""
+
 from __future__ import annotations
 
 import uuid

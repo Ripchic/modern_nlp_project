@@ -53,10 +53,6 @@ class QueryLogRepository:
 
     async def list_by_user(self, user_id: int, *, limit: int = 20) -> list[QueryLog]:
         result = await self._session.execute(
-            select(QueryLog)
-            .where(QueryLog.user_id == user_id)
-            .order_by(QueryLog.created_at.desc())
-            .limit(limit)
+            select(QueryLog).where(QueryLog.user_id == user_id).order_by(QueryLog.created_at.desc()).limit(limit)
         )
         return list(result.scalars().all())
-

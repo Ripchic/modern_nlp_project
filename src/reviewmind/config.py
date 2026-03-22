@@ -20,9 +20,7 @@ except ImportError:  # pydantic-settings < 2.8
 class _GracefulEnvSource(EnvSettingsSource):
     """Env source that gracefully handles comma-separated list fields."""
 
-    def prepare_field_value(
-        self, field_name: str, field: Any, value: Any, value_is_complex: bool
-    ) -> Any:
+    def prepare_field_value(self, field_name: str, field: Any, value: Any, value_is_complex: bool) -> Any:
         if value is not None and self.field_is_complex(field) and isinstance(value, str):
             try:
                 return _json.loads(value)
@@ -34,9 +32,7 @@ class _GracefulEnvSource(EnvSettingsSource):
 class _GracefulDotEnvSource(DotEnvSettingsSource):
     """DotEnv source that gracefully handles comma-separated list fields."""
 
-    def prepare_field_value(
-        self, field_name: str, field: Any, value: Any, value_is_complex: bool
-    ) -> Any:
+    def prepare_field_value(self, field_name: str, field: Any, value: Any, value_is_complex: bool) -> Any:
         if value is not None and self.field_is_complex(field) and isinstance(value, str):
             try:
                 return _json.loads(value)

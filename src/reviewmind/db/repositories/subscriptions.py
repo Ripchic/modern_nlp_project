@@ -57,9 +57,6 @@ class SubscriptionRepository:
 
     async def list_by_user(self, user_id: int) -> list[Subscription]:
         result = await self._session.execute(
-            select(Subscription)
-            .where(Subscription.user_id == user_id)
-            .order_by(Subscription.activated_at.desc())
+            select(Subscription).where(Subscription.user_id == user_id).order_by(Subscription.activated_at.desc())
         )
         return list(result.scalars().all())
-

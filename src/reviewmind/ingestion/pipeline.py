@@ -219,7 +219,10 @@ class IngestionPipeline:
         if not cleaned:
             log.warning("clean_empty", raw_text_preview=raw_text[:200])
             return SourceIngestionResult(
-                url=url, success=False, source_type=source_type, error="Text too short after cleaning",
+                url=url,
+                success=False,
+                source_type=source_type,
+                error="Text too short after cleaning",
             )
         log.debug("clean_ok", cleaned_len=len(cleaned))
 
@@ -256,7 +259,10 @@ class IngestionPipeline:
         except EmbeddingError as exc:
             log.error("embedding_failed", error=str(exc))
             return SourceIngestionResult(
-                url=url, success=False, source_type=source_type, error=f"Embedding failed: {exc}",
+                url=url,
+                success=False,
+                source_type=source_type,
+                error=f"Embedding failed: {exc}",
             )
 
         # ------ step 6: upsert into Qdrant ------
@@ -288,7 +294,10 @@ class IngestionPipeline:
         except Exception as exc:  # noqa: BLE001
             log.error("upsert_failed", error=str(exc))
             return SourceIngestionResult(
-                url=url, success=False, source_type=source_type, error=f"Upsert failed: {exc}",
+                url=url,
+                success=False,
+                source_type=source_type,
+                error=f"Upsert failed: {exc}",
             )
 
         log.info(

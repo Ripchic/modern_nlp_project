@@ -499,6 +499,7 @@ class TestCacheExports:
 
     def test_session_manager_exported(self):
         from reviewmind.cache import SessionManager as SM
+
         assert SM is SessionManager
 
     def test_constants_exported(self):

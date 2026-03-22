@@ -24,7 +24,9 @@ def _bypass_session_manager():
     """Override conftest fixture — let real _persist_mode/_get_current_mode be tested."""
     yield
 
+
 # ── Helpers ──────────────────────────────────────────────────────────────────
+
 
 def _make_user(user_id: int = 12345):
     from aiogram.types import User

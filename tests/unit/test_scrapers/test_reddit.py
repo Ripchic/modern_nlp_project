@@ -146,9 +146,16 @@ class TestRedditComment:
 class TestRedditPost:
     def test_basic_creation(self):
         p = RedditPost(
-            post_id="abc123", title="Title", selftext="Body text",
-            author="user", score=100, upvote_ratio=0.9, num_comments=10,
-            subreddit="gadgets", url="https://...", permalink="https://...",
+            post_id="abc123",
+            title="Title",
+            selftext="Body text",
+            author="user",
+            score=100,
+            upvote_ratio=0.9,
+            num_comments=10,
+            subreddit="gadgets",
+            url="https://...",
+            permalink="https://...",
             created_utc=1709300000.0,
         )
         assert p.post_id == "abc123"
@@ -158,33 +165,65 @@ class TestRedditPost:
 
     def test_default_comments_empty(self):
         p = RedditPost(
-            post_id="x", title="T", selftext="B", author="u", score=0,
-            upvote_ratio=0.5, num_comments=0, subreddit="s", url="u",
-            permalink="p", created_utc=0.0,
+            post_id="x",
+            title="T",
+            selftext="B",
+            author="u",
+            score=0,
+            upvote_ratio=0.5,
+            num_comments=0,
+            subreddit="s",
+            url="u",
+            permalink="p",
+            created_utc=0.0,
         )
         assert p.comments == []
 
     def test_default_source_url(self):
         p = RedditPost(
-            post_id="x", title="T", selftext="B", author="u", score=0,
-            upvote_ratio=0.5, num_comments=0, subreddit="s", url="u",
-            permalink="p", created_utc=0.0,
+            post_id="x",
+            title="T",
+            selftext="B",
+            author="u",
+            score=0,
+            upvote_ratio=0.5,
+            num_comments=0,
+            subreddit="s",
+            url="u",
+            permalink="p",
+            created_utc=0.0,
         )
         assert p.source_url == ""
 
     def test_default_extra_metadata(self):
         p = RedditPost(
-            post_id="x", title="T", selftext="B", author="u", score=0,
-            upvote_ratio=0.5, num_comments=0, subreddit="s", url="u",
-            permalink="p", created_utc=0.0,
+            post_id="x",
+            title="T",
+            selftext="B",
+            author="u",
+            score=0,
+            upvote_ratio=0.5,
+            num_comments=0,
+            subreddit="s",
+            url="u",
+            permalink="p",
+            created_utc=0.0,
         )
         assert p.extra_metadata == {}
 
     def test_full_text_with_title_and_selftext(self):
         p = RedditPost(
-            post_id="x", title="My Title", selftext="My body text",
-            author="u", score=0, upvote_ratio=0.5, num_comments=0,
-            subreddit="s", url="u", permalink="p", created_utc=0.0,
+            post_id="x",
+            title="My Title",
+            selftext="My body text",
+            author="u",
+            score=0,
+            upvote_ratio=0.5,
+            num_comments=0,
+            subreddit="s",
+            url="u",
+            permalink="p",
+            created_utc=0.0,
         )
         assert "My Title" in p.full_text
         assert "My body text" in p.full_text
@@ -195,18 +234,35 @@ class TestRedditPost:
             RedditComment(author="b", body="Comment two", score=2, is_top_level=False),
         ]
         p = RedditPost(
-            post_id="x", title="Title", selftext="Body", author="u", score=0,
-            upvote_ratio=0.5, num_comments=2, subreddit="s", url="u",
-            permalink="p", created_utc=0.0, comments=comments,
+            post_id="x",
+            title="Title",
+            selftext="Body",
+            author="u",
+            score=0,
+            upvote_ratio=0.5,
+            num_comments=2,
+            subreddit="s",
+            url="u",
+            permalink="p",
+            created_utc=0.0,
+            comments=comments,
         )
         assert "Comment one" in p.full_text
         assert "Comment two" in p.full_text
 
     def test_full_text_skips_deleted_selftext(self):
         p = RedditPost(
-            post_id="x", title="Title", selftext="[deleted]", author="u",
-            score=0, upvote_ratio=0.5, num_comments=0, subreddit="s",
-            url="u", permalink="p", created_utc=0.0,
+            post_id="x",
+            title="Title",
+            selftext="[deleted]",
+            author="u",
+            score=0,
+            upvote_ratio=0.5,
+            num_comments=0,
+            subreddit="s",
+            url="u",
+            permalink="p",
+            created_utc=0.0,
         )
         assert "[deleted]" not in p.full_text
         assert "Title" in p.full_text
@@ -218,9 +274,18 @@ class TestRedditPost:
             RedditComment(author="c", body="[removed]", score=0, is_top_level=True),
         ]
         p = RedditPost(
-            post_id="x", title="T", selftext="B", author="u", score=0,
-            upvote_ratio=0.5, num_comments=3, subreddit="s", url="u",
-            permalink="p", created_utc=0.0, comments=comments,
+            post_id="x",
+            title="T",
+            selftext="B",
+            author="u",
+            score=0,
+            upvote_ratio=0.5,
+            num_comments=3,
+            subreddit="s",
+            url="u",
+            permalink="p",
+            created_utc=0.0,
+            comments=comments,
         )
         assert "Good" in p.full_text
         assert "[deleted]" not in p.full_text
@@ -228,9 +293,17 @@ class TestRedditPost:
 
     def test_full_text_empty_selftext(self):
         p = RedditPost(
-            post_id="x", title="Title Only", selftext="", author="u",
-            score=0, upvote_ratio=0.5, num_comments=0, subreddit="s",
-            url="u", permalink="p", created_utc=0.0,
+            post_id="x",
+            title="Title Only",
+            selftext="",
+            author="u",
+            score=0,
+            upvote_ratio=0.5,
+            num_comments=0,
+            subreddit="s",
+            url="u",
+            permalink="p",
+            created_utc=0.0,
         )
         assert p.full_text == "Title Only"
 
@@ -243,9 +316,16 @@ class TestRedditPost:
 class TestSearchResult:
     def test_basic_creation(self):
         r = SearchResult(
-            post_id="xyz", title="Review", selftext="Content",
-            author="reviewer", score=50, num_comments=5, subreddit="tech",
-            url="https://...", permalink="https://...", created_utc=1709300000.0,
+            post_id="xyz",
+            title="Review",
+            selftext="Content",
+            author="reviewer",
+            score=50,
+            num_comments=5,
+            subreddit="tech",
+            url="https://...",
+            permalink="https://...",
+            created_utc=1709300000.0,
         )
         assert r.post_id == "xyz"
         assert r.title == "Review"
@@ -253,9 +333,16 @@ class TestSearchResult:
 
     def test_all_fields(self):
         r = SearchResult(
-            post_id="id1", title="T", selftext="S", author="A",
-            score=0, num_comments=0, subreddit="sub", url="url",
-            permalink="perm", created_utc=0.0,
+            post_id="id1",
+            title="T",
+            selftext="S",
+            author="A",
+            score=0,
+            num_comments=0,
+            subreddit="sub",
+            url="url",
+            permalink="perm",
+            created_utc=0.0,
         )
         assert r.subreddit == "sub"
         assert r.permalink == "perm"
@@ -363,7 +450,9 @@ class TestIsRedditUrl:
 class TestRedditScraperInit:
     def test_explicit_credentials(self):
         scraper = RedditScraper(
-            client_id="id", client_secret="secret", user_agent="ua/1.0",
+            client_id="id",
+            client_secret="secret",
+            user_agent="ua/1.0",
         )
         assert scraper._client_id == "id"
         assert scraper._client_secret == "secret"
@@ -371,20 +460,26 @@ class TestRedditScraperInit:
 
     def test_default_comment_limit(self):
         scraper = RedditScraper(
-            client_id="id", client_secret="secret", user_agent="ua",
+            client_id="id",
+            client_secret="secret",
+            user_agent="ua",
         )
         assert scraper._comment_limit == 20
 
     def test_custom_comment_limit(self):
         scraper = RedditScraper(
-            client_id="id", client_secret="secret", user_agent="ua",
+            client_id="id",
+            client_secret="secret",
+            user_agent="ua",
             comment_limit=5,
         )
         assert scraper._comment_limit == 5
 
     def test_reddit_lazy_not_created(self):
         scraper = RedditScraper(
-            client_id="id", client_secret="secret", user_agent="ua",
+            client_id="id",
+            client_secret="secret",
+            user_agent="ua",
         )
         assert scraper._reddit is None
 
@@ -404,7 +499,9 @@ class TestRedditScraperInit:
 
     def test_reddit_property_creates_instance(self):
         scraper = RedditScraper(
-            client_id="id", client_secret="secret", user_agent="ua",
+            client_id="id",
+            client_secret="secret",
+            user_agent="ua",
         )
         with patch("praw.Reddit") as mock_reddit_cls:
             mock_reddit_cls.return_value = MagicMock()
@@ -418,7 +515,9 @@ class TestRedditScraperInit:
 
     def test_reddit_property_cached(self):
         scraper = RedditScraper(
-            client_id="id", client_secret="secret", user_agent="ua",
+            client_id="id",
+            client_secret="secret",
+            user_agent="ua",
         )
         with patch("praw.Reddit") as mock_reddit_cls:
             mock_instance = MagicMock()
@@ -490,7 +589,9 @@ class TestIsDeletedSubmission:
 class TestCollectComments:
     def _make_scraper(self, comment_limit: int = 20) -> RedditScraper:
         return RedditScraper(
-            client_id="id", client_secret="secret", user_agent="ua",
+            client_id="id",
+            client_secret="secret",
+            user_agent="ua",
             comment_limit=comment_limit,
         )
 
@@ -510,10 +611,16 @@ class TestCollectComments:
     def test_collects_first_level_replies(self):
         scraper = self._make_scraper()
         reply = SimpleNamespace(
-            body="Reply to comment", author=_fake_author("r1"), score=5, replies=[],
+            body="Reply to comment",
+            author=_fake_author("r1"),
+            score=5,
+            replies=[],
         )
         top_comment = SimpleNamespace(
-            body="Top comment", author=_fake_author("u1"), score=10, replies=[reply],
+            body="Top comment",
+            author=_fake_author("u1"),
+            score=10,
+            replies=[reply],
         )
         sub = _make_fake_submission(comments=[top_comment])
         result = scraper._collect_comments(sub)
@@ -526,8 +633,7 @@ class TestCollectComments:
     def test_respects_comment_limit(self):
         scraper = self._make_scraper(comment_limit=3)
         comments = [
-            SimpleNamespace(body=f"Comment {i}", author=_fake_author(f"u{i}"), score=i, replies=[])
-            for i in range(10)
+            SimpleNamespace(body=f"Comment {i}", author=_fake_author(f"u{i}"), score=i, replies=[]) for i in range(10)
         ]
         sub = _make_fake_submission(comments=comments)
         result = scraper._collect_comments(sub)
@@ -540,7 +646,10 @@ class TestCollectComments:
             SimpleNamespace(body="[deleted]", author=_fake_author("u2"), score=0, replies=[]),
             SimpleNamespace(body="[removed]", author=_fake_author("u3"), score=0, replies=[]),
             SimpleNamespace(
-                body="Another good one", author=_fake_author("u4"), score=5, replies=[],
+                body="Another good one",
+                author=_fake_author("u4"),
+                score=5,
+                replies=[],
             ),
         ]
         sub = _make_fake_submission(comments=comments)
@@ -592,13 +701,22 @@ class TestCollectComments:
         """comment_limit counts both top-level AND reply comments."""
         scraper = self._make_scraper(comment_limit=2)
         reply = SimpleNamespace(
-            body="Reply", author=_fake_author("r1"), score=1, replies=[],
+            body="Reply",
+            author=_fake_author("r1"),
+            score=1,
+            replies=[],
         )
         top1 = SimpleNamespace(
-            body="Top 1", author=_fake_author("u1"), score=10, replies=[reply],
+            body="Top 1",
+            author=_fake_author("u1"),
+            score=10,
+            replies=[reply],
         )
         top2 = SimpleNamespace(
-            body="Top 2", author=_fake_author("u2"), score=5, replies=[],
+            body="Top 2",
+            author=_fake_author("u2"),
+            score=5,
+            replies=[],
         )
         sub = _make_fake_submission(comments=[top1, top2])
         result = scraper._collect_comments(sub)
@@ -616,7 +734,9 @@ class TestCollectComments:
 class TestGetPost:
     def _make_scraper_with_mock(self):
         scraper = RedditScraper(
-            client_id="id", client_secret="secret", user_agent="ua",
+            client_id="id",
+            client_secret="secret",
+            user_agent="ua",
         )
         mock_reddit = MagicMock()
         scraper._reddit = mock_reddit
@@ -701,8 +821,11 @@ class TestGetPost:
     def test_post_metadata_fields(self):
         scraper, mock_reddit = self._make_scraper_with_mock()
         sub = _make_fake_submission(
-            score=42, upvote_ratio=0.95, num_comments=15,
-            subreddit="headphones", created_utc=1709300000.0,
+            score=42,
+            upvote_ratio=0.95,
+            num_comments=15,
+            subreddit="headphones",
+            created_utc=1709300000.0,
         )
         mock_reddit.submission.return_value = sub
 
@@ -723,7 +846,9 @@ class TestGetPost:
 class TestParseUrl:
     def test_valid_url_calls_get_post(self):
         scraper = RedditScraper(
-            client_id="id", client_secret="secret", user_agent="ua",
+            client_id="id",
+            client_secret="secret",
+            user_agent="ua",
         )
         mock_reddit = MagicMock()
         scraper._reddit = mock_reddit
@@ -736,14 +861,18 @@ class TestParseUrl:
 
     def test_invalid_url_returns_none(self):
         scraper = RedditScraper(
-            client_id="id", client_secret="secret", user_agent="ua",
+            client_id="id",
+            client_secret="secret",
+            user_agent="ua",
         )
         result = scraper.parse_url("https://google.com")
         assert result is None
 
     def test_sets_source_url_from_input(self):
         scraper = RedditScraper(
-            client_id="id", client_secret="secret", user_agent="ua",
+            client_id="id",
+            client_secret="secret",
+            user_agent="ua",
         )
         mock_reddit = MagicMock()
         scraper._reddit = mock_reddit
@@ -757,7 +886,9 @@ class TestParseUrl:
 
     def test_redd_it_url(self):
         scraper = RedditScraper(
-            client_id="id", client_secret="secret", user_agent="ua",
+            client_id="id",
+            client_secret="secret",
+            user_agent="ua",
         )
         mock_reddit = MagicMock()
         scraper._reddit = mock_reddit
@@ -777,7 +908,9 @@ class TestParseUrl:
 class TestSearchSubreddit:
     def _make_scraper_with_mock(self):
         scraper = RedditScraper(
-            client_id="id", client_secret="secret", user_agent="ua",
+            client_id="id",
+            client_secret="secret",
+            user_agent="ua",
         )
         mock_reddit = MagicMock()
         scraper._reddit = mock_reddit
@@ -825,7 +958,10 @@ class TestSearchSubreddit:
 
         scraper.search_subreddit("query", limit=5)
         mock_subreddit.search.assert_called_once_with(
-            "query", sort="relevance", time_filter="year", limit=5,
+            "query",
+            sort="relevance",
+            time_filter="year",
+            limit=5,
         )
 
     def test_filters_deleted_posts(self):
@@ -870,16 +1006,23 @@ class TestSearchSubreddit:
         mock_reddit.subreddit.return_value = mock_subreddit
 
         scraper.search_subreddit(
-            "query", sort="top", time_filter="month", limit=20,
+            "query",
+            sort="top",
+            time_filter="month",
+            limit=20,
         )
         mock_subreddit.search.assert_called_once_with(
-            "query", sort="top", time_filter="month", limit=20,
+            "query",
+            sort="top",
+            time_filter="month",
+            limit=20,
         )
 
     def test_permalink_format_in_results(self):
         scraper, mock_reddit = self._make_scraper_with_mock()
         sub = _make_fake_submission(
-            post_id="p1", permalink="/r/test/comments/p1/slug/",
+            post_id="p1",
+            permalink="/r/test/comments/p1/slug/",
         )
         mock_subreddit = MagicMock()
         mock_subreddit.search.return_value = [sub]
@@ -946,16 +1089,24 @@ class TestIntegrationScenarios:
     def test_full_parse_url_flow(self):
         """Complete flow: URL → extract_post_id → get_post → RedditPost with comments."""
         scraper = RedditScraper(
-            client_id="id", client_secret="secret", user_agent="ua",
+            client_id="id",
+            client_secret="secret",
+            user_agent="ua",
         )
         mock_reddit = MagicMock()
         scraper._reddit = mock_reddit
 
         reply = SimpleNamespace(
-            body="I agree!", author=_fake_author("replier"), score=3, replies=[],
+            body="I agree!",
+            author=_fake_author("replier"),
+            score=3,
+            replies=[],
         )
         comment = SimpleNamespace(
-            body="Great headphones!", author=_fake_author("commenter"), score=15, replies=[reply],
+            body="Great headphones!",
+            author=_fake_author("commenter"),
+            score=15,
+            replies=[reply],
         )
         sub = _make_fake_submission(
             post_id="abc123",
@@ -980,13 +1131,16 @@ class TestIntegrationScenarios:
     def test_search_and_parse_flow(self):
         """Search → get results → parse first result."""
         scraper = RedditScraper(
-            client_id="id", client_secret="secret", user_agent="ua",
+            client_id="id",
+            client_secret="secret",
+            user_agent="ua",
         )
         mock_reddit = MagicMock()
         scraper._reddit = mock_reddit
 
         search_sub = _make_fake_submission(
-            post_id="s1", title="Best headphones",
+            post_id="s1",
+            title="Best headphones",
             permalink="/r/headphones/comments/s1/best/",
         )
         mock_subreddit = MagicMock()
@@ -1000,7 +1154,9 @@ class TestIntegrationScenarios:
     def test_mixed_deleted_and_valid_comments(self):
         """Ensure deleted comments are filtered while valid ones are kept."""
         scraper = RedditScraper(
-            client_id="id", client_secret="secret", user_agent="ua",
+            client_id="id",
+            client_secret="secret",
+            user_agent="ua",
         )
         mock_reddit = MagicMock()
         scraper._reddit = mock_reddit
@@ -1023,14 +1179,18 @@ class TestIntegrationScenarios:
     def test_post_with_only_title_no_selftext(self):
         """Link posts often have empty selftext."""
         scraper = RedditScraper(
-            client_id="id", client_secret="secret", user_agent="ua",
+            client_id="id",
+            client_secret="secret",
+            user_agent="ua",
         )
         mock_reddit = MagicMock()
         scraper._reddit = mock_reddit
 
         sub = _make_fake_submission(
-            post_id="link", title="Check out this review",
-            selftext="", url="https://example.com/review",
+            post_id="link",
+            title="Check out this review",
+            selftext="",
+            url="https://example.com/review",
         )
         mock_reddit.submission.return_value = sub
 
@@ -1043,7 +1203,9 @@ class TestIntegrationScenarios:
     def test_large_comment_thread_limited(self):
         """With many comments, only comment_limit are collected."""
         scraper = RedditScraper(
-            client_id="id", client_secret="secret", user_agent="ua",
+            client_id="id",
+            client_secret="secret",
+            user_agent="ua",
             comment_limit=5,
         )
         mock_reddit = MagicMock()

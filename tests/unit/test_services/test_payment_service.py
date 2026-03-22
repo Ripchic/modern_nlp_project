@@ -218,7 +218,8 @@ class TestActivateSubscription:
             service._user_repo.update = AsyncMock(return_value=user)
 
             result = await service.activate_subscription(
-                user_id=100, telegram_payment_charge_id="charge_new",
+                user_id=100,
+                telegram_payment_charge_id="charge_new",
             )
 
         assert result.success is True
@@ -241,7 +242,8 @@ class TestActivateSubscription:
             service._user_repo = MagicMock()
 
             result = await service.activate_subscription(
-                user_id=100, telegram_payment_charge_id="charge_dup",
+                user_id=100,
+                telegram_payment_charge_id="charge_dup",
             )
 
         assert result.success is True
@@ -269,7 +271,8 @@ class TestActivateSubscription:
             service._user_repo.update = AsyncMock(return_value=user)
 
             result = await service.activate_subscription(
-                user_id=100, telegram_payment_charge_id="charge_ext",
+                user_id=100,
+                telegram_payment_charge_id="charge_ext",
             )
 
         assert result.success is True
@@ -297,7 +300,8 @@ class TestActivateSubscription:
             service._user_repo.update = AsyncMock(return_value=user)
 
             result = await service.activate_subscription(
-                user_id=100, telegram_payment_charge_id="charge_new2",
+                user_id=100,
+                telegram_payment_charge_id="charge_new2",
             )
 
         assert result.success is True
@@ -323,7 +327,8 @@ class TestActivateSubscription:
             service._user_repo.update = AsyncMock(return_value=user)
 
             result = await service.activate_subscription(
-                user_id=999, telegram_payment_charge_id="charge_newuser",
+                user_id=999,
+                telegram_payment_charge_id="charge_newuser",
             )
 
         assert result.success is True
@@ -347,7 +352,9 @@ class TestActivateSubscription:
             service._user_repo.update = AsyncMock(return_value=user)
 
             await service.activate_subscription(
-                user_id=100, telegram_payment_charge_id="charge_amt", amount_stars=5,
+                user_id=100,
+                telegram_payment_charge_id="charge_amt",
+                amount_stars=5,
             )
 
         call_kwargs = service._sub_repo.create.call_args[1]
@@ -532,7 +539,10 @@ class TestSuccessfulPayment:
 
         expires = datetime(2026, 5, 1, 0, 0, tzinfo=timezone.utc)
         mock_result = ActivationResult(
-            success=True, already_active=True, expires_at=expires, subscription_id=5,
+            success=True,
+            already_active=True,
+            expires_at=expires,
+            subscription_id=5,
         )
         mock_service = MagicMock()
         mock_service.activate_subscription = AsyncMock(return_value=mock_result)
@@ -764,6 +774,7 @@ class TestIntegrationScenarios:
                 user = _make_user_model(user_id=100, subscription="free", sub_expires_at=current_expiry)
 
             session = _mock_session()
+
             # We need the created sub to carry the correct expires_at; capture it from create() args
             async def _fake_create(**kwargs):
                 sub = MagicMock()
@@ -784,7 +795,8 @@ class TestIntegrationScenarios:
                 service._user_repo.update = AsyncMock(return_value=user)
 
                 result = await service.activate_subscription(
-                    user_id=100, telegram_payment_charge_id=f"charge_multi_{i}",
+                    user_id=100,
+                    telegram_payment_charge_id=f"charge_multi_{i}",
                 )
 
             assert result.success is True

@@ -45,4 +45,3 @@ class UserLimitRepository:
         row.requests_used = 0
         await self._session.flush()
         return row
-

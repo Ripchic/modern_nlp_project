@@ -22,6 +22,7 @@ from reviewmind.ingestion.chunker import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_long_text(word_count: int = 5000) -> str:
     """Generate a long text with *word_count* words, split into paragraphs."""
     words = [f"word{i}" for i in range(word_count)]
@@ -44,6 +45,7 @@ def _make_short_text(word_count: int = 100) -> str:
 # ===========================================================================
 # TestConstants
 # ===========================================================================
+
 
 class TestConstants:
     """Verify module-level constants match the PRD specification."""
@@ -83,6 +85,7 @@ class TestConstants:
 # ===========================================================================
 # TestChunk
 # ===========================================================================
+
 
 class TestChunk:
     """Tests for the Chunk dataclass."""
@@ -132,6 +135,7 @@ class TestChunk:
 # TestBuildSplitter
 # ===========================================================================
 
+
 class TestBuildSplitter:
     """Tests for the _build_splitter helper."""
 
@@ -159,6 +163,7 @@ class TestBuildSplitter:
 # TestChunkTextEmpty
 # ===========================================================================
 
+
 class TestChunkTextEmpty:
     """Edge cases: empty / whitespace input."""
 
@@ -183,6 +188,7 @@ class TestChunkTextEmpty:
 # ===========================================================================
 # TestChunkTextShort
 # ===========================================================================
+
 
 class TestChunkTextShort:
     """Short text (< 1 chunk) should return exactly 1 chunk."""
@@ -220,6 +226,7 @@ class TestChunkTextShort:
 # TestChunkTextLong
 # ===========================================================================
 
+
 class TestChunkTextLong:
     """Long text should produce multiple chunks with correct properties."""
 
@@ -253,9 +260,7 @@ class TestChunkTextLong:
             current_end = result[i].text[-100:]  # last 100 chars
             next_start = result[i + 1].text[:300]  # first 300 chars
             # At least some content should overlap
-            if current_end[-50:] in next_start or any(
-                word in next_start for word in current_end.split()[-3:]
-            ):
+            if current_end[-50:] in next_start or any(word in next_start for word in current_end.split()[-3:]):
                 overlap_found += 1
         # Most consecutive pairs should have overlap
         assert overlap_found > 0, "No overlap detected between consecutive chunks"
@@ -287,6 +292,7 @@ class TestChunkTextLong:
 # ===========================================================================
 # TestChunkTextMetadata
 # ===========================================================================
+
 
 class TestChunkTextMetadata:
     """Metadata handling in chunk_text."""
@@ -330,6 +336,7 @@ class TestChunkTextMetadata:
 # TestChunkTextCustomParams
 # ===========================================================================
 
+
 class TestChunkTextCustomParams:
     """Custom chunk_size and chunk_overlap."""
 
@@ -359,6 +366,7 @@ class TestChunkTextCustomParams:
 # ===========================================================================
 # TestChunkTextDicts
 # ===========================================================================
+
 
 class TestChunkTextDicts:
     """Tests for the chunk_text_dicts convenience function."""
@@ -402,6 +410,7 @@ class TestChunkTextDicts:
 # TestChunkTextRussian
 # ===========================================================================
 
+
 class TestChunkTextRussian:
     """Verify chunking works correctly with Russian / Unicode text."""
 
@@ -420,9 +429,7 @@ class TestChunkTextRussian:
 
     def test_mixed_language_text(self) -> None:
         text = (
-            "Sony WH-1000XM5 — отличные наушники. "
-            "Best noise cancelling headphones. "
-            "Шумоподавление работает прекрасно."
+            "Sony WH-1000XM5 — отличные наушники. Best noise cancelling headphones. Шумоподавление работает прекрасно."
         )
         result = chunk_text(text)
         assert len(result) == 1
@@ -434,19 +441,23 @@ class TestChunkTextRussian:
 # TestIngestionExports
 # ===========================================================================
 
+
 class TestIngestionExports:
     """Verify that chunker symbols are properly exported from the package."""
 
     def test_chunk_text_exported(self) -> None:
         from reviewmind.ingestion import chunk_text as ct
+
         assert ct is chunk_text
 
     def test_chunk_text_dicts_exported(self) -> None:
         from reviewmind.ingestion import chunk_text_dicts as ctd
+
         assert ctd is chunk_text_dicts
 
     def test_chunk_class_exported(self) -> None:
         from reviewmind.ingestion import Chunk as C
+
         assert C is Chunk
 
     def test_constants_exported(self) -> None:
@@ -459,6 +470,7 @@ class TestIngestionExports:
             DEFAULT_SEPARATORS,
             MIN_CHUNK_LENGTH,
         )
+
         assert CHUNK_SIZE_TOKENS == 500
         assert CHUNK_OVERLAP_TOKENS == 50
         assert CHARS_PER_TOKEN == 4
@@ -469,11 +481,18 @@ class TestIngestionExports:
 
     def test_all_chunker_symbols_in__all__(self) -> None:
         import reviewmind.ingestion as mod
+
         expected = {
-            "chunk_text", "chunk_text_dicts", "Chunk",
-            "CHUNK_SIZE_TOKENS", "CHUNK_SIZE_CHARS",
-            "CHUNK_OVERLAP_TOKENS", "CHUNK_OVERLAP_CHARS",
-            "CHARS_PER_TOKEN", "DEFAULT_SEPARATORS", "MIN_CHUNK_LENGTH",
+            "chunk_text",
+            "chunk_text_dicts",
+            "Chunk",
+            "CHUNK_SIZE_TOKENS",
+            "CHUNK_SIZE_CHARS",
+            "CHUNK_OVERLAP_TOKENS",
+            "CHUNK_OVERLAP_CHARS",
+            "CHARS_PER_TOKEN",
+            "DEFAULT_SEPARATORS",
+            "MIN_CHUNK_LENGTH",
         }
         assert expected.issubset(set(mod.__all__))
 
@@ -481,6 +500,7 @@ class TestIngestionExports:
 # ===========================================================================
 # TestIntegrationScenarios
 # ===========================================================================
+
 
 class TestIntegrationScenarios:
     """End-to-end scenarios simulating real usage."""
@@ -555,10 +575,8 @@ class TestIntegrationScenarios:
     def test_clean_then_chunk_pipeline(self) -> None:
         """Simulate clean → chunk pipeline."""
         from reviewmind.ingestion.cleaner import clean_text
-        raw = (
-            "<p>This is a review with <b>HTML</b> tags. </p>"
-            "<p>The product is good. " * 300 + "</p>"
-        )
+
+        raw = "<p>This is a review with <b>HTML</b> tags. </p><p>The product is good. " * 300 + "</p>"
         cleaned = clean_text(raw)
         if cleaned:  # may be None/empty if too short after cleaning
             result = chunk_text(cleaned, metadata={"source_type": "web"})

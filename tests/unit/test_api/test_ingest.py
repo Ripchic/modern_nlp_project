@@ -44,13 +44,20 @@ def _mock_engine() -> MagicMock:
 
 def _success_result(url: str, chunks: int = 5) -> SourceIngestionResult:
     return SourceIngestionResult(
-        url=url, success=True, source_type="web", chunks_count=chunks, source_id=1,
+        url=url,
+        success=True,
+        source_type="web",
+        chunks_count=chunks,
+        source_id=1,
     )
 
 
 def _failed_result(url: str, error: str = "Scrape failed") -> SourceIngestionResult:
     return SourceIngestionResult(
-        url=url, success=False, source_type="web", error=error,
+        url=url,
+        success=False,
+        source_type="web",
+        error=error,
     )
 
 
@@ -165,20 +172,27 @@ class TestIngestEndpointSuccess:
     @patch("reviewmind.api.endpoints.ingest.IngestionPipeline")
     def test_single_url_success(self, mock_pipeline_cls):
         pipeline = AsyncMock()
-        pipeline.ingest_urls = AsyncMock(return_value=_ingestion_result([
-            _success_result("https://example.com", chunks=5),
-        ]))
+        pipeline.ingest_urls = AsyncMock(
+            return_value=_ingestion_result(
+                [
+                    _success_result("https://example.com", chunks=5),
+                ]
+            )
+        )
         pipeline.__aenter__ = AsyncMock(return_value=pipeline)
         pipeline.__aexit__ = AsyncMock(return_value=None)
         mock_pipeline_cls.return_value = pipeline
 
         app = _make_app(qdrant=_mock_qdrant())
         with TestClient(app) as client:
-            resp = client.post("/ingest", json={
-                "user_id": 123,
-                "urls": ["https://example.com"],
-                "product_query": "test product",
-            })
+            resp = client.post(
+                "/ingest",
+                json={
+                    "user_id": 123,
+                    "urls": ["https://example.com"],
+                    "product_query": "test product",
+                },
+            )
 
         assert resp.status_code == 200
         data = resp.json()
@@ -192,25 +206,32 @@ class TestIngestEndpointSuccess:
     @patch("reviewmind.api.endpoints.ingest.IngestionPipeline")
     def test_multiple_urls_success(self, mock_pipeline_cls):
         pipeline = AsyncMock()
-        pipeline.ingest_urls = AsyncMock(return_value=_ingestion_result([
-            _success_result("https://youtube.com/watch?v=abc", chunks=3),
-            _success_result("https://reddit.com/r/tech/123", chunks=7),
-            _success_result("https://rtings.com/review", chunks=10),
-        ]))
+        pipeline.ingest_urls = AsyncMock(
+            return_value=_ingestion_result(
+                [
+                    _success_result("https://youtube.com/watch?v=abc", chunks=3),
+                    _success_result("https://reddit.com/r/tech/123", chunks=7),
+                    _success_result("https://rtings.com/review", chunks=10),
+                ]
+            )
+        )
         pipeline.__aenter__ = AsyncMock(return_value=pipeline)
         pipeline.__aexit__ = AsyncMock(return_value=None)
         mock_pipeline_cls.return_value = pipeline
 
         app = _make_app(qdrant=_mock_qdrant())
         with TestClient(app) as client:
-            resp = client.post("/ingest", json={
-                "user_id": 456,
-                "urls": [
-                    "https://youtube.com/watch?v=abc",
-                    "https://reddit.com/r/tech/123",
-                    "https://rtings.com/review",
-                ],
-            })
+            resp = client.post(
+                "/ingest",
+                json={
+                    "user_id": 456,
+                    "urls": [
+                        "https://youtube.com/watch?v=abc",
+                        "https://reddit.com/r/tech/123",
+                        "https://rtings.com/review",
+                    ],
+                },
+            )
 
         data = resp.json()
         assert data["success_count"] == 3
@@ -243,20 +264,27 @@ class TestIngestEndpointPartialFailure:
     @patch("reviewmind.api.endpoints.ingest.IngestionPipeline")
     def test_one_success_one_failure(self, mock_pipeline_cls):
         pipeline = AsyncMock()
-        pipeline.ingest_urls = AsyncMock(return_value=_ingestion_result([
-            _success_result("https://good.com", chunks=5),
-            _failed_result("https://bad.com", error="не удалось загрузить"),
-        ]))
+        pipeline.ingest_urls = AsyncMock(
+            return_value=_ingestion_result(
+                [
+                    _success_result("https://good.com", chunks=5),
+                    _failed_result("https://bad.com", error="не удалось загрузить"),
+                ]
+            )
+        )
         pipeline.__aenter__ = AsyncMock(return_value=pipeline)
         pipeline.__aexit__ = AsyncMock(return_value=None)
         mock_pipeline_cls.return_value = pipeline
 
         app = _make_app(qdrant=_mock_qdrant())
         with TestClient(app) as client:
-            resp = client.post("/ingest", json={
-                "user_id": 1,
-                "urls": ["https://good.com", "https://bad.com"],
-            })
+            resp = client.post(
+                "/ingest",
+                json={
+                    "user_id": 1,
+                    "urls": ["https://good.com", "https://bad.com"],
+                },
+            )
 
         data = resp.json()
         assert data["success_count"] == 1
@@ -272,10 +300,14 @@ class TestIngestEndpointPartialFailure:
     @patch("reviewmind.api.endpoints.ingest.IngestionPipeline")
     def test_all_failed(self, mock_pipeline_cls):
         pipeline = AsyncMock()
-        pipeline.ingest_urls = AsyncMock(return_value=_ingestion_result([
-            _failed_result("https://a.com"),
-            _failed_result("https://b.com"),
-        ]))
+        pipeline.ingest_urls = AsyncMock(
+            return_value=_ingestion_result(
+                [
+                    _failed_result("https://a.com"),
+                    _failed_result("https://b.com"),
+                ]
+            )
+        )
         pipeline.__aenter__ = AsyncMock(return_value=pipeline)
         pipeline.__aexit__ = AsyncMock(return_value=None)
         mock_pipeline_cls.return_value = pipeline
@@ -312,9 +344,13 @@ class TestIngestEndpointNoDB:
     @patch("reviewmind.api.endpoints.ingest.IngestionPipeline")
     def test_no_db_engine_still_works(self, mock_pipeline_cls):
         pipeline = AsyncMock()
-        pipeline.ingest_urls = AsyncMock(return_value=_ingestion_result([
-            _success_result("https://example.com", chunks=3),
-        ]))
+        pipeline.ingest_urls = AsyncMock(
+            return_value=_ingestion_result(
+                [
+                    _success_result("https://example.com", chunks=3),
+                ]
+            )
+        )
         pipeline.__aenter__ = AsyncMock(return_value=pipeline)
         pipeline.__aexit__ = AsyncMock(return_value=None)
         mock_pipeline_cls.return_value = pipeline
@@ -340,9 +376,13 @@ class TestIngestEndpointWithDB:
     @patch("reviewmind.api.endpoints.ingest.IngestionPipeline")
     def test_db_session_provided(self, mock_pipeline_cls):
         pipeline = AsyncMock()
-        pipeline.ingest_urls = AsyncMock(return_value=_ingestion_result([
-            _success_result("https://example.com", chunks=2),
-        ]))
+        pipeline.ingest_urls = AsyncMock(
+            return_value=_ingestion_result(
+                [
+                    _success_result("https://example.com", chunks=2),
+                ]
+            )
+        )
         pipeline.__aenter__ = AsyncMock(return_value=pipeline)
         pipeline.__aexit__ = AsyncMock(return_value=None)
         mock_pipeline_cls.return_value = pipeline
@@ -416,20 +456,27 @@ class TestIngestEndpointProductQuery:
     @patch("reviewmind.api.endpoints.ingest.IngestionPipeline")
     def test_product_query_passed_to_pipeline(self, mock_pipeline_cls):
         pipeline = AsyncMock()
-        pipeline.ingest_urls = AsyncMock(return_value=_ingestion_result([
-            _success_result("https://example.com"),
-        ]))
+        pipeline.ingest_urls = AsyncMock(
+            return_value=_ingestion_result(
+                [
+                    _success_result("https://example.com"),
+                ]
+            )
+        )
         pipeline.__aenter__ = AsyncMock(return_value=pipeline)
         pipeline.__aexit__ = AsyncMock(return_value=None)
         mock_pipeline_cls.return_value = pipeline
 
         app = _make_app(qdrant=_mock_qdrant())
         with TestClient(app) as client:
-            client.post("/ingest", json={
-                "user_id": 1,
-                "urls": ["https://example.com"],
-                "product_query": "Sony WH-1000XM5",
-            })
+            client.post(
+                "/ingest",
+                json={
+                    "user_id": 1,
+                    "urls": ["https://example.com"],
+                    "product_query": "Sony WH-1000XM5",
+                },
+            )
 
         pipeline.ingest_urls.assert_called_once()
         call_kwargs = pipeline.ingest_urls.call_args
@@ -438,19 +485,26 @@ class TestIngestEndpointProductQuery:
     @patch("reviewmind.api.endpoints.ingest.IngestionPipeline")
     def test_default_product_query_empty(self, mock_pipeline_cls):
         pipeline = AsyncMock()
-        pipeline.ingest_urls = AsyncMock(return_value=_ingestion_result([
-            _success_result("https://example.com"),
-        ]))
+        pipeline.ingest_urls = AsyncMock(
+            return_value=_ingestion_result(
+                [
+                    _success_result("https://example.com"),
+                ]
+            )
+        )
         pipeline.__aenter__ = AsyncMock(return_value=pipeline)
         pipeline.__aexit__ = AsyncMock(return_value=None)
         mock_pipeline_cls.return_value = pipeline
 
         app = _make_app(qdrant=_mock_qdrant())
         with TestClient(app) as client:
-            client.post("/ingest", json={
-                "user_id": 1,
-                "urls": ["https://example.com"],
-            })
+            client.post(
+                "/ingest",
+                json={
+                    "user_id": 1,
+                    "urls": ["https://example.com"],
+                },
+            )
 
         call_kwargs = pipeline.ingest_urls.call_args
         assert call_kwargs.kwargs["product_query"] == ""
@@ -462,20 +516,27 @@ class TestIngestEndpointSessionId:
     @patch("reviewmind.api.endpoints.ingest.IngestionPipeline")
     def test_session_id_passed_through(self, mock_pipeline_cls):
         pipeline = AsyncMock()
-        pipeline.ingest_urls = AsyncMock(return_value=_ingestion_result([
-            _success_result("https://example.com"),
-        ]))
+        pipeline.ingest_urls = AsyncMock(
+            return_value=_ingestion_result(
+                [
+                    _success_result("https://example.com"),
+                ]
+            )
+        )
         pipeline.__aenter__ = AsyncMock(return_value=pipeline)
         pipeline.__aexit__ = AsyncMock(return_value=None)
         mock_pipeline_cls.return_value = pipeline
 
         app = _make_app(qdrant=_mock_qdrant())
         with TestClient(app) as client:
-            client.post("/ingest", json={
-                "user_id": 1,
-                "session_id": "sess-xyz",
-                "urls": ["https://example.com"],
-            })
+            client.post(
+                "/ingest",
+                json={
+                    "user_id": 1,
+                    "session_id": "sess-xyz",
+                    "urls": ["https://example.com"],
+                },
+            )
 
         call_kwargs = pipeline.ingest_urls.call_args
         assert call_kwargs.kwargs["session_id"] == "sess-xyz"
@@ -517,9 +578,13 @@ class TestIngestFullApp:
     @patch("reviewmind.api.endpoints.ingest.IngestionPipeline")
     def test_ingest_reachable(self, mock_pipeline_cls):
         pipeline = AsyncMock()
-        pipeline.ingest_urls = AsyncMock(return_value=_ingestion_result([
-            _success_result("https://example.com", chunks=1),
-        ]))
+        pipeline.ingest_urls = AsyncMock(
+            return_value=_ingestion_result(
+                [
+                    _success_result("https://example.com", chunks=1),
+                ]
+            )
+        )
         pipeline.__aenter__ = AsyncMock(return_value=pipeline)
         pipeline.__aexit__ = AsyncMock(return_value=None)
         mock_pipeline_cls.return_value = pipeline
@@ -545,12 +610,15 @@ class TestSchemaExports:
 
     def test_import_ingest_request(self):
         from reviewmind.api.schemas import IngestRequest
+
         assert IngestRequest is not None
 
     def test_import_ingest_response(self):
         from reviewmind.api.schemas import IngestResponse
+
         assert IngestResponse is not None
 
     def test_import_ingest_url_result(self):
         from reviewmind.api.schemas import IngestURLResult
+
         assert IngestURLResult is not None

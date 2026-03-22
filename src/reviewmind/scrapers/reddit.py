@@ -46,17 +46,11 @@ _DELETED_MARKERS: frozenset[str] = frozenset({"[deleted]", "[removed]", "[уда
 
 _REDDIT_URL_PATTERNS: list[re.Pattern[str]] = [
     # Standard: https://www.reddit.com/r/subreddit/comments/post_id/slug/
-    re.compile(
-        r"(?:https?://)?(?:www\.)?reddit\.com/r/(?P<subreddit>[^/]+)/comments/(?P<post_id>[a-z0-9]+)"
-    ),
+    re.compile(r"(?:https?://)?(?:www\.)?reddit\.com/r/(?P<subreddit>[^/]+)/comments/(?P<post_id>[a-z0-9]+)"),
     # Old reddit: https://old.reddit.com/r/subreddit/comments/post_id/slug/
-    re.compile(
-        r"(?:https?://)?old\.reddit\.com/r/(?P<subreddit>[^/]+)/comments/(?P<post_id>[a-z0-9]+)"
-    ),
+    re.compile(r"(?:https?://)?old\.reddit\.com/r/(?P<subreddit>[^/]+)/comments/(?P<post_id>[a-z0-9]+)"),
     # Short links: https://redd.it/post_id
-    re.compile(
-        r"(?:https?://)?redd\.it/(?P<post_id>[a-z0-9]+)"
-    ),
+    re.compile(r"(?:https?://)?redd\.it/(?P<post_id>[a-z0-9]+)"),
 ]
 
 _REDDIT_DOMAIN_PATTERN: re.Pattern[str] = re.compile(

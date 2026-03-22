@@ -30,8 +30,7 @@ SUBSCRIPTION_PRICE_LABEL: str = "ReviewMind Premium (30 дней)"
 """Label displayed in the Telegram payment invoice."""
 
 SUBSCRIPTION_DESCRIPTION: str = (
-    "Безлимитные запросы к AI-анализатору обзоров на 30 дней. "
-    "Без ограничений по количеству запросов в сутки."
+    "Безлимитные запросы к AI-анализатору обзоров на 30 дней. Без ограничений по количеству запросов в сутки."
 )
 
 SUBSCRIPTION_ACTIVATED_MSG: str = (
@@ -42,8 +41,7 @@ SUBSCRIPTION_ACTIVATED_MSG: str = (
 )
 
 SUBSCRIPTION_ALREADY_ACTIVE_MSG: str = (
-    "ℹ️ У вас уже есть активная подписка до <b>{expires_at}</b>.\n"
-    "Оплата не была проведена повторно."
+    "ℹ️ У вас уже есть активная подписка до <b>{expires_at}</b>.\nОплата не была проведена повторно."
 )
 
 SUBSCRIPTION_ERROR_MSG: str = "⚠️ Не удалось активировать подписку. Попробуйте позже."
@@ -82,13 +80,9 @@ class ActivationResult:
     def message(self) -> str:
         """Human-readable message for the Telegram user."""
         if self.already_active and self.expires_at:
-            return SUBSCRIPTION_ALREADY_ACTIVE_MSG.format(
-                expires_at=self.expires_at.strftime("%d.%m.%Y %H:%M UTC")
-            )
+            return SUBSCRIPTION_ALREADY_ACTIVE_MSG.format(expires_at=self.expires_at.strftime("%d.%m.%Y %H:%M UTC"))
         if self.success and self.expires_at:
-            return SUBSCRIPTION_ACTIVATED_MSG.format(
-                expires_at=self.expires_at.strftime("%d.%m.%Y %H:%M UTC")
-            )
+            return SUBSCRIPTION_ACTIVATED_MSG.format(expires_at=self.expires_at.strftime("%d.%m.%Y %H:%M UTC"))
         return SUBSCRIPTION_ERROR_MSG
 
 

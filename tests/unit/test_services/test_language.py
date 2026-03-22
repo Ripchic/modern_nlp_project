@@ -42,10 +42,7 @@ class TestDetectRussian:
         assert detect_language("Обзор наушников Sony WH-1000XM5") == "ru"
 
     def test_russian_paragraph(self):
-        text = (
-            "Эти наушники обладают отличным шумоподавлением. "
-            "Батарея держит около 30 часов. Звук сбалансированный."
-        )
+        text = "Эти наушники обладают отличным шумоподавлением. Батарея держит около 30 часов. Звук сбалансированный."
         assert detect_language(text) == "ru"
 
     def test_russian_with_numbers(self):
@@ -202,13 +199,13 @@ class TestPromptIntegration:
         from reviewmind.core.prompts import build_rag_system_prompt
 
         result = build_rag_system_prompt([], language="ru")
-        assert "определённый язык: ru" in result
+        assert "целевой язык: ru" in result
 
     def test_english_language_in_rag_prompt(self):
         from reviewmind.core.prompts import build_rag_system_prompt
 
         result = build_rag_system_prompt([], language="en")
-        assert "определённый язык: en" in result
+        assert "целевой язык: en" in result
 
 
 # ── Exports ──────────────────────────────────────────────────────────────────

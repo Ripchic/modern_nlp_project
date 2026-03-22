@@ -52,23 +52,15 @@ MAX_AGE_DAYS: int = 365
 # Captures the 11-character video ID from various YouTube URL formats.
 _YOUTUBE_URL_PATTERNS: list[re.Pattern[str]] = [
     # Standard: https://www.youtube.com/watch?v=VIDEO_ID
-    re.compile(
-        r"(?:https?://)?(?:www\.)?youtube\.com/watch\?(?:[^&]*&)*v=(?P<id>[A-Za-z0-9_-]{11})"
-    ),
+    re.compile(r"(?:https?://)?(?:www\.)?youtube\.com/watch\?(?:[^&]*&)*v=(?P<id>[A-Za-z0-9_-]{11})"),
     # Short: https://youtu.be/VIDEO_ID
     re.compile(r"(?:https?://)?youtu\.be/(?P<id>[A-Za-z0-9_-]{11})"),
     # Shorts: https://www.youtube.com/shorts/VIDEO_ID
-    re.compile(
-        r"(?:https?://)?(?:www\.)?youtube\.com/shorts/(?P<id>[A-Za-z0-9_-]{11})"
-    ),
+    re.compile(r"(?:https?://)?(?:www\.)?youtube\.com/shorts/(?P<id>[A-Za-z0-9_-]{11})"),
     # Embed: https://www.youtube.com/embed/VIDEO_ID
-    re.compile(
-        r"(?:https?://)?(?:www\.)?youtube\.com/embed/(?P<id>[A-Za-z0-9_-]{11})"
-    ),
+    re.compile(r"(?:https?://)?(?:www\.)?youtube\.com/embed/(?P<id>[A-Za-z0-9_-]{11})"),
     # Live: https://www.youtube.com/live/VIDEO_ID
-    re.compile(
-        r"(?:https?://)?(?:www\.)?youtube\.com/live/(?P<id>[A-Za-z0-9_-]{11})"
-    ),
+    re.compile(r"(?:https?://)?(?:www\.)?youtube\.com/live/(?P<id>[A-Za-z0-9_-]{11})"),
 ]
 
 
@@ -146,14 +138,16 @@ class YouTubeScraper:
                 jar.load(ignore_discard=True, ignore_expires=True)
                 session = Session()
                 session.cookies = jar
-                session.headers.update({
-                    "User-Agent": (
-                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                        "AppleWebKit/537.36 (KHTML, like Gecko) "
-                        "Chrome/134.0.0.0 Safari/537.36"
-                    ),
-                    "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
-                })
+                session.headers.update(
+                    {
+                        "User-Agent": (
+                            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                            "AppleWebKit/537.36 (KHTML, like Gecko) "
+                            "Chrome/134.0.0.0 Safari/537.36"
+                        ),
+                        "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
+                    }
+                )
                 logger.info("youtube.cookies_loaded", path=str(path), count=len(jar))
                 return YouTubeTranscriptApi(http_client=session)
             logger.warning("youtube.cookies_not_found", path=str(path))

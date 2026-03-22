@@ -141,10 +141,7 @@ class TestFormatChunksForContext:
         assert "(" not in result
 
     def test_multiple_chunks_all_numbered(self):
-        chunks = [
-            ChunkContext(text=f"chunk {i}", source_url=f"https://src{i}.com")
-            for i in range(1, 4)
-        ]
+        chunks = [ChunkContext(text=f"chunk {i}", source_url=f"https://src{i}.com") for i in range(1, 4)]
         result = format_chunks_for_context(chunks)
         assert "[1]" in result
         assert "[2]" in result
@@ -301,9 +298,9 @@ class TestBuildRagSystemPrompt:
         assert "🏆 Вывод" in result
 
     def test_language_rule_present(self):
-        """PRD rule 6: Отвечай на языке пользователя."""
+        """PRD rule 6: Отвечай на языке запроса пользователя."""
         result = build_rag_system_prompt([])
-        assert "языке пользователя" in result
+        assert "языке запроса пользователя" in result
 
     def test_none_history_treated_as_empty(self):
         result_none = build_rag_system_prompt([], chat_history=None)
@@ -340,7 +337,7 @@ class TestPromptConstants:
         assert "ReviewMind" in FALLBACK_SYSTEM_PROMPT
 
     def test_fallback_mentions_language_rule(self):
-        assert "языке пользователя" in FALLBACK_SYSTEM_PROMPT
+        assert "языке запроса пользователя" in FALLBACK_SYSTEM_PROMPT
 
     def test_sponsored_marker_value(self):
         assert SPONSORED_MARKER == "[sponsored]"

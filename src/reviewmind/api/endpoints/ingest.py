@@ -31,10 +31,7 @@ async def post_ingest(body: IngestRequest, request: Request) -> IngestResponse:
     if qdrant is None:
         log.error("qdrant_unavailable")
         return IngestResponse(
-            results=[
-                IngestURLResult(url=u, status="failed", error="Vector store unavailable")
-                for u in body.urls
-            ],
+            results=[IngestURLResult(url=u, status="failed", error="Vector store unavailable") for u in body.urls],
             failed_count=len(body.urls),
         )
 
@@ -55,10 +52,7 @@ async def post_ingest(body: IngestRequest, request: Request) -> IngestResponse:
     except Exception as exc:
         log.error("ingest_unexpected_error", error=str(exc))
         return IngestResponse(
-            results=[
-                IngestURLResult(url=u, status="failed", error="Internal error")
-                for u in body.urls
-            ],
+            results=[IngestURLResult(url=u, status="failed", error="Internal error") for u in body.urls],
             failed_count=len(body.urls),
         )
 

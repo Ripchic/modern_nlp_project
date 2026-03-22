@@ -1,4 +1,5 @@
 """Unit tests for SQLAlchemy ORM models (TASK-009)."""
+
 from __future__ import annotations
 
 import uuid
@@ -225,8 +226,13 @@ class TestQueryLogModel:
 
     def test_nullable_fields(self):
         nullable = (
-            "session_id", "mode", "query_text", "response_text",
-            "sources_used", "rating", "response_time_ms",
+            "session_id",
+            "mode",
+            "query_text",
+            "response_text",
+            "sources_used",
+            "rating",
+            "response_time_ms",
         )
         for field in nullable:
             assert QueryLog.__table__.c[field].nullable is True

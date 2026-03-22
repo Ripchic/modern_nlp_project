@@ -37,21 +37,22 @@ MIN_CHUNK_LENGTH: int = 1
 # Default separators for RecursiveCharacterTextSplitter.
 # Prioritises paragraph breaks → sentence boundaries → word boundaries.
 DEFAULT_SEPARATORS: list[str] = [
-    "\n\n",   # paragraph break
-    "\n",      # line break
-    ". ",      # sentence boundary (period + space)
-    "! ",      # exclamation sentence boundary
-    "? ",      # question sentence boundary
-    "; ",      # semicolon boundary
-    ", ",      # clause boundary
-    " ",       # word boundary
-    "",        # character-level fallback
+    "\n\n",  # paragraph break
+    "\n",  # line break
+    ". ",  # sentence boundary (period + space)
+    "! ",  # exclamation sentence boundary
+    "? ",  # question sentence boundary
+    "; ",  # semicolon boundary
+    ", ",  # clause boundary
+    " ",  # word boundary
+    "",  # character-level fallback
 ]
 
 
 # ---------------------------------------------------------------------------
 # Chunk dataclass
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class Chunk:
@@ -69,6 +70,7 @@ class Chunk:
 # ---------------------------------------------------------------------------
 # Chunker
 # ---------------------------------------------------------------------------
+
 
 def _build_splitter(
     chunk_size: int = CHUNK_SIZE_CHARS,

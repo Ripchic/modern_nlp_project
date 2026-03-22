@@ -226,10 +226,7 @@ class EmbeddingService:
                 # Validate dimension
                 for i, vec in enumerate(vectors):
                     if len(vec) != self._dimension:
-                        raise EmbeddingError(
-                            f"Expected dimension {self._dimension}, "
-                            f"got {len(vec)} for text index {i}"
-                        )
+                        raise EmbeddingError(f"Expected dimension {self._dimension}, got {len(vec)} for text index {i}")
 
                 logger.debug(
                     "Embedding response received",
@@ -280,6 +277,4 @@ class EmbeddingService:
                 raise EmbeddingError(f"Unexpected error generating embeddings: {exc}") from exc
 
         # All retries exhausted
-        raise EmbeddingError(
-            f"Embedding request failed after {self._max_retries} attempts: {last_error}"
-        )
+        raise EmbeddingError(f"Embedding request failed after {self._max_retries} attempts: {last_error}")

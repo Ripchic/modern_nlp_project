@@ -49,9 +49,7 @@ class SourceRepository:
         await self._session.flush()
         return source
 
-    async def get_or_create(
-        self, source_url: str, source_type: str, **kwargs
-    ) -> tuple[Source, bool]:
+    async def get_or_create(self, source_url: str, source_type: str, **kwargs) -> tuple[Source, bool]:
         """Return (source, created)."""
         source = await self.get_by_url(source_url)
         if source is not None:
@@ -75,4 +73,3 @@ class SourceRepository:
         await self._session.delete(source)
         await self._session.flush()
         return True
-

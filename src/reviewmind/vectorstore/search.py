@@ -167,9 +167,7 @@ async def search_collection(
     list[SearchResult]
         Results sorted by descending score.
     """
-    query_filter = (
-        _build_product_filter(product_query) if product_query else None
-    )
+    query_filter = _build_product_filter(product_query) if product_query else None
 
     try:
         response = await client.query_points(
@@ -188,10 +186,7 @@ async def search_collection(
         )
         return []
 
-    results = [
-        _scored_point_to_result(point, collection_name)
-        for point in response.points
-    ]
+    results = [_scored_point_to_result(point, collection_name) for point in response.points]
     logger.info(
         "search_collection_done",
         collection=collection_name,

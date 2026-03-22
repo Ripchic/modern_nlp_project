@@ -37,13 +37,9 @@ class User(Base):
 
     user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)  # telegram_user_id
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
-    subscription: Mapped[str] = mapped_column(
-        String(20), default="free", server_default="free", nullable=False
-    )
+    subscription: Mapped[str] = mapped_column(String(20), default="free", server_default="free", nullable=False)
     sub_expires_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 
     # relationships
     limits: Mapped[list[UserLimit]] = relationship("UserLimit", back_populates="user", cascade="all, delete-orphan")
@@ -51,9 +47,7 @@ class User(Base):
         "Subscription", back_populates="user", cascade="all, delete-orphan"
     )
     jobs: Mapped[list[Job]] = relationship("Job", back_populates="user", cascade="all, delete-orphan")
-    query_logs: Mapped[list[QueryLog]] = relationship(
-        "QueryLog", back_populates="user", cascade="all, delete-orphan"
-    )
+    query_logs: Mapped[list[QueryLog]] = relationship("QueryLog", back_populates="user", cascade="all, delete-orphan")
 
 
 # ---------------------------------------------------------------------------
@@ -63,9 +57,7 @@ class UserLimit(Base):
     __tablename__ = "user_limits"
     __table_args__ = (UniqueConstraint("user_id", "date", name="uq_user_limits_user_date"),)
 
-    user_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), primary_key=True
-    )
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), primary_key=True)
     date: Mapped[date] = mapped_column(Date, primary_key=True)
     requests_used: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
 
@@ -126,18 +118,14 @@ class Job(Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
-    )
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     job_type: Mapped[str] = mapped_column(String(20), nullable=False)  # 'auto_search' | 'manual_links'
     status: Mapped[str] = mapped_column(
         String(20), default="pending", nullable=False
     )  # 'pending' | 'running' | 'done' | 'failed'
     product_query: Mapped[str | None] = mapped_column(Text, nullable=True)
     celery_task_id: Mapped[str | None] = mapped_column(String(256), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
     user: Mapped[User] = relationship("User", back_populates="jobs")
@@ -154,9 +142,7 @@ class QueryLog(Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
-    )
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     session_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     mode: Mapped[str | None] = mapped_column(String(20), nullable=True)  # 'auto' | 'manual'
     query_text: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -165,8 +151,6 @@ class QueryLog(Base):
     rating: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)  # 1 (👍) | -1 (👎) | NULL
     response_time_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     used_tavily: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 
     user: Mapped[User] = relationship("User", back_populates="query_logs")

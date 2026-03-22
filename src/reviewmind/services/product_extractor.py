@@ -21,8 +21,8 @@ logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 _EXTRACTION_PROMPT = (
     "Ты — помощник, который извлекает названия товаров из пользовательских запросов.\n\n"
     "ПРАВИЛА:\n"
-    "1. Верни JSON-объект вида {\"products\": [\"Product1\", \"Product2\"]}.\n"
-    "2. Если в запросе НЕТ товара — верни {\"products\": []}.\n"
+    '1. Верни JSON-объект вида {"products": ["Product1", "Product2"]}.\n'
+    '2. Если в запросе НЕТ товара — верни {"products": []}.\n'
     "3. Извлекай ТОЛЬКО конкретные модели/названия товаров (бренд + модель).\n"
     "4. НЕ выдумывай товары, которых нет в запросе.\n"
     "5. Для сравнительных запросов ('X vs Y', 'X или Y') — верни оба товара.\n"
@@ -76,6 +76,7 @@ _COMPARISON_RE = re.compile(
 
 
 # ── Public API ─────────────────────────────────────────────────────────────────
+
 
 async def extract_product(
     query: str,
@@ -147,6 +148,7 @@ def is_comparison_query(query: str) -> bool:
 
 
 # ── Internal helpers ───────────────────────────────────────────────────────────
+
 
 async def _extract_via_llm(
     query: str,

@@ -184,11 +184,15 @@ class TestRerank:
         """Curated (0.8) should rank above auto (0.85) after ×1.3 boost."""
         results = [
             _make_result(
-                score=0.85, source_url="auto_url", is_curated=False,
+                score=0.85,
+                source_url="auto_url",
+                is_curated=False,
                 collection="auto_crawled",
             ),
             _make_result(
-                score=0.8, source_url="curated_url", is_curated=True,
+                score=0.8,
+                source_url="curated_url",
+                is_curated=True,
                 collection="curated_kb",
             ),
         ]
@@ -200,10 +204,13 @@ class TestRerank:
         """Sponsored (0.9) should rank below normal (0.75) after ×0.7."""
         results = [
             _make_result(
-                score=0.9, source_url="sponsored_url", is_sponsored=True,
+                score=0.9,
+                source_url="sponsored_url",
+                is_sponsored=True,
             ),
             _make_result(
-                score=0.75, source_url="normal_url",
+                score=0.75,
+                source_url="normal_url",
             ),
         ]
         reranked = rerank(results)
@@ -226,10 +233,7 @@ class TestRerank:
 
     def test_top_k_less_than_input(self):
         """With fewer results than top_k, all results should be returned."""
-        results = [
-            _make_result(score=0.8, source_url=f"url_{i}")
-            for i in range(3)
-        ]
+        results = [_make_result(score=0.8, source_url=f"url_{i}") for i in range(3)]
         reranked = rerank(results, top_k=8)
         assert len(reranked) == 3
 
@@ -247,12 +251,18 @@ class TestRerank:
         """Duplicates from two collections should be collapsed."""
         results = [
             _make_result(
-                score=0.7, source_url="same_url", chunk_index=0,
-                collection="curated_kb", is_curated=True,
+                score=0.7,
+                source_url="same_url",
+                chunk_index=0,
+                collection="curated_kb",
+                is_curated=True,
             ),
             _make_result(
-                score=0.8, source_url="same_url", chunk_index=0,
-                collection="auto_crawled", is_curated=False,
+                score=0.8,
+                source_url="same_url",
+                chunk_index=0,
+                collection="auto_crawled",
+                is_curated=False,
             ),
         ]
         reranked = rerank(results)
@@ -275,10 +285,7 @@ class TestRerank:
         assert original.score == pytest.approx(original_score)
 
     def test_custom_top_k(self):
-        results = [
-            _make_result(score=0.5 + i * 0.05, source_url=f"url_{i}")
-            for i in range(10)
-        ]
+        results = [_make_result(score=0.5 + i * 0.05, source_url=f"url_{i}") for i in range(10)]
         reranked = rerank(results, top_k=3)
         assert len(reranked) == 3
 
@@ -322,9 +329,9 @@ class TestRerank:
         ]
         reranked = rerank(results)
         urls = [r.source_url for r in reranked]
-        assert urls[0] == "curated1"   # 1.04
-        assert urls[1] == "curated2"   # 0.91
-        assert urls[2] == "auto1"      # 0.85
+        assert urls[0] == "curated1"  # 1.04
+        assert urls[1] == "curated2"  # 0.91
+        assert urls[2] == "auto1"  # 0.85
 
     def test_top_k_one(self):
         results = [
@@ -345,12 +352,16 @@ class TestNoCuratedResults:
     def test_only_auto_results(self):
         results = [
             _make_result(
-                score=0.8, source_url="auto1",
-                collection="auto_crawled", is_curated=False,
+                score=0.8,
+                source_url="auto1",
+                collection="auto_crawled",
+                is_curated=False,
             ),
             _make_result(
-                score=0.75, source_url="auto2",
-                collection="auto_crawled", is_curated=False,
+                score=0.75,
+                source_url="auto2",
+                collection="auto_crawled",
+                is_curated=False,
             ),
         ]
         reranked = rerank(results)
@@ -366,12 +377,16 @@ class TestNoAutoResults:
     def test_only_curated_results(self):
         results = [
             _make_result(
-                score=0.7, source_url="cur1",
-                collection="curated_kb", is_curated=True,
+                score=0.7,
+                source_url="cur1",
+                collection="curated_kb",
+                is_curated=True,
             ),
             _make_result(
-                score=0.65, source_url="cur2",
-                collection="curated_kb", is_curated=True,
+                score=0.65,
+                source_url="cur2",
+                collection="curated_kb",
+                is_curated=True,
             ),
         ]
         reranked = rerank(results)
@@ -398,10 +413,7 @@ class TestEdgeCases:
         assert len(reranked) == 3
 
     def test_all_same_score(self):
-        results = [
-            _make_result(score=0.8, source_url=f"url_{i}")
-            for i in range(5)
-        ]
+        results = [_make_result(score=0.8, source_url=f"url_{i}") for i in range(5)]
         reranked = rerank(results)
         assert len(reranked) == 5
         for r in reranked:
@@ -435,12 +447,18 @@ class TestEdgeCases:
         """Same source in both collections — curated with boost should win."""
         results = [
             _make_result(
-                score=0.75, source_url="shared_url", chunk_index=0,
-                collection="auto_crawled", is_curated=False,
+                score=0.75,
+                source_url="shared_url",
+                chunk_index=0,
+                collection="auto_crawled",
+                is_curated=False,
             ),
             _make_result(
-                score=0.7, source_url="shared_url", chunk_index=0,
-                collection="curated_kb", is_curated=True,
+                score=0.7,
+                source_url="shared_url",
+                chunk_index=0,
+                collection="curated_kb",
+                is_curated=True,
             ),
         ]
         reranked = rerank(results)
@@ -474,10 +492,7 @@ class TestIntegrationScenarios:
 
     def test_prd_example_top_k_trim(self):
         """PRD test step 3: 15 results with top_k=8 → exactly 8."""
-        results = [
-            _make_result(score=0.5 + i * 0.03, source_url=f"url_{i}")
-            for i in range(15)
-        ]
+        results = [_make_result(score=0.5 + i * 0.03, source_url=f"url_{i}") for i in range(15)]
         reranked = rerank(results, top_k=8)
         assert len(reranked) == 8
 
@@ -490,31 +505,46 @@ class TestIntegrationScenarios:
         results = [
             # Curated editorial reviews
             _make_result(
-                score=0.82, source_url="wirecutter.com/headphones",
-                source_type="web", is_curated=True,
-                collection="curated_kb", chunk_index=0,
+                score=0.82,
+                source_url="wirecutter.com/headphones",
+                source_type="web",
+                is_curated=True,
+                collection="curated_kb",
+                chunk_index=0,
             ),
             _make_result(
-                score=0.78, source_url="rtings.com/headphones",
-                source_type="web", is_curated=True,
-                collection="curated_kb", chunk_index=0,
+                score=0.78,
+                source_url="rtings.com/headphones",
+                source_type="web",
+                is_curated=True,
+                collection="curated_kb",
+                chunk_index=0,
             ),
             # Normal auto-crawled
             _make_result(
-                score=0.88, source_url="youtube.com/watch?v=abc",
-                source_type="youtube", is_curated=False,
-                collection="auto_crawled", chunk_index=0,
+                score=0.88,
+                source_url="youtube.com/watch?v=abc",
+                source_type="youtube",
+                is_curated=False,
+                collection="auto_crawled",
+                chunk_index=0,
             ),
             _make_result(
-                score=0.85, source_url="reddit.com/r/headphones/xyz",
-                source_type="reddit", is_curated=False,
-                collection="auto_crawled", chunk_index=0,
+                score=0.85,
+                source_url="reddit.com/r/headphones/xyz",
+                source_type="reddit",
+                is_curated=False,
+                collection="auto_crawled",
+                chunk_index=0,
             ),
             # Sponsored content
             _make_result(
-                score=0.92, source_url="youtube.com/watch?v=sponsor",
-                source_type="youtube", is_sponsored=True,
-                collection="auto_crawled", chunk_index=0,
+                score=0.92,
+                source_url="youtube.com/watch?v=sponsor",
+                source_type="youtube",
+                is_sponsored=True,
+                collection="auto_crawled",
+                chunk_index=0,
             ),
         ]
         reranked = rerank(results, top_k=5)

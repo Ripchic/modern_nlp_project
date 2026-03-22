@@ -647,9 +647,15 @@ class TestApiQueryEndpoint:
 
         data = resp.json()
         expected_fields = {
-            "answer", "sources", "used_curated", "used_tavily",
-            "confidence_met", "chunks_count", "response_time_ms",
-            "query_log_id", "error",
+            "answer",
+            "sources",
+            "used_curated",
+            "used_tavily",
+            "confidence_met",
+            "chunks_count",
+            "response_time_ms",
+            "query_log_id",
+            "error",
         }
         assert expected_fields.issubset(set(data.keys()))
 

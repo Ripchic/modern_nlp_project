@@ -59,9 +59,7 @@ class JobRepository:
         await self._session.flush()
         return job
 
-    async def list_by_user(
-        self, user_id: int, *, status: str | None = None, limit: int = 20
-    ) -> list[Job]:
+    async def list_by_user(self, user_id: int, *, status: str | None = None, limit: int = 20) -> list[Job]:
         stmt = select(Job).where(Job.user_id == user_id)
         if status is not None:
             stmt = stmt.where(Job.status == status)
@@ -76,4 +74,3 @@ class JobRepository:
         await self._session.delete(job)
         await self._session.flush()
         return True
-

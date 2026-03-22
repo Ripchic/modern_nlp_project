@@ -229,12 +229,15 @@ class TestModuleExports:
 
     def test_detect_url_type_from_package(self) -> None:
         from reviewmind.ingestion import detect_url_type as fn
+
         assert callable(fn)
 
     def test_route_to_scraper_from_package(self) -> None:
         from reviewmind.ingestion import route_to_scraper as fn
+
         assert callable(fn)
 
     def test_scraper_type_alias(self) -> None:
         from reviewmind.ingestion import ScraperType
+
         assert ScraperType is not None

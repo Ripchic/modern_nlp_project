@@ -833,11 +833,7 @@ class TestAutoModeAnswerStructure:
         call_kwargs = msg.answer.call_args.kwargs
         markup = call_kwargs.get("reply_markup")
         assert markup is not None
-        button_data = [
-            btn.callback_data
-            for row in markup.inline_keyboard
-            for btn in row
-        ]
+        button_data = [btn.callback_data for row in markup.inline_keyboard for btn in row]
         assert any(d.startswith(FEEDBACK_USEFUL) for d in button_data)
         assert any(d.startswith(FEEDBACK_BAD) for d in button_data)
         assert any(d.startswith(FEEDBACK_SOURCES) for d in button_data)

@@ -127,9 +127,7 @@ def _check_confidence(results: list[SearchResult]) -> bool:
     The check requires at least :data:`CONFIDENCE_MIN_CHUNKS` chunks
     with a score strictly above :data:`CONFIDENCE_SCORE_THRESHOLD`.
     """
-    confident_count = sum(
-        1 for r in results if r.score > CONFIDENCE_SCORE_THRESHOLD
-    )
+    confident_count = sum(1 for r in results if r.score > CONFIDENCE_SCORE_THRESHOLD)
     return confident_count >= CONFIDENCE_MIN_CHUNKS
 
 
@@ -329,9 +327,7 @@ class RAGPipeline:
         log.info(
             "rag_confidence_check",
             confidence_met=confidence_met,
-            confident_chunks=sum(
-                1 for r in reranked if r.score > CONFIDENCE_SCORE_THRESHOLD
-            ),
+            confident_chunks=sum(1 for r in reranked if r.score > CONFIDENCE_SCORE_THRESHOLD),
             threshold=CONFIDENCE_SCORE_THRESHOLD,
             min_required=CONFIDENCE_MIN_CHUNKS,
         )
@@ -346,7 +342,7 @@ class RAGPipeline:
                 reranked = reranked + tavily_search
                 # Re-sort combined results by score descending and trim
                 reranked.sort(key=lambda r: r.score, reverse=True)
-                reranked = reranked[:self._rerank_top_k]
+                reranked = reranked[: self._rerank_top_k]
                 log.info(
                     "rag_tavily_fallback_merged",
                     tavily_count=len(tavily_search),

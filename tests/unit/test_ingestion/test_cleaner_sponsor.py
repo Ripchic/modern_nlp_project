@@ -35,6 +35,7 @@ from reviewmind.ingestion.sponsor import (
 # CLEANER TESTS
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class TestCleanerConstants:
     """Test exported constants."""
 
@@ -344,6 +345,7 @@ class TestCleanText:
 # SPONSOR DETECTION TESTS
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class TestSponsorPatterns:
     """Test that pattern lists are populated."""
 
@@ -569,31 +571,38 @@ class TestFindMatches:
 # INTEGRATION / EXPORTS
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class TestIngestionExports:
     """Test that ingestion __init__.py exports expected symbols."""
 
     def test_clean_text_importable(self) -> None:
         from reviewmind.ingestion import clean_text as ct
+
         assert callable(ct)
 
     def test_detect_sponsor_importable(self) -> None:
         from reviewmind.ingestion import detect_sponsor as ds
+
         assert callable(ds)
 
     def test_detect_sponsor_detailed_importable(self) -> None:
         from reviewmind.ingestion import detect_sponsor_detailed as dsd
+
         assert callable(dsd)
 
     def test_min_clean_length_importable(self) -> None:
         from reviewmind.ingestion import MIN_CLEAN_LENGTH as mcl
+
         assert mcl == 50
 
     def test_all_patterns_importable(self) -> None:
         from reviewmind.ingestion import ALL_PATTERNS as ap
+
         assert len(ap) > 0
 
     def test_result_importable(self) -> None:
         from reviewmind.ingestion import SponsorDetectionResult as sdr
+
         assert sdr is not None
 
 

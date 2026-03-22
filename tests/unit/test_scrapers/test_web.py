@@ -183,23 +183,29 @@ class TestWebScraperInit:
 
 
 class TestIsWebUrl:
-    @pytest.mark.parametrize("url", [
-        "https://www.rtings.com/headphones",
-        "http://example.com/page",
-        "https://wirecutter.com/reviews/best-headphones",
-        "https://4pda.to/review/123",
-        "https://example.com",
-        "HTTP://EXAMPLE.COM",
-    ])
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://www.rtings.com/headphones",
+            "http://example.com/page",
+            "https://wirecutter.com/reviews/best-headphones",
+            "https://4pda.to/review/123",
+            "https://example.com",
+            "HTTP://EXAMPLE.COM",
+        ],
+    )
     def test_valid_urls(self, url: str):
         assert WebScraper.is_web_url(url) is True
 
-    @pytest.mark.parametrize("url", [
-        "",
-        "not-a-url",
-        "ftp://files.example.com",
-        "just some text",
-    ])
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "",
+            "not-a-url",
+            "ftp://files.example.com",
+            "just some text",
+        ],
+    )
     def test_invalid_urls(self, url: str):
         assert WebScraper.is_web_url(url) is False
 
@@ -610,8 +616,13 @@ class TestExtract:
     def test_success(self, mock_extract):
         long = _long_text(300)
         mock_extract.return_value = FakeDocument(
-            text=long, title="T", author="A", date="2026-03-01",
-            sitename="S", description="D", language="en",
+            text=long,
+            title="T",
+            author="A",
+            date="2026-03-01",
+            sitename="S",
+            description="D",
+            language="en",
         )
         scraper = WebScraper()
         result = scraper._extract("<html>X</html>", "https://example.com")
@@ -680,22 +691,27 @@ class TestExtract:
 class TestScrapersExports:
     def test_web_scraper_importable(self):
         from reviewmind.scrapers import WebScraper as WS
+
         assert WS is WebScraper
 
     def test_web_page_importable(self):
         from reviewmind.scrapers import WebPage as WP
+
         assert WP is WebPage
 
     def test_default_timeout_importable(self):
         from reviewmind.scrapers import DEFAULT_TIMEOUT as DT
+
         assert DT == DEFAULT_TIMEOUT
 
     def test_min_text_length_importable(self):
         from reviewmind.scrapers import MIN_TEXT_LENGTH as MTL
+
         assert MTL == MIN_TEXT_LENGTH
 
     def test_all_exports(self):
         import reviewmind.scrapers as scrapers
+
         assert "WebScraper" in scrapers.__all__
         assert "WebPage" in scrapers.__all__
         assert "DEFAULT_TIMEOUT" in scrapers.__all__

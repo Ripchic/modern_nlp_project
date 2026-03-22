@@ -1,5 +1,6 @@
 """Debug: admin_user_ids parsing."""
-import os, json
+import json
+import os
 
 os.environ["ADMIN_USER_IDS"] = "857056289"
 
@@ -20,6 +21,6 @@ else:
 # The fix: handle int in the validator
 print()
 print("Now test actual Settings:")
-from reviewmind.config import Settings
+from reviewmind.config import Settings  # noqa: E402
 s = Settings()
 print(f"admin_user_ids = {s.admin_user_ids}")

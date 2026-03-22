@@ -212,11 +212,7 @@ class TavilyScraper:
                 content=content,
                 score=float(item.get("score", 0.0)),
                 raw_content=item.get("raw_content") if include_raw_content else None,
-                extra={
-                    k: v
-                    for k, v in item.items()
-                    if k not in {"url", "title", "content", "score", "raw_content"}
-                },
+                extra={k: v for k, v in item.items() if k not in {"url", "title", "content", "score", "raw_content"}},
             )
             parsed.append(result)
 

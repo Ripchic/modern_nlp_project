@@ -32,6 +32,7 @@ from reviewmind.vectorstore.search import (
 # Helpers
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def _make_scored_point(
     point_id: str | int = "pt-1",
     score: float = 0.9,
@@ -197,42 +198,48 @@ class TestScoredPointToResult:
         assert r.point_id == "p1"
 
     def test_curated_flag(self):
-        pt = _make_scored_point(payload={
-            "text": "curated text",
-            "source_url": "https://curated.com",
-            "source_type": "curated",
-            "is_curated": True,
-            "is_sponsored": False,
-            "product_query": "headphones",
-            "language": "ru",
-            "chunk_index": 2,
-        })
+        pt = _make_scored_point(
+            payload={
+                "text": "curated text",
+                "source_url": "https://curated.com",
+                "source_type": "curated",
+                "is_curated": True,
+                "is_sponsored": False,
+                "product_query": "headphones",
+                "language": "ru",
+                "chunk_index": 2,
+            }
+        )
         r = _scored_point_to_result(pt, "curated_kb")
         assert r.is_curated is True
         assert r.collection == "curated_kb"
 
     def test_sponsored_flag(self):
-        pt = _make_scored_point(payload={
-            "text": "sponsored text",
-            "source_url": "https://sponsor.com",
-            "source_type": "youtube",
-            "is_curated": False,
-            "is_sponsored": True,
-            "product_query": "gadget",
-            "language": "en",
-            "chunk_index": 0,
-        })
+        pt = _make_scored_point(
+            payload={
+                "text": "sponsored text",
+                "source_url": "https://sponsor.com",
+                "source_type": "youtube",
+                "is_curated": False,
+                "is_sponsored": True,
+                "product_query": "gadget",
+                "language": "en",
+                "chunk_index": 0,
+            }
+        )
         r = _scored_point_to_result(pt, "auto_crawled")
         assert r.is_sponsored is True
 
     def test_extra_payload_fields(self):
-        pt = _make_scored_point(payload={
-            "text": "text",
-            "source_url": "url",
-            "author": "Jane",
-            "date": "2026-01-01",
-            "custom_field": 42,
-        })
+        pt = _make_scored_point(
+            payload={
+                "text": "text",
+                "source_url": "url",
+                "author": "Jane",
+                "date": "2026-01-01",
+                "custom_field": 42,
+            }
+        )
         r = _scored_point_to_result(pt, "auto_crawled")
         assert r.extra == {"author": "Jane", "date": "2026-01-01", "custom_field": 42}
 
@@ -341,10 +348,12 @@ class TestSearchCollection:
     @pytest.mark.asyncio
     async def test_basic_search(self):
         client = AsyncMock()
-        client.query_points.return_value = _make_query_response([
-            _make_scored_point("p1", 0.95),
-            _make_scored_point("p2", 0.85),
-        ])
+        client.query_points.return_value = _make_query_response(
+            [
+                _make_scored_point("p1", 0.95),
+                _make_scored_point("p2", 0.85),
+            ]
+        )
 
         results = await search_collection(
             client=client,
@@ -448,9 +457,11 @@ class TestSearchCollection:
     @pytest.mark.asyncio
     async def test_search_sets_collection_on_results(self):
         client = AsyncMock()
-        client.query_points.return_value = _make_query_response([
-            _make_scored_point("p1", 0.9),
-        ])
+        client.query_points.return_value = _make_query_response(
+            [
+                _make_scored_point("p1", 0.9),
+            ]
+        )
 
         results = await search_collection(
             client=client,
@@ -490,10 +501,7 @@ class TestHybridSearch:
 
         await hybrid_search(client=client, query_vector=DUMMY_VECTOR)
         assert client.query_points.call_count == 2
-        collection_names = [
-            call.kwargs["collection_name"]
-            for call in client.query_points.call_args_list
-        ]
+        collection_names = [call.kwargs["collection_name"] for call in client.query_points.call_args_list]
         assert COLLECTION_CURATED_KB in collection_names
         assert COLLECTION_AUTO_CRAWLED in collection_names
 
@@ -513,26 +521,34 @@ class TestHybridSearch:
     @pytest.mark.asyncio
     async def test_merges_results_from_both_collections(self):
         """Results from both collections are merged into one list."""
-        curated_point = _make_scored_point("c1", 0.92, payload={
-            "text": "curated text",
-            "source_url": "https://curated.com",
-            "source_type": "curated",
-            "is_curated": True,
-            "is_sponsored": False,
-            "product_query": "headphones",
-            "language": "ru",
-            "chunk_index": 0,
-        })
-        auto_point = _make_scored_point("a1", 0.88, payload={
-            "text": "auto text",
-            "source_url": "https://auto.com",
-            "source_type": "youtube",
-            "is_curated": False,
-            "is_sponsored": False,
-            "product_query": "headphones",
-            "language": "en",
-            "chunk_index": 0,
-        })
+        curated_point = _make_scored_point(
+            "c1",
+            0.92,
+            payload={
+                "text": "curated text",
+                "source_url": "https://curated.com",
+                "source_type": "curated",
+                "is_curated": True,
+                "is_sponsored": False,
+                "product_query": "headphones",
+                "language": "ru",
+                "chunk_index": 0,
+            },
+        )
+        auto_point = _make_scored_point(
+            "a1",
+            0.88,
+            payload={
+                "text": "auto text",
+                "source_url": "https://auto.com",
+                "source_type": "youtube",
+                "is_curated": False,
+                "is_sponsored": False,
+                "product_query": "headphones",
+                "language": "en",
+                "chunk_index": 0,
+            },
+        )
 
         client = AsyncMock()
         # Return different results for different collections
@@ -604,11 +620,15 @@ class TestHybridSearch:
     @pytest.mark.asyncio
     async def test_one_collection_error_returns_other(self):
         """If one collection search fails, return results from the other."""
-        auto_point = _make_scored_point("a1", 0.88, payload={
-            "text": "auto text",
-            "source_url": "https://auto.com",
-            "chunk_index": 0,
-        })
+        auto_point = _make_scored_point(
+            "a1",
+            0.88,
+            payload={
+                "text": "auto text",
+                "source_url": "https://auto.com",
+                "chunk_index": 0,
+            },
+        )
 
         client = AsyncMock()
 
@@ -706,19 +726,27 @@ class TestHybridSearch:
     async def test_many_results_from_multiple_collections(self):
         """Handling large result sets from multiple collections."""
         curated_points = [
-            _make_scored_point(f"c{i}", 0.9 - i * 0.01, payload={
-                "text": f"curated_{i}",
-                "source_url": f"https://curated.com/{i}",
-                "chunk_index": i,
-            })
+            _make_scored_point(
+                f"c{i}",
+                0.9 - i * 0.01,
+                payload={
+                    "text": f"curated_{i}",
+                    "source_url": f"https://curated.com/{i}",
+                    "chunk_index": i,
+                },
+            )
             for i in range(5)
         ]
         auto_points = [
-            _make_scored_point(f"a{i}", 0.88 - i * 0.01, payload={
-                "text": f"auto_{i}",
-                "source_url": f"https://auto.com/{i}",
-                "chunk_index": i,
-            })
+            _make_scored_point(
+                f"a{i}",
+                0.88 - i * 0.01,
+                payload={
+                    "text": f"auto_{i}",
+                    "source_url": f"https://auto.com/{i}",
+                    "chunk_index": i,
+                },
+            )
             for i in range(5)
         ]
 
@@ -748,22 +776,27 @@ class TestSearchExports:
 
     def test_search_result_exported(self):
         from reviewmind.vectorstore import SearchResult
+
         assert SearchResult is not None
 
     def test_hybrid_search_exported(self):
         from reviewmind.vectorstore import hybrid_search
+
         assert callable(hybrid_search)
 
     def test_search_collection_exported(self):
         from reviewmind.vectorstore import search_collection
+
         assert callable(search_collection)
 
     def test_default_top_k_exported(self):
         from reviewmind.vectorstore import DEFAULT_TOP_K
+
         assert DEFAULT_TOP_K == 5
 
     def test_default_score_threshold_exported(self):
         from reviewmind.vectorstore import DEFAULT_SCORE_THRESHOLD
+
         assert DEFAULT_SCORE_THRESHOLD is None
 
 
@@ -778,22 +811,30 @@ class TestIntegrationScenarios:
     @pytest.mark.asyncio
     async def test_curated_prioritized_over_auto_same_score(self):
         """Same score from both collections: both present in results."""
-        curated_point = _make_scored_point("c1", 0.90, payload={
-            "text": "curated review",
-            "source_url": "https://wirecutter.com/review",
-            "source_type": "curated",
-            "is_curated": True,
-            "is_sponsored": False,
-            "chunk_index": 0,
-        })
-        auto_point = _make_scored_point("a1", 0.90, payload={
-            "text": "auto review",
-            "source_url": "https://youtube.com/watch?v=abc",
-            "source_type": "youtube",
-            "is_curated": False,
-            "is_sponsored": False,
-            "chunk_index": 0,
-        })
+        curated_point = _make_scored_point(
+            "c1",
+            0.90,
+            payload={
+                "text": "curated review",
+                "source_url": "https://wirecutter.com/review",
+                "source_type": "curated",
+                "is_curated": True,
+                "is_sponsored": False,
+                "chunk_index": 0,
+            },
+        )
+        auto_point = _make_scored_point(
+            "a1",
+            0.90,
+            payload={
+                "text": "auto review",
+                "source_url": "https://youtube.com/watch?v=abc",
+                "source_type": "youtube",
+                "is_curated": False,
+                "is_sponsored": False,
+                "chunk_index": 0,
+            },
+        )
 
         client = AsyncMock()
 
@@ -814,15 +855,19 @@ class TestIntegrationScenarios:
     @pytest.mark.asyncio
     async def test_search_with_sponsored_content(self):
         """Verify sponsored flag is preserved through the pipeline."""
-        sponsored_point = _make_scored_point("s1", 0.88, payload={
-            "text": "amazing product sponsored review",
-            "source_url": "https://youtube.com/watch?v=sponsored",
-            "source_type": "youtube",
-            "is_curated": False,
-            "is_sponsored": True,
-            "product_query": "Sony XM5",
-            "chunk_index": 0,
-        })
+        sponsored_point = _make_scored_point(
+            "s1",
+            0.88,
+            payload={
+                "text": "amazing product sponsored review",
+                "source_url": "https://youtube.com/watch?v=sponsored",
+                "source_type": "youtube",
+                "is_curated": False,
+                "is_sponsored": True,
+                "product_query": "Sony XM5",
+                "chunk_index": 0,
+            },
+        )
 
         client = AsyncMock()
         client.query_points.return_value = _make_query_response([sponsored_point])
@@ -838,26 +883,34 @@ class TestIntegrationScenarios:
     @pytest.mark.asyncio
     async def test_full_workflow_product_query_filter(self):
         """Full workflow: hybrid search with product filter, results from both collections."""
-        curated_point = _make_scored_point("c1", 0.92, payload={
-            "text": "Sony XM5 are excellent noise cancelling headphones",
-            "source_url": "https://wirecutter.com/best-headphones",
-            "source_type": "web",
-            "is_curated": True,
-            "is_sponsored": False,
-            "product_query": "Sony WH-1000XM5",
-            "language": "en",
-            "chunk_index": 0,
-        })
-        auto_point = _make_scored_point("a1", 0.85, payload={
-            "text": "Bought XM5 last week, amazing ANC",
-            "source_url": "https://reddit.com/r/headphones/12345",
-            "source_type": "reddit",
-            "is_curated": False,
-            "is_sponsored": False,
-            "product_query": "Sony WH-1000XM5",
-            "language": "en",
-            "chunk_index": 0,
-        })
+        curated_point = _make_scored_point(
+            "c1",
+            0.92,
+            payload={
+                "text": "Sony XM5 are excellent noise cancelling headphones",
+                "source_url": "https://wirecutter.com/best-headphones",
+                "source_type": "web",
+                "is_curated": True,
+                "is_sponsored": False,
+                "product_query": "Sony WH-1000XM5",
+                "language": "en",
+                "chunk_index": 0,
+            },
+        )
+        auto_point = _make_scored_point(
+            "a1",
+            0.85,
+            payload={
+                "text": "Bought XM5 last week, amazing ANC",
+                "source_url": "https://reddit.com/r/headphones/12345",
+                "source_type": "reddit",
+                "is_curated": False,
+                "is_sponsored": False,
+                "product_query": "Sony WH-1000XM5",
+                "language": "en",
+                "chunk_index": 0,
+            },
+        )
 
         client = AsyncMock()
 
@@ -884,11 +937,15 @@ class TestIntegrationScenarios:
     @pytest.mark.asyncio
     async def test_empty_curated_returns_auto_only(self):
         """When curated_kb is empty, results come only from auto_crawled."""
-        auto_point = _make_scored_point("a1", 0.80, payload={
-            "text": "auto review text",
-            "source_url": "https://auto.com/review",
-            "chunk_index": 0,
-        })
+        auto_point = _make_scored_point(
+            "a1",
+            0.80,
+            payload={
+                "text": "auto review text",
+                "source_url": "https://auto.com/review",
+                "chunk_index": 0,
+            },
+        )
 
         client = AsyncMock()
 
@@ -906,12 +963,16 @@ class TestIntegrationScenarios:
     @pytest.mark.asyncio
     async def test_empty_auto_returns_curated_only(self):
         """When auto_crawled is empty, results come only from curated_kb."""
-        curated_point = _make_scored_point("c1", 0.85, payload={
-            "text": "curated review text",
-            "source_url": "https://curated.com/review",
-            "is_curated": True,
-            "chunk_index": 0,
-        })
+        curated_point = _make_scored_point(
+            "c1",
+            0.85,
+            payload={
+                "text": "curated review text",
+                "source_url": "https://curated.com/review",
+                "is_curated": True,
+                "chunk_index": 0,
+            },
+        )
 
         client = AsyncMock()
 

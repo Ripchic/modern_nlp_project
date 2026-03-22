@@ -391,9 +391,7 @@ class TestApiQueryLimitIntegration:
     @patch("reviewmind.api.endpoints.query._check_limit", new_callable=AsyncMock)
     @patch("reviewmind.api.endpoints.query.LLMClient")
     def test_limit_allows_and_increments(self, mock_llm_cls, mock_check, mock_inc):
-        mock_check.return_value = LimitCheckResult(
-            allowed=True, requests_used=1, requests_limit=3, reason="ok"
-        )
+        mock_check.return_value = LimitCheckResult(allowed=True, requests_used=1, requests_limit=3, reason="ok")
         mock_client_instance = MagicMock()
         mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
         mock_client_instance.__aexit__ = AsyncMock(return_value=False)

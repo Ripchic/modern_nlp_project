@@ -133,9 +133,7 @@ class TestSearchPostsSuccess:
 
     def test_limit_respected(self):
         scraper, mock_reddit = _make_scraper_with_mock()
-        submissions = [
-            _make_fake_submission(post_id=f"p{i}", score=100 - i) for i in range(20)
-        ]
+        submissions = [_make_fake_submission(post_id=f"p{i}", score=100 - i) for i in range(20)]
 
         mock_sub = MagicMock()
         mock_sub.search.return_value = iter(submissions)

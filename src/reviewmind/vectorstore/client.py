@@ -291,10 +291,7 @@ async def upsert_chunks(
         If ``vectors`` and ``payloads`` have different lengths or are empty.
     """
     if len(vectors) != len(payloads):
-        msg = (
-            f"vectors and payloads must have the same length, "
-            f"got {len(vectors)} vectors and {len(payloads)} payloads"
-        )
+        msg = f"vectors and payloads must have the same length, got {len(vectors)} vectors and {len(payloads)} payloads"
         raise ValueError(msg)
 
     total = len(vectors)

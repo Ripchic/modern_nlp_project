@@ -190,9 +190,7 @@ class TestBuildComparisonPrompt:
     def test_chat_history_included(self):
         r1 = ProductRAGResult("A")
         history = [{"role": "user", "content": "Какой телефон лучше?"}]
-        prompt = _build_comparison_prompt(
-            product_results=[r1], chat_history=history, language="ru"
-        )
+        prompt = _build_comparison_prompt(product_results=[r1], chat_history=history, language="ru")
         assert "Какой телефон лучше?" in prompt
 
     def test_empty_results(self):
@@ -401,10 +399,7 @@ class TestCompareProducts:
             patch(
                 "reviewmind.services.comparison_service._parallel_rag",
                 new_callable=AsyncMock,
-                return_value=[
-                    ProductRAGResult(name)
-                    for name in ["A", "B", "C", "D"]
-                ],
+                return_value=[ProductRAGResult(name) for name in ["A", "B", "C", "D"]],
             ),
             patch(
                 "reviewmind.core.llm.LLMClient",
@@ -426,12 +421,8 @@ class TestCompareProducts:
     async def test_source_deduplication(self):
         from reviewmind.core.rag import RAGResponse
 
-        rag1 = RAGResponse(
-            answer="a", sources=["https://a.com", "https://b.com"], chunks_count=2
-        )
-        rag2 = RAGResponse(
-            answer="b", sources=["https://b.com", "https://c.com"], chunks_count=2
-        )
+        rag1 = RAGResponse(answer="a", sources=["https://a.com", "https://b.com"], chunks_count=2)
+        rag2 = RAGResponse(answer="b", sources=["https://b.com", "https://c.com"], chunks_count=2)
 
         with (
             patch(
@@ -556,9 +547,7 @@ class TestIntegrationScenarios:
         no_data = ProductRAGResult("Unknown Product X")
         with_data = ProductRAGResult("iPhone 16", rag_response=rag_with_data)
 
-        prompt = _build_comparison_prompt(
-            product_results=[with_data, no_data], language="ru"
-        )
+        prompt = _build_comparison_prompt(product_results=[with_data, no_data], language="ru")
         # Check that the missing-data product is mentioned with "no data" message
         assert "Unknown Product X" in prompt
         assert "отсутствуют" in prompt.lower()

@@ -419,9 +419,7 @@ class TestRAGPipelineQuery:
         ]
 
     @pytest.mark.asyncio
-    async def test_full_pipeline_happy_path(
-        self, mock_qdrant, mock_embedding, mock_llm, search_results_confident
-    ):
+    async def test_full_pipeline_happy_path(self, mock_qdrant, mock_embedding, mock_llm, search_results_confident):
         with patch(
             "reviewmind.core.rag.hybrid_search",
             new_callable=AsyncMock,
@@ -441,9 +439,7 @@ class TestRAGPipelineQuery:
         mock_llm.generate_analysis.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_pipeline_low_confidence(
-        self, mock_qdrant, mock_embedding, mock_llm, search_results_low_confidence
-    ):
+    async def test_pipeline_low_confidence(self, mock_qdrant, mock_embedding, mock_llm, search_results_low_confidence):
         with patch(
             "reviewmind.core.rag.hybrid_search",
             new_callable=AsyncMock,
@@ -457,9 +453,7 @@ class TestRAGPipelineQuery:
         assert resp.error is None
 
     @pytest.mark.asyncio
-    async def test_pipeline_no_results(
-        self, mock_qdrant, mock_embedding, mock_llm
-    ):
+    async def test_pipeline_no_results(self, mock_qdrant, mock_embedding, mock_llm):
         with patch(
             "reviewmind.core.rag.hybrid_search",
             new_callable=AsyncMock,
@@ -477,9 +471,7 @@ class TestRAGPipelineQuery:
         mock_llm.generate_analysis.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_pipeline_passes_product_query(
-        self, mock_qdrant, mock_embedding, mock_llm
-    ):
+    async def test_pipeline_passes_product_query(self, mock_qdrant, mock_embedding, mock_llm):
         mock_search = AsyncMock(return_value=[])
         with patch("reviewmind.core.rag.hybrid_search", mock_search):
             pipeline = RAGPipeline(mock_qdrant, mock_embedding, mock_llm)
@@ -490,9 +482,7 @@ class TestRAGPipelineQuery:
         assert call_kwargs.kwargs.get("product_query") == "Sony WH-1000XM5"
 
     @pytest.mark.asyncio
-    async def test_pipeline_passes_chat_history(
-        self, mock_qdrant, mock_embedding, mock_llm
-    ):
+    async def test_pipeline_passes_chat_history(self, mock_qdrant, mock_embedding, mock_llm):
         history = [
             {"role": "user", "content": "Tell me about XM5"},
             {"role": "assistant", "content": "Great headphones!"},
@@ -509,23 +499,17 @@ class TestRAGPipelineQuery:
         assert call_kwargs.kwargs.get("chat_history") == history
 
     @pytest.mark.asyncio
-    async def test_pipeline_search_top_k(
-        self, mock_qdrant, mock_embedding, mock_llm
-    ):
+    async def test_pipeline_search_top_k(self, mock_qdrant, mock_embedding, mock_llm):
         mock_search = AsyncMock(return_value=[])
         with patch("reviewmind.core.rag.hybrid_search", mock_search):
-            pipeline = RAGPipeline(
-                mock_qdrant, mock_embedding, mock_llm, search_top_k=10
-            )
+            pipeline = RAGPipeline(mock_qdrant, mock_embedding, mock_llm, search_top_k=10)
             await pipeline.query("test")
 
         call_kwargs = mock_search.call_args
         assert call_kwargs.kwargs.get("top_k") == 10
 
     @pytest.mark.asyncio
-    async def test_pipeline_rerank_top_k(
-        self, mock_qdrant, mock_embedding, mock_llm
-    ):
+    async def test_pipeline_rerank_top_k(self, mock_qdrant, mock_embedding, mock_llm):
         """Verify custom rerank_top_k is passed to rerank()."""
         results = _make_results(15, base_score=0.95)
         mock_rerank = MagicMock(side_effect=lambda res, top_k: res[:top_k])
@@ -537,9 +521,7 @@ class TestRAGPipelineQuery:
             ),
             patch("reviewmind.core.rag.rerank", mock_rerank),
         ):
-            pipeline = RAGPipeline(
-                mock_qdrant, mock_embedding, mock_llm, rerank_top_k=4
-            )
+            pipeline = RAGPipeline(mock_qdrant, mock_embedding, mock_llm, rerank_top_k=4)
             resp = await pipeline.query("test")
 
         mock_rerank.assert_called_once()
@@ -548,9 +530,7 @@ class TestRAGPipelineQuery:
         assert resp.chunks_count <= 4
 
     @pytest.mark.asyncio
-    async def test_pipeline_max_context_chunks_limit(
-        self, mock_qdrant, mock_embedding, mock_llm
-    ):
+    async def test_pipeline_max_context_chunks_limit(self, mock_qdrant, mock_embedding, mock_llm):
         """When rerank returns > MAX_CONTEXT_CHUNKS, context is trimmed."""
         results = _make_results(12, base_score=0.95)
         with (
@@ -564,17 +544,13 @@ class TestRAGPipelineQuery:
                 side_effect=lambda res, top_k: res[:top_k],
             ),
         ):
-            pipeline = RAGPipeline(
-                mock_qdrant, mock_embedding, mock_llm, rerank_top_k=12
-            )
+            pipeline = RAGPipeline(mock_qdrant, mock_embedding, mock_llm, rerank_top_k=12)
             resp = await pipeline.query("test")
 
         assert resp.chunks_count <= MAX_CONTEXT_CHUNKS
 
     @pytest.mark.asyncio
-    async def test_used_sponsored_flag(
-        self, mock_qdrant, mock_embedding, mock_llm
-    ):
+    async def test_used_sponsored_flag(self, mock_qdrant, mock_embedding, mock_llm):
         results = [
             _make_result(score=0.9, is_sponsored=True, source_url="https://sp1.com"),
             _make_result(score=0.85, source_url="https://clean.com", chunk_index=1),
@@ -590,9 +566,7 @@ class TestRAGPipelineQuery:
         assert resp.used_sponsored is True
 
     @pytest.mark.asyncio
-    async def test_no_sponsored_flag(
-        self, mock_qdrant, mock_embedding, mock_llm
-    ):
+    async def test_no_sponsored_flag(self, mock_qdrant, mock_embedding, mock_llm):
         results = [_make_result(score=0.9, is_sponsored=False)]
         with patch(
             "reviewmind.core.rag.hybrid_search",
@@ -863,9 +837,7 @@ class TestRAGPipelineIntegration:
         embed.close = AsyncMock()
 
         llm = AsyncMock()
-        llm.generate_analysis = AsyncMock(
-            return_value="Контекста недостаточно для полного анализа."
-        )
+        llm.generate_analysis = AsyncMock(return_value="Контекста недостаточно для полного анализа.")
         llm.close = AsyncMock()
 
         qdrant = AsyncMock()

@@ -562,7 +562,9 @@ class TestRAGTavilyIntegration:
                 return_value=low_confidence_results,
             ),
             patch.object(
-                RAGPipeline, "_tavily_fallback", mock_tavily,
+                RAGPipeline,
+                "_tavily_fallback",
+                mock_tavily,
             ),
         ):
             pipeline = RAGPipeline(mock_qdrant, mock_embedding, mock_llm)
@@ -572,9 +574,7 @@ class TestRAGTavilyIntegration:
         mock_tavily.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_tavily_not_triggered_on_high_confidence(
-        self, mock_qdrant, mock_embedding, mock_llm
-    ):
+    async def test_tavily_not_triggered_on_high_confidence(self, mock_qdrant, mock_embedding, mock_llm):
         from reviewmind.core.rag import RAGPipeline
         from reviewmind.vectorstore.search import SearchResult
 
@@ -592,7 +592,9 @@ class TestRAGTavilyIntegration:
                 return_value=confident_results,
             ),
             patch.object(
-                RAGPipeline, "_tavily_fallback", mock_tavily,
+                RAGPipeline,
+                "_tavily_fallback",
+                mock_tavily,
             ),
         ):
             pipeline = RAGPipeline(mock_qdrant, mock_embedding, mock_llm)
@@ -602,9 +604,7 @@ class TestRAGTavilyIntegration:
         mock_tavily.assert_not_awaited()
 
     @pytest.mark.asyncio
-    async def test_tavily_fallback_returns_empty(
-        self, mock_qdrant, mock_embedding, mock_llm, low_confidence_results
-    ):
+    async def test_tavily_fallback_returns_empty(self, mock_qdrant, mock_embedding, mock_llm, low_confidence_results):
         from reviewmind.core.rag import RAGPipeline
 
         mock_tavily = AsyncMock(return_value=[])
@@ -616,7 +616,9 @@ class TestRAGTavilyIntegration:
                 return_value=low_confidence_results,
             ),
             patch.object(
-                RAGPipeline, "_tavily_fallback", mock_tavily,
+                RAGPipeline,
+                "_tavily_fallback",
+                mock_tavily,
             ),
         ):
             pipeline = RAGPipeline(mock_qdrant, mock_embedding, mock_llm)
@@ -640,7 +642,9 @@ class TestRAGTavilyIntegration:
                 return_value=low_confidence_results,
             ),
             patch.object(
-                RAGPipeline, "_tavily_fallback", mock_tavily,
+                RAGPipeline,
+                "_tavily_fallback",
+                mock_tavily,
             ),
         ):
             pipeline = RAGPipeline(mock_qdrant, mock_embedding, mock_llm)
@@ -652,9 +656,7 @@ class TestRAGTavilyIntegration:
         assert any("tavily" in s for s in resp.sources)
 
     @pytest.mark.asyncio
-    async def test_tavily_fallback_method_no_api_key(
-        self, mock_qdrant, mock_embedding, mock_llm
-    ):
+    async def test_tavily_fallback_method_no_api_key(self, mock_qdrant, mock_embedding, mock_llm):
         """When TAVILY_API_KEY is empty, _tavily_fallback returns []."""
         from reviewmind.core.rag import RAGPipeline
 
@@ -664,9 +666,7 @@ class TestRAGTavilyIntegration:
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_tavily_fallback_method_with_api_key(
-        self, mock_qdrant, mock_embedding, mock_llm, tavily_results
-    ):
+    async def test_tavily_fallback_method_with_api_key(self, mock_qdrant, mock_embedding, mock_llm, tavily_results):
         """When API key is available, _tavily_fallback calls TavilyScraper.search."""
         from reviewmind.core.rag import RAGPipeline
 
@@ -684,9 +684,7 @@ class TestRAGTavilyIntegration:
         mock_scraper_instance.search.assert_awaited_once_with("best headphones")
 
     @pytest.mark.asyncio
-    async def test_tavily_fallback_method_error_graceful(
-        self, mock_qdrant, mock_embedding, mock_llm
-    ):
+    async def test_tavily_fallback_method_error_graceful(self, mock_qdrant, mock_embedding, mock_llm):
         """If TavilyScraper.search raises, _tavily_fallback returns []."""
         from reviewmind.core.rag import RAGPipeline
 
@@ -751,10 +749,7 @@ class TestTavilyResultsToSearchResults:
     def test_multiple_results(self):
         from reviewmind.core.rag import _tavily_results_to_search_results
 
-        tavily = [
-            TavilyResult(url=f"https://t.com/{i}", content=f"Content {i}", score=0.9 - i * 0.1)
-            for i in range(3)
-        ]
+        tavily = [TavilyResult(url=f"https://t.com/{i}", content=f"Content {i}", score=0.9 - i * 0.1) for i in range(3)]
         search_results = _tavily_results_to_search_results(tavily)
         assert len(search_results) == 3
         assert all(sr.source_type == "tavily" for sr in search_results)

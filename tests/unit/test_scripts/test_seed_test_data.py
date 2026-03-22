@@ -277,7 +277,8 @@ class TestSeedData:
             patch("qdrant_client.AsyncQdrantClient", return_value=mock_client),
             patch("reviewmind.core.embeddings.EmbeddingService", return_value=mock_embed),
             patch(
-                "reviewmind.vectorstore.client.upsert_chunks", new_callable=AsyncMock,
+                "reviewmind.vectorstore.client.upsert_chunks",
+                new_callable=AsyncMock,
                 return_value=MagicMock(inserted=1, skipped=0),
             ),
             patch("reviewmind.vectorstore.collections.ensure_all_collections", new_callable=AsyncMock),
