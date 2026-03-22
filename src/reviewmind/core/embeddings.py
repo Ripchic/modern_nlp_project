@@ -207,6 +207,9 @@ class EmbeddingService:
 
     async def _embed_with_retry(self, texts: list[str]) -> list[list[float]]:
         """Execute the embedding API call with exponential-backoff retry."""
+        import time as _time
+
+        _embed_start = _time.perf_counter()
         last_error: Exception | None = None
 
         for attempt in range(1, self._max_retries + 1):
@@ -238,6 +241,12 @@ class EmbeddingService:
                         "total_tokens": getattr(response.usage, "total_tokens", None),
                     },
                 )
+                try:
+                    from reviewmind.metrics import EMBEDDING_DURATION_SECONDS
+
+                    EMBEDDING_DURATION_SECONDS.observe(_time.perf_counter() - _embed_start)
+                except Exception:
+                    pass
                 return vectors
 
             except _RETRYABLE_ERRORS as exc:

@@ -254,6 +254,9 @@ class RAGPipeline:
         )
 
         # ── Step 1: Embed query ──────────────────────────────
+        import time as _time
+
+        _rag_start = _time.perf_counter()
         log.info("rag_pipeline_start", user_query=user_query[:120])
 
         # Detect query language for response localisation
@@ -396,6 +399,14 @@ class RAGPipeline:
             sources_count=len(sources),
             confidence_met=confidence_met,
         )
+
+        # Record RAG pipeline duration metric
+        try:
+            from reviewmind.metrics import RAG_QUERY_DURATION_SECONDS
+
+            RAG_QUERY_DURATION_SECONDS.observe(_time.perf_counter() - _rag_start)
+        except Exception:
+            pass
 
         return RAGResponse(
             answer=answer,

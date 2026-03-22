@@ -1,9 +1,31 @@
-# Production override — exposes public ports, no local-dev port overrides.
-# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# Production / remote VM override — exposes all service ports to 0.0.0.0 (LAN-accessible).
+# Infrastructure ports (postgres, redis) are intentionally NOT exposed.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Exposed ports on the VM:
+#   8000  — FastAPI (REST API + /docs + /metrics/)
+#   3000  — Grafana dashboards
+#   9090  — Prometheus query UI
+#   6333  — Qdrant vector store dashboard
+#   5555  — Flower (Celery task monitor)
 services:
   api:
     ports:
       - "8000:8000"
+
+  grafana:
+    ports:
+      - "3000:3000"
+
+  prometheus:
+    ports:
+      - "9090:9090"
+
+  qdrant:
+    ports:
+      - "6333:6333"
 
   flower:
     ports:

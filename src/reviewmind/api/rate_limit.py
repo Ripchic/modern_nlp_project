@@ -96,6 +96,12 @@ limiter = Limiter(
 
 def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> Response:
     """Return a JSON 429 response with Retry-After header."""
+    try:
+        from reviewmind.metrics import RATE_LIMIT_HITS_TOTAL
+
+        RATE_LIMIT_HITS_TOTAL.inc()
+    except Exception:
+        pass
     retry_after = getattr(exc, "retry_after", 60)
     logger.warning(
         "rate_limit_exceeded",

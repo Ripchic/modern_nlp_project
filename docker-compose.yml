@@ -72,7 +72,7 @@ services:
         condition: service_healthy
     command: ["uvicorn", "reviewmind.main:app", "--host", "0.0.0.0", "--port", "8000"]
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/health || exit 1"]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; r=urllib.request.urlopen('http://localhost:8000/health'); exit(0 if r.status==200 else 1)\""]
       interval: 15s
       timeout: 10s
       retries: 5
@@ -157,6 +157,51 @@ services:
       - worker
     command: ["celery", "-A", "reviewmind.workers.celery_app", "flower", "--port=5555"]
 
+  # ── Monitoring ───────────────────────────────────────────────────────────
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - reviewmind-network
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:9090/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      POSTGRES_USER: ${POSTGRES_USER:-reviewmind}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-reviewmind}
+      POSTGRES_DB: ${POSTGRES_DB:-reviewmind}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - reviewmind-network
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
 # ── Volumes ──────────────────────────────────────────────────────────────────
 
 volumes:
@@ -165,6 +210,10 @@ volumes:
   redis_data:
     driver: local
   qdrant_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
     driver: local
 
 # ── Networks ─────────────────────────────────────────────────────────────────

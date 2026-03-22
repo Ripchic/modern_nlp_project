@@ -226,6 +226,9 @@ def ingest_sources_task(
     urls: list[str],
     session_id: str | None = None,
 ) -> dict:
+    import time as _time
+
+    _task_start = _time.perf_counter()
     """Celery task: run the ingestion pipeline for a set of URLs.
 
     Creates/updates a ``Job`` record in PostgreSQL through the lifecycle:
@@ -254,7 +257,7 @@ def ingest_sources_task(
         Summary with ``job_id``, ``status``, ``completed_at``, counts.
     """
     try:
-        return _run_async(
+        result = _run_async(
             _ingest_sources(
                 job_id=job_id,
                 user_id=user_id,
@@ -263,6 +266,16 @@ def ingest_sources_task(
                 session_id=session_id,
             )
         )
+        try:
+            from reviewmind.metrics import CELERY_TASK_DURATION_SECONDS, CELERY_TASKS_TOTAL
+
+            CELERY_TASK_DURATION_SECONDS.labels(task_name="ingest_sources", status="success").observe(
+                _time.perf_counter() - _task_start
+            )
+            CELERY_TASKS_TOTAL.labels(task_name="ingest_sources", status="success").inc()
+        except Exception:
+            pass
+        return result
     except Exception as exc:
         retry_num = self.request.retries
         countdown = RETRY_COUNTDOWNS[retry_num] if retry_num < len(RETRY_COUNTDOWNS) else RETRY_COUNTDOWNS[-1]
@@ -279,9 +292,27 @@ def ingest_sources_task(
                 countdown=countdown,
                 error=str(exc),
             )
+            try:
+                from reviewmind.metrics import CELERY_TASK_DURATION_SECONDS, CELERY_TASKS_TOTAL
+
+                CELERY_TASK_DURATION_SECONDS.labels(task_name="ingest_sources", status="retry").observe(
+                    _time.perf_counter() - _task_start
+                )
+                CELERY_TASKS_TOTAL.labels(task_name="ingest_sources", status="retry").inc()
+            except Exception:
+                pass
             raise self.retry(exc=exc, countdown=countdown)
 
         # Final failure — all retries exhausted
+        try:
+            from reviewmind.metrics import CELERY_TASK_DURATION_SECONDS, CELERY_TASKS_TOTAL
+
+            CELERY_TASK_DURATION_SECONDS.labels(task_name="ingest_sources", status="failure").observe(
+                _time.perf_counter() - _task_start
+            )
+            CELERY_TASKS_TOTAL.labels(task_name="ingest_sources", status="failure").inc()
+        except Exception:
+            pass
         log.error("ingest_task_final_failure", error=str(exc))
         _run_async(
             _handle_final_failure(

@@ -1,0 +1,159 @@
+{
+  "project": "ReviewMind — Monitoring & Observability Stack",
+  "version": "2.0",
+  "created_at": "2026-03-21",
+
+  "agent_instructions": {
+    "before_start": [
+      "Прочитай этот файл и git log --oneline -20",
+      "Выбери ОДНУ задачу со статусом pending и наивысшим приоритетом",
+      "Проверь, что все dependencies этой задачи имеют статус done"
+    ],
+    "during_work": [
+      "Работай только над выбранной задачей",
+      "Делай коммиты после каждого логического изменения",
+      "Не трогай код, не связанный с текущей задачей"
+    ],
+    "before_finish": [
+      "Выполни ВСЕ test_steps из задачи",
+      "Меняй status на done ТОЛЬКО после успешного прохождения всех тестов",
+      "Напиши summary в progress_2.md",
+      "ЗАПРЕЩЕНО удалять или редактировать задачи — только менять status"
+    ]
+  },
+
+  "tasks": [
+    {
+      "id": "TASK-051",
+      "category": "infrastructure",
+      "priority": "critical",
+      "stage": "Stage 10: Monitoring Foundation",
+      "description": "Prometheus metrics instrumentation: определение метрик, ASGI middleware, /metrics endpoint, инструментация FastAPI/Celery/RAG",
+      "details": "Создать src/reviewmind/metrics.py с определениями всех Prometheus-метрик: (1) HTTP_REQUEST_DURATION_SECONDS — Histogram по endpoint, method, status_code (buckets: 0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10), (2) HTTP_REQUESTS_TOTAL — Counter по endpoint, method, status_code, (3) HTTP_REQUESTS_IN_PROGRESS — Gauge по endpoint, (4) CELERY_TASK_DURATION_SECONDS — Histogram по task_name, status, (5) CELERY_TASKS_TOTAL — Counter по task_name, status, (6) RAG_QUERY_DURATION_SECONDS — Histogram, (7) EMBEDDING_DURATION_SECONDS — Histogram, (8) SCRAPER_DURATION_SECONDS — Histogram по scraper_type, (9) RATE_LIMIT_HITS_TOTAL — Counter, (10) INGESTION_CHUNKS_TOTAL — Counter по status (inserted/skipped). Добавить PrometheusMiddleware (ASGI) в main.py для автоматического сбора HTTP-метрик. Добавить GET /metrics endpoint через make_asgi_app(). Инструментировать core/rag.py (observe RAG_QUERY_DURATION), core/embeddings.py (observe EMBEDDING_DURATION), workers/tasks.py (observe CELERY_TASK_DURATION, inc CELERY_TASKS_TOTAL), api/rate_limit.py (inc RATE_LIMIT_HITS). Добавить prometheus-client в явные зависимости pyproject.toml.",
+      "acceptance_criteria": [
+        "src/reviewmind/metrics.py содержит все 10 метрик с корректными labels",
+        "GET /metrics возвращает Prometheus text format (Content-Type: text/plain; version=0.0.4)",
+        "HTTP-запросы автоматически трекаются (latency, counter, in_progress)",
+        "Celery задачи трекаются (duration, counter по status)",
+        "RAG pipeline latency записывается в Histogram",
+        "prometheus-client в pyproject.toml dependencies",
+        "Существующие тесты не сломаны"
+      ],
+      "test_steps": [
+        "Шаг 1: ruff check src/ — 0 ошибок",
+        "Шаг 2: pytest — все существующие тесты проходят",
+        "Шаг 3: curl http://localhost:8000/metrics — ответ 200 с Prometheus text format",
+        "Шаг 4: Отправить POST /query → повторный GET /metrics содержит http_request_duration_seconds{endpoint='/query'}",
+        "Шаг 5: python -c 'from reviewmind.metrics import HTTP_REQUEST_DURATION_SECONDS, CELERY_TASK_DURATION_SECONDS, RAG_QUERY_DURATION_SECONDS' — импорт без ошибок"
+      ],
+      "dependencies": [],
+      "status": "done"
+    },
+    {
+      "id": "TASK-052",
+      "category": "infrastructure",
+      "priority": "critical",
+      "stage": "Stage 10: Monitoring Foundation",
+      "description": "Docker Compose: Prometheus + Grafana сервисы, scrape config, provisioning datasources и dashboard provider",
+      "details": "Добавить два сервиса в docker-compose.yml: (1) prometheus (prom/prometheus:v2.51.0, port 9090 internal, volume prometheus_data:/prometheus, healthcheck wget --spider http://localhost:9090/-/healthy, config из monitoring/prometheus/prometheus.yml), (2) grafana (grafana/grafana:11.0.0, port 3000 internal, GF_SECURITY_ADMIN_PASSWORD из .env, volumes grafana_data:/var/lib/grafana + provisioning mount, healthcheck wget http://localhost:3000/api/health, depends_on prometheus). Создать monitoring/prometheus/prometheus.yml: global scrape_interval=15s, scrape_configs: job 'fastapi' static_configs targets=['api:8000'], job 'qdrant' targets=['qdrant:6333']. Создать monitoring/grafana/provisioning/datasources/datasources.yml: (1) Prometheus datasource (url: http://prometheus:9090, default=true), (2) PostgreSQL datasource (host: postgres:5432, user/password/database из env vars, sslmode=disable, read-only). Создать monitoring/grafana/provisioning/dashboards/dashboards.yml: provider type=file, path=/var/lib/grafana/dashboards, updateIntervalSeconds=30, allowUiUpdates=true. Обновить docker-compose.prod.yml: expose grafana port 3000. Обновить docker-compose.override.yml: expose prometheus port 9090 для dev. Обновить .env.example: GF_SECURITY_ADMIN_PASSWORD, GRAFANA_POSTGRES_USER, GRAFANA_POSTGRES_PASSWORD. Добавить grafana и prometheus в reviewmind-network.",
+      "acceptance_criteria": [
+        "docker compose config — валидация без ошибок",
+        "docker compose up -d prometheus — сервис стартует и healthy",
+        "docker compose up -d grafana — сервис стартует и healthy",
+        "curl http://localhost:9090/api/v1/targets — targets visible",
+        "Grafana доступна на localhost:3000 с admin паролем из .env",
+        "Grafana содержит 2 datasource: Prometheus (default) + PostgreSQL",
+        "Dashboard provider настроен на auto-load из /var/lib/grafana/dashboards",
+        "Volumes: prometheus_data, grafana_data persistent"
+      ],
+      "test_steps": [
+        "Шаг 1: docker compose config — валидация без ошибок",
+        "Шаг 2: docker compose up -d prometheus grafana — оба сервиса стартуют",
+        "Шаг 3: docker compose ps — prometheus и grafana healthy",
+        "Шаг 4: curl http://localhost:9090/api/v1/targets — статус targets",
+        "Шаг 5: curl http://localhost:3000/api/health — Grafana healthy",
+        "Шаг 6: Открыть Grafana → Configuration → Data Sources → 2 datasource видны"
+      ],
+      "dependencies": ["TASK-051"],
+      "status": "done"
+    },
+    {
+      "id": "TASK-053",
+      "category": "functional",
+      "priority": "high",
+      "stage": "Stage 11: Grafana Dashboards",
+      "description": "Grafana дашборд System Health: request rate, latency, error rate, service health, Celery throughput",
+      "details": "Создать monitoring/grafana/dashboards/system-health.json — Grafana dashboard JSON. Панели (Prometheus datasource): Row 1 'HTTP Metrics': (1) Request Rate — timeseries rate(http_requests_total[5m]) by endpoint, (2) Latency p50/p95/p99 — timeseries histogram_quantile(0.5/0.95/0.99, rate(http_request_duration_seconds_bucket[5m])), (3) Error Rate — timeseries rate(http_requests_total{status_code=~'5..'}[5m]) / rate(http_requests_total[5m]), (4) Active Requests — gauge http_requests_in_progress. Row 2 'Service Health': (5) PostgreSQL Health — stat panel (из /health endpoint или up metric), (6) Redis Health — stat, (7) Qdrant Health — stat. Row 3 'Celery': (8) Task Throughput — timeseries rate(celery_tasks_total[5m]) by task_name, (9) Task Duration — timeseries histogram_quantile(0.95, rate(celery_task_duration_seconds_bucket[5m])), (10) Task Failures — timeseries rate(celery_tasks_total{status='failure'}[5m]). Row 4 'Application': (11) RAG Query Latency — timeseries histogram_quantile(0.95, rate(rag_query_duration_seconds_bucket[5m])), (12) Embedding Latency — timeseries, (13) Rate Limit Hits — timeseries rate(rate_limit_hits_total[5m]). Настроить time range variable, auto-refresh 30s, tags=['reviewmind', 'system'].",
+      "acceptance_criteria": [
+        "Dashboard JSON валиден и загружается в Grafana без ошибок",
+        "13 панелей отображают данные при наличии трафика",
+        "Latency показывает p50/p95/p99 перцентили",
+        "Service health показывает up/down статус",
+        "Celery метрики корректно агрегируются по task_name",
+        "Auto-refresh 30 секунд",
+        "Dashboard доступен в Grafana UI после docker compose up"
+      ],
+      "test_steps": [
+        "Шаг 1: docker compose up -d — все сервисы запущены",
+        "Шаг 2: Открыть Grafana → Dashboards → System Health — дашборд загружен",
+        "Шаг 3: Отправить несколько POST /query → панели request rate и latency показывают данные",
+        "Шаг 4: Проверить Service Health панели — postgres/redis/qdrant статусы",
+        "Шаг 5: Проверить Celery панели после запуска background task"
+      ],
+      "dependencies": ["TASK-052"],
+      "status": "done"
+    },
+    {
+      "id": "TASK-054",
+      "category": "functional",
+      "priority": "high",
+      "stage": "Stage 11: Grafana Dashboards",
+      "description": "Grafana дашборд User Activity: DAU/WAU/MAU, queries/day, mode distribution, feedback, subscriptions, top products",
+      "details": "Создать monitoring/grafana/dashboards/user-activity.json — Grafana dashboard JSON. Панели (PostgreSQL datasource, SQL queries): Row 1 'User Metrics': (1) DAU — timeseries SQL: SELECT DATE(created_at) AS time, COUNT(DISTINCT user_id) AS dau FROM query_logs WHERE $__timeFilter(created_at) GROUP BY 1 ORDER BY 1, (2) WAU — timeseries с DATE_TRUNC('week', ...), (3) MAU — timeseries с DATE_TRUNC('month', ...), (4) Total Users — stat panel SELECT COUNT(*) FROM users. Row 2 'Query Metrics': (5) Queries Per Day — timeseries SELECT DATE(created_at) AS time, COUNT(*) FROM query_logs GROUP BY 1, (6) Mode Distribution — pie chart SELECT mode, COUNT(*) FROM query_logs GROUP BY mode, (7) Avg Response Time — timeseries SELECT DATE(created_at) AS time, AVG(response_time_ms) FROM query_logs GROUP BY 1. Row 3 'Engagement': (8) Feedback Score Trend — timeseries SELECT DATE(created_at) AS time, AVG(rating) FILTER (WHERE rating IS NOT NULL) FROM query_logs GROUP BY 1, (9) Feedback Distribution — pie chart rating=1 vs rating=-1 counts, (10) Tavily Fallback Rate — timeseries SELECT DATE(created_at), AVG(CASE WHEN used_tavily THEN 1 ELSE 0 END) FROM query_logs GROUP BY 1. Row 4 'Monetization': (11) Subscription Conversions — timeseries SELECT DATE(activated_at) AS time, COUNT(*) FROM subscriptions GROUP BY 1, (12) Free Tier Exhaustion — timeseries SELECT date AS time, COUNT(*) FILTER (WHERE requests_used >= 3) FROM user_limits GROUP BY 1, (13) Top Products — table SELECT query_text, COUNT(*) as cnt FROM query_logs GROUP BY 1 ORDER BY 2 DESC LIMIT 20. Настроить time range variable, auto-refresh 5m.",
+      "acceptance_criteria": [
+        "Dashboard JSON валиден и загружается в Grafana",
+        "DAU/WAU/MAU панели показывают тренды уникальных пользователей",
+        "Mode distribution показывает auto vs links соотношение",
+        "Feedback trend показывает динамику рейтингов",
+        "Top Products таблица отображает 20 самых популярных запросов",
+        "Subscription conversions отображают тренд активаций",
+        "Все SQL-запросы используют $__timeFilter для корректной фильтрации по времени"
+      ],
+      "test_steps": [
+        "Шаг 1: docker compose up -d — все сервисы запущены",
+        "Шаг 2: Открыть Grafana → Dashboards → User Activity — дашборд загружен",
+        "Шаг 3: При наличии данных в query_logs — DAU и Queries/Day показывают значения",
+        "Шаг 4: Проверить Mode Distribution pie chart — секции auto/links",
+        "Шаг 5: Проверить Top Products table — список запросов с count"
+      ],
+      "dependencies": ["TASK-052"],
+      "status": "done"
+    },
+    {
+      "id": "TASK-055",
+      "category": "functional",
+      "priority": "medium",
+      "stage": "Stage 11: Grafana Dashboards",
+      "description": "Grafana дашборд Database & Data Stores: row counts, sources distribution, Qdrant stats, ingestion rates, job stats",
+      "details": "Создать monitoring/grafana/dashboards/database-stats.json — Grafana dashboard JSON. Панели (PostgreSQL + Prometheus datasources): Row 1 'PostgreSQL Tables': (1) Table Row Counts — bar gauge SELECT relname AS table, n_live_tup AS rows FROM pg_stat_user_tables ORDER BY n_live_tup DESC, (2) Total Sources — stat SELECT COUNT(*) FROM sources, (3) Total Query Logs — stat SELECT COUNT(*) FROM query_logs, (4) Total Users — stat SELECT COUNT(*) FROM users. Row 2 'Sources': (5) Sources By Type — pie chart SELECT source_type, COUNT(*) FROM sources GROUP BY 1, (6) Sources Over Time — timeseries SELECT DATE(created_at) AS time, COUNT(*) FROM sources WHERE $__timeFilter(created_at) GROUP BY 1, (7) Curated vs Crawled — pie chart SELECT CASE WHEN is_curated THEN 'curated' ELSE 'crawled' END, COUNT(*) FROM sources GROUP BY 1, (8) Sponsored Content Rate — stat SELECT ROUND(100.0 * COUNT(*) FILTER (WHERE is_sponsored) / NULLIF(COUNT(*), 0), 1) FROM sources. Row 3 'Qdrant' (Prometheus datasource): (9) Collection Points Count — stat (Qdrant REST API metrics), (10) Ingestion Rate — timeseries rate(ingestion_chunks_total[5m]) by status. Row 4 'Jobs & Performance': (11) Job Completion Stats — pie chart SELECT status, COUNT(*) FROM jobs GROUP BY 1, (12) Avg Response Time Trend — timeseries SELECT DATE(created_at) AS time, AVG(response_time_ms), percentile_cont(0.95) WITHIN GROUP (ORDER BY response_time_ms) FROM query_logs WHERE $__timeFilter(created_at) GROUP BY 1, (13) Failed Jobs Over Time — timeseries SELECT DATE(completed_at) AS time, COUNT(*) FROM jobs WHERE status='failed' AND $__timeFilter(completed_at) GROUP BY 1. Настроить auto-refresh 5m.",
+      "acceptance_criteria": [
+        "Dashboard JSON валиден и загружается в Grafana",
+        "Table Row Counts показывает актуальное количество строк по таблицам",
+        "Sources By Type показывает distribution (youtube/reddit/web/curated/tavily)",
+        "Sources Over Time показывает тренд загрузки данных",
+        "Job Completion Stats показывает done/failed/pending",
+        "Avg Response Time Trend показывает p50 и p95",
+        "Все time-based SQL используют $__timeFilter"
+      ],
+      "test_steps": [
+        "Шаг 1: docker compose up -d — все сервисы запущены",
+        "Шаг 2: Открыть Grafana → Dashboards → Database Stats — дашборд загружен",
+        "Шаг 3: Table Row Counts показывает значения для всех 6 таблиц",
+        "Шаг 4: При наличии sources — Sources By Type pie chart заполнен",
+        "Шаг 5: Job Completion Stats показывает состояние задач"
+      ],
+      "dependencies": ["TASK-052"],
+      "status": "done"
+    }
+  ]
+}

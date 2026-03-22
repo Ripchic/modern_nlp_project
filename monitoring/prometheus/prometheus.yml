@@ -1,0 +1,17 @@
+# Prometheus configuration for ReviewMind monitoring stack.
+# Scrapes FastAPI /metrics and Qdrant built-in /metrics.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "fastapi"
+    metrics_path: /metrics/
+    static_configs:
+      - targets: ["api:8000"]
+
+  - job_name: "qdrant"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["qdrant:6333"]

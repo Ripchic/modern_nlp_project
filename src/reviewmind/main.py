@@ -107,6 +107,11 @@ def create_app() -> FastAPI:
     )
     application.include_router(api_router)
 
+    # ── Prometheus metrics ─────────────────────────────────────
+    from reviewmind.metrics import setup_metrics
+
+    setup_metrics(application)
+
     # ── Rate limiting (slowapi) ───────────────────────────────
     from reviewmind.api.rate_limit import setup_rate_limiting
 

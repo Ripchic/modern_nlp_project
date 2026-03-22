@@ -1,0 +1,15 @@
+# Grafana dashboard provider — auto-loads JSON dashboards from disk.
+
+apiVersion: 1
+
+providers:
+  - name: ReviewMind
+    orgId: 1
+    folder: ReviewMind
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

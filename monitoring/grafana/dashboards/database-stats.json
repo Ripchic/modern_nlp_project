@@ -1,0 +1,221 @@
+{
+  "uid": "reviewmind-database-stats",
+  "title": "ReviewMind — Database & Data Stores",
+  "tags": ["reviewmind", "database"],
+  "timezone": "browser",
+  "refresh": "5m",
+  "time": { "from": "now-7d", "to": "now" },
+  "editable": true,
+  "panels": [
+    {
+      "type": "row",
+      "title": "PostgreSQL Tables",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 1,
+      "type": "bargauge",
+      "title": "Table Row Counts",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "postgresql" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": []
+      },
+      "options": { "orientation": "horizontal", "displayMode": "gradient" },
+      "targets": [
+        {
+          "rawSql": "SELECT relname AS \"table\", n_live_tup AS rows FROM pg_stat_user_tables ORDER BY n_live_tup DESC",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Total Sources",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "postgresql" },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+      "targets": [
+        {
+          "rawSql": "SELECT COUNT(*) AS total FROM sources",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Total Query Logs",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "postgresql" },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+      "targets": [
+        {
+          "rawSql": "SELECT COUNT(*) AS total FROM query_logs",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Total Users",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "postgresql" },
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+      "targets": [
+        {
+          "rawSql": "SELECT COUNT(*) AS total FROM users",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Sources",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 5,
+      "type": "piechart",
+      "title": "Sources By Type",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "postgresql" },
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 10 },
+      "targets": [
+        {
+          "rawSql": "SELECT source_type, COUNT(*) AS cnt FROM sources GROUP BY 1 ORDER BY 2 DESC",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Sources Ingested Over Time",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "postgresql" },
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "rawSql": "SELECT DATE(parsed_at) AS time, COUNT(*) AS sources FROM sources WHERE parsed_at IS NOT NULL AND $__timeFilter(parsed_at) GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "piechart",
+      "title": "Curated vs Crawled",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "postgresql" },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 10 },
+      "targets": [
+        {
+          "rawSql": "SELECT CASE WHEN is_curated THEN 'curated' ELSE 'crawled' END AS origin, COUNT(*) AS cnt FROM sources GROUP BY 1",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "stat",
+      "title": "Sponsored Content Rate",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "postgresql" },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "percent" }, "overrides": [] },
+      "targets": [
+        {
+          "rawSql": "SELECT ROUND(100.0 * COUNT(*) FILTER (WHERE is_sponsored) / NULLIF(COUNT(*), 0), 1) AS sponsored_pct FROM sources",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Qdrant & Ingestion",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "Qdrant Collections Points",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 19 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sum(app_info_collections_total_points) or vector(0)",
+          "legendFormat": "total points"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Ingestion Rate (chunks/s)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 19 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sum(rate(ingestion_chunks_total[5m])) by (status)",
+          "legendFormat": "{{ status }}"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Jobs & Performance",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 11,
+      "type": "piechart",
+      "title": "Job Completion Stats",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "postgresql" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 28 },
+      "targets": [
+        {
+          "rawSql": "SELECT status, COUNT(*) AS cnt FROM jobs GROUP BY 1 ORDER BY 2 DESC",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Avg Response Time Trend (p50 / p95)",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "postgresql" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 28 },
+      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
+      "targets": [
+        {
+          "rawSql": "SELECT DATE(created_at) AS time, AVG(response_time_ms) AS p50, percentile_cont(0.95) WITHIN GROUP (ORDER BY response_time_ms) AS p95 FROM query_logs WHERE response_time_ms IS NOT NULL AND $__timeFilter(created_at) GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Failed Jobs Over Time",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "postgresql" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 28 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "rawSql": "SELECT DATE(completed_at) AS time, COUNT(*) AS failures FROM jobs WHERE status = 'failed' AND completed_at IS NOT NULL AND $__timeFilter(completed_at) GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}
