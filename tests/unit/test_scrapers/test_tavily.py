@@ -520,6 +520,23 @@ class TestRAGTavilyIntegration:
     def low_confidence_results(self):
         from reviewmind.vectorstore.search import SearchResult
 
+        # Use curated chunks so auto_crawled_count == 0 → Tavily fallback fires
+        return [
+            SearchResult(
+                text=f"weak chunk {i}",
+                score=0.5 - i * 0.1,
+                source_url=f"https://weak{i}.com",
+                source_type="curated",
+                is_curated=True,
+            )
+            for i in range(2)
+        ]
+
+    @pytest.fixture
+    def low_confidence_auto_crawled_results(self):
+        from reviewmind.vectorstore.search import SearchResult
+
+        # Auto-crawled chunks → Tavily should be skipped (data already exists)
         return [
             SearchResult(
                 text=f"weak chunk {i}",
@@ -626,6 +643,34 @@ class TestRAGTavilyIntegration:
 
         assert resp.used_tavily is False  # empty results → not used
         assert resp.answer != ""  # LLM still called
+
+    @pytest.mark.asyncio
+    async def test_tavily_skipped_when_auto_crawled_has_data(
+        self, mock_qdrant, mock_embedding, mock_llm, low_confidence_auto_crawled_results
+    ):
+        """Tavily should NOT fire when auto_crawled already has data (even low confidence)."""
+        from reviewmind.core.rag import RAGPipeline
+
+        mock_tavily = AsyncMock(return_value=[])
+
+        with (
+            patch(
+                "reviewmind.core.rag.hybrid_search",
+                new_callable=AsyncMock,
+                return_value=low_confidence_auto_crawled_results,
+            ),
+            patch.object(
+                RAGPipeline,
+                "_tavily_fallback",
+                mock_tavily,
+            ),
+        ):
+            pipeline = RAGPipeline(mock_qdrant, mock_embedding, mock_llm)
+            resp = await pipeline.query("already crawled product")
+
+        assert resp.used_tavily is False
+        mock_tavily.assert_not_awaited()
+        assert resp.answer != ""
 
     @pytest.mark.asyncio
     async def test_tavily_results_merged_into_context(

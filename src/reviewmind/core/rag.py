@@ -305,10 +305,14 @@ class RAGPipeline:
                     total=len(search_results),
                 )
 
+        auto_crawled_count = sum(
+            1 for r in search_results if not r.is_curated
+        )
         log.info(
             "rag_search_done",
             results_count=len(search_results),
             curated_count=sum(1 for r in search_results if r.is_curated),
+            auto_crawled_count=auto_crawled_count,
         )
 
         # ── Step 3: Rerank ───────────────────────────────────
@@ -331,9 +335,20 @@ class RAGPipeline:
             min_required=CONFIDENCE_MIN_CHUNKS,
         )
 
-        # ── Step 4b: Tavily fallback (skip when source URLs provided) ───
+        # ── Step 4b: Tavily fallback ─────────────────────────
+        # Skip Tavily when:
+        #  - source URLs were explicitly provided (links mode), OR
+        #  - auto_crawled already has data for this query (re-searching
+        #    would return the same sites already ingested).
         used_tavily = False
-        if (not confidence_met or embedding_or_search_failed) and not source_urls:
+        skip_tavily = bool(source_urls) or auto_crawled_count > 0
+        if skip_tavily and not confidence_met:
+            log.info(
+                "rag_tavily_skipped",
+                reason="auto_crawled_has_data" if auto_crawled_count > 0 else "source_urls_provided",
+                auto_crawled_count=auto_crawled_count,
+            )
+        if (not confidence_met or embedding_or_search_failed) and not skip_tavily:
             tavily_results = await self._tavily_fallback(user_query, log)
             if tavily_results:
                 used_tavily = True

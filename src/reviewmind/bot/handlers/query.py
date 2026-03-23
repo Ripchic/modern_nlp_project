@@ -49,6 +49,41 @@ MAX_SEARCH_URLS = 10  # cap on URLs collected from YouTube + Reddit search
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 
+async def _filter_already_ingested(urls: list[str]) -> list[str]:
+    """Return only *urls* that are NOT already in Qdrant ``auto_crawled``.
+
+    Best-effort: on any error the original list is returned unchanged
+    so ingestion can proceed (the pipeline has its own dedup as well).
+    """
+    if not urls:
+        return urls
+    try:
+        from reviewmind.vectorstore.search import scroll_by_source_urls  # noqa: PLC0415
+
+        qdrant = _create_qdrant_client()
+        try:
+            existing = await scroll_by_source_urls(
+                client=qdrant,
+                source_urls=urls,
+                limit=len(urls),
+            )
+            existing_urls = {r.source_url for r in existing}
+            filtered = [u for u in urls if u not in existing_urls]
+            if existing_urls:
+                logger.info(
+                    "urls_already_ingested_filtered",
+                    total=len(urls),
+                    already_ingested=len(existing_urls),
+                    remaining=len(filtered),
+                )
+            return filtered
+        finally:
+            await qdrant.close()
+    except Exception as exc:
+        logger.warning("url_dedup_check_failed", error=str(exc))
+        return urls
+
+
 def _truncate(text: str, limit: int = _MAX_ANSWER_LENGTH) -> str:
     """Truncate *text* to fit Telegram's message length limit."""
     if len(text) > limit:
@@ -329,6 +364,7 @@ async def on_text_message(message: Message) -> None:
             # are persisted in auto_crawled for future queries.
             if rag_response.used_tavily and rag_response.sources:
                 tavily_urls = [s for s in rag_response.sources if s.startswith("http")]
+                tavily_urls = await _filter_already_ingested(tavily_urls)
                 if tavily_urls:
                     job_id = await _schedule_background_job(
                         user_id=user_id,
@@ -439,6 +475,9 @@ async def on_text_message(message: Message) -> None:
             if url.startswith("http") and url not in seen:
                 seen.add(url)
                 source_urls.append(url)
+
+    # Filter out URLs that are already ingested in Qdrant
+    source_urls = await _filter_already_ingested(source_urls)
 
     log.info("auto_source_urls_collected", url_count=len(source_urls))
 
