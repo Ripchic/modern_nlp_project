@@ -93,7 +93,7 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/2
       YOUTUBE_COOKIES_PATH: /app/cookies.txt
     volumes:
-      - ./cookies.txt:/app/cookies.txt:ro
+      - ./cookies.txt:/app/cookies.txt
     networks:
       - reviewmind-network
     depends_on:
@@ -120,7 +120,7 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/2
       YOUTUBE_COOKIES_PATH: /app/cookies.txt
     volumes:
-      - ./cookies.txt:/app/cookies.txt:ro
+      - ./cookies.txt:/app/cookies.txt
     networks:
       - reviewmind-network
     depends_on:

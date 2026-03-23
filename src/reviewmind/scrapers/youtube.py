@@ -375,6 +375,7 @@ class YouTubeScraper:
         more robustly than the transcript API.
         """
         import json
+        import shutil
         import tempfile
 
         logger.info("youtube.ytdlp_fallback_start", video_id=video_id)
@@ -401,18 +402,17 @@ class YouTubeScraper:
                 "socket_timeout": 30,
             }
 
-            # Use cookies if available
-            if hasattr(self, "_api") and hasattr(self._api, "_http_client"):
-                pass  # youtube-transcript-api session, not useful for yt-dlp
-            # Check for cookie file directly
+            # Copy cookies to a writable temp file (original may be read-only mount)
             from reviewmind.config import settings  # noqa: PLC0415
 
             cookie_file = settings.youtube_cookies_path
             if cookie_file:
                 cookie_path = Path(cookie_file)
                 if cookie_path.is_file():
-                    ydl_opts["cookiefile"] = str(cookie_path)
-                    logger.debug("youtube.ytdlp_using_cookies", path=str(cookie_path))
+                    tmp_cookie = Path(tmpdir) / "cookies.txt"
+                    shutil.copy2(cookie_path, tmp_cookie)
+                    ydl_opts["cookiefile"] = str(tmp_cookie)
+                    logger.debug("youtube.ytdlp_using_cookies", path=str(tmp_cookie))
 
             try:
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
