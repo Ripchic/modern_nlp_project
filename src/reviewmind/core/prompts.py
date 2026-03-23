@@ -246,6 +246,12 @@ def build_rag_system_prompt(
         Fully rendered system prompt ready to be sent as the ``system``
         message in a chat-completion request.
     """
+    # When no chunks are available, use the fallback prompt that encourages
+    # general-knowledge recommendations instead of the strict RAG template
+    # which would tell the LLM to only answer from (missing) context.
+    if not chunks:
+        return FALLBACK_SYSTEM_PROMPT
+
     context_text = format_chunks_for_context(chunks)
     history_text = format_chat_history(chat_history or [])
     lang = language or DEFAULT_PROMPT_LANGUAGE

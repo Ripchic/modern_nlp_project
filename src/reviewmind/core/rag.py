@@ -261,31 +261,30 @@ class RAGPipeline:
         query_language = detect_language(user_query)
         log.debug("rag_language_detected", language=query_language)
 
+        search_results: list[SearchResult] = []
+        embedding_or_search_failed = False
+
         try:
             query_vector = await self.embedding_service.embed_text(user_query)
         except EmbeddingError as exc:
             log.error("rag_embedding_error", error=str(exc))
-            return RAGResponse(
-                answer="",
-                error=f"Embedding error: {exc}",
-            )
+            embedding_or_search_failed = True
+            query_vector = None
 
-        log.debug("rag_embedding_done", vector_dim=len(query_vector))
+        if query_vector is not None:
+            log.debug("rag_embedding_done", vector_dim=len(query_vector))
 
-        # ── Step 2: Hybrid search ────────────────────────────
-        try:
-            search_results = await hybrid_search(
-                client=self._qdrant,
-                query_vector=query_vector,
-                product_query=product_query,
-                top_k=self._search_top_k,
-            )
-        except Exception as exc:
-            log.error("rag_search_error", error=str(exc))
-            return RAGResponse(
-                answer="",
-                error=f"Search error: {exc}",
-            )
+            # ── Step 2: Hybrid search ────────────────────────────
+            try:
+                search_results = await hybrid_search(
+                    client=self._qdrant,
+                    query_vector=query_vector,
+                    product_query=product_query,
+                    top_k=self._search_top_k,
+                )
+            except Exception as exc:
+                log.error("rag_search_error", error=str(exc))
+                embedding_or_search_failed = True
 
         # ── Step 2b: Source-URL retrieval (links mode) ────
         if source_urls:
@@ -334,7 +333,7 @@ class RAGPipeline:
 
         # ── Step 4b: Tavily fallback (skip when source URLs provided) ───
         used_tavily = False
-        if not confidence_met and not source_urls:
+        if (not confidence_met or embedding_or_search_failed) and not source_urls:
             tavily_results = await self._tavily_fallback(user_query, log)
             if tavily_results:
                 used_tavily = True

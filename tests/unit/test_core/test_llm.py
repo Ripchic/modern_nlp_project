@@ -582,9 +582,9 @@ class TestGenerateAnalysis:
         assert call_kwargs.get("top_p") == 0.9
 
     @pytest.mark.asyncio
-    async def test_no_chunks_uses_no_context_text_in_system_prompt(self):
-        """Without chunks, the system prompt should contain the no-context notice."""
-        from reviewmind.core.prompts import NO_CONTEXT_TEXT
+    async def test_no_chunks_uses_fallback_system_prompt(self):
+        """Without chunks, the system prompt should be FALLBACK_SYSTEM_PROMPT."""
+        from reviewmind.core.prompts import FALLBACK_SYSTEM_PROMPT
 
         client = _create_client()
         mock_create = AsyncMock(return_value=_make_response("ok"))
@@ -594,7 +594,7 @@ class TestGenerateAnalysis:
 
         messages = mock_create.call_args.kwargs["messages"]
         system_content = messages[0]["content"]
-        assert NO_CONTEXT_TEXT in system_content
+        assert system_content == FALLBACK_SYSTEM_PROMPT
 
     @pytest.mark.asyncio
     async def test_chunks_text_in_system_prompt(self):
@@ -650,8 +650,9 @@ class TestGenerateAnalysis:
         mock_create = AsyncMock(return_value=_make_response("ok"))
         client._client.chat.completions.create = mock_create
 
+        chunks = [ChunkContext(text="Test text", source_url="https://ex.com")]
         history = [{"role": "user", "content": "What about battery?"}]
-        await client.generate_analysis("query", chat_history=history)
+        await client.generate_analysis("query", chunks=chunks, chat_history=history)
 
         messages = mock_create.call_args.kwargs["messages"]
         all_content = " ".join(m["content"] for m in messages)
@@ -679,7 +680,8 @@ class TestGenerateAnalysis:
         mock_create = AsyncMock(return_value=_make_response("ok"))
         client._client.chat.completions.create = mock_create
 
-        await client.generate_analysis("query")
+        chunks = [ChunkContext(text="Test text", source_url="https://ex.com")]
+        await client.generate_analysis("query", chunks=chunks)
 
         messages = mock_create.call_args.kwargs["messages"]
         system_content = messages[0]["content"]

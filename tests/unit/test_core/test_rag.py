@@ -608,11 +608,17 @@ class TestRAGPipelineErrors:
         embed.close = AsyncMock()
 
         pipeline = RAGPipeline(mock_qdrant, embed, mock_llm)
-        resp = await pipeline.query("test")
 
-        assert resp.answer == ""
-        assert "Embedding error" in resp.error
-        mock_llm.generate_analysis.assert_not_awaited()
+        # Tavily fallback is triggered; patch it to return empty so we verify
+        # the pipeline still produces an answer via LLM (with empty context).
+        with patch.object(pipeline, "_tavily_fallback", new_callable=AsyncMock, return_value=[]):
+            resp = await pipeline.query("test")
+
+        # Even with embedding failure and no Tavily results, the pipeline
+        # now generates an LLM answer (using the fallback system prompt)
+        assert resp.answer == "answer"
+        assert resp.error is None
+        mock_llm.generate_analysis.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_search_error(self, mock_qdrant, mock_llm):
@@ -620,16 +626,21 @@ class TestRAGPipelineErrors:
         embed.embed_text = AsyncMock(return_value=[0.1] * 1536)
         embed.close = AsyncMock()
 
-        with patch(
-            "reviewmind.core.rag.hybrid_search",
-            new_callable=AsyncMock,
-            side_effect=RuntimeError("Qdrant connection lost"),
+        pipeline = RAGPipeline(mock_qdrant, embed, mock_llm)
+
+        with (
+            patch(
+                "reviewmind.core.rag.hybrid_search",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("Qdrant connection lost"),
+            ),
+            patch.object(pipeline, "_tavily_fallback", new_callable=AsyncMock, return_value=[]),
         ):
-            pipeline = RAGPipeline(mock_qdrant, embed, mock_llm)
             resp = await pipeline.query("test")
 
-        assert resp.answer == ""
-        assert "Search error" in resp.error
+        # Pipeline recovers via LLM fallback (no context, but still answers)
+        assert resp.answer == "answer"
+        assert resp.error is None
 
     @pytest.mark.asyncio
     async def test_llm_error(self, mock_qdrant):

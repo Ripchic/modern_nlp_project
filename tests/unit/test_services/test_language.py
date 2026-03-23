@@ -175,36 +175,43 @@ class TestReturnContract:
 class TestPromptIntegration:
     """Verify language integrates with the prompt system."""
 
+    _DUMMY_CHUNK = None  # Lazily created
+
+    @staticmethod
+    def _chunk():
+        from reviewmind.core.prompts import ChunkContext
+        return [ChunkContext(text="Test text", source_url="https://ex.com")]
+
     def test_build_rag_prompt_accepts_language(self):
         from reviewmind.core.prompts import build_rag_system_prompt
 
-        result = build_rag_system_prompt([], language="en")
+        result = build_rag_system_prompt(self._chunk(), language="en")
         assert "en" in result
 
     def test_build_rag_prompt_default_language(self):
         from reviewmind.core.prompts import DEFAULT_PROMPT_LANGUAGE, build_rag_system_prompt
 
-        result = build_rag_system_prompt([])
+        result = build_rag_system_prompt(self._chunk())
         assert DEFAULT_PROMPT_LANGUAGE in result
 
     def test_build_rag_prompt_with_detected_language(self):
         from reviewmind.core.prompts import build_rag_system_prompt
 
         lang = detect_language("Is this product worth buying?")
-        result = build_rag_system_prompt([], language=lang)
+        result = build_rag_system_prompt(self._chunk(), language=lang)
         assert lang in result
 
     def test_detected_language_in_rag_prompt_template(self):
         """The language slot must appear in the rendered prompt."""
         from reviewmind.core.prompts import build_rag_system_prompt
 
-        result = build_rag_system_prompt([], language="ru")
+        result = build_rag_system_prompt(self._chunk(), language="ru")
         assert "целевой язык: ru" in result
 
     def test_english_language_in_rag_prompt(self):
         from reviewmind.core.prompts import build_rag_system_prompt
 
-        result = build_rag_system_prompt([], language="en")
+        result = build_rag_system_prompt(self._chunk(), language="en")
         assert "целевой язык: en" in result
 
 
@@ -261,10 +268,11 @@ class TestIntegrationScenarios:
 
     def test_detect_then_prompt_flow(self):
         """Full flow: detect → build prompt with detected language."""
-        from reviewmind.core.prompts import build_rag_system_prompt
+        from reviewmind.core.prompts import ChunkContext, build_rag_system_prompt
 
         query = "Стоит ли покупать Sony WH-1000XM5?"
         lang = detect_language(query)
-        prompt = build_rag_system_prompt([], language=lang)
+        chunks = [ChunkContext(text="Test text", source_url="https://ex.com")]
+        prompt = build_rag_system_prompt(chunks, language=lang)
         assert lang in prompt
         assert "ПРАВИЛА" in prompt

@@ -11,21 +11,12 @@ from dataclasses import dataclass, field
 import structlog
 
 from reviewmind.core.llm import LLMClient, LLMError
+from reviewmind.core.prompts import FALLBACK_SYSTEM_PROMPT
 
 logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
-# ── System prompt (temporary, no-RAG) ─────────────────────────
-_SYSTEM_PROMPT = (
-    "Ты — ReviewMind, AI-ассистент для анализа обзоров товаров. "
-    "Помогай пользователю с вопросами о товарах, покупках и обзорах.\n\n"
-    "Правила:\n"
-    "1. Отвечай на языке пользователя.\n"
-    "2. Будь полезным, кратким и дружелюбным.\n"
-    "3. Если не знаешь ответа — честно скажи об этом.\n"
-    "4. Не выдумывай факты и характеристики товаров.\n"
-    "5. Предупреждай, что данные могут быть неполными без "
-    "подключённого поиска по обзорам."
-)
+# ── System prompt — reuse the FALLBACK prompt from prompts.py ─
+_SYSTEM_PROMPT = FALLBACK_SYSTEM_PROMPT
 
 _ERROR_RESPONSE = (
     "😔 Извините, произошла ошибка при обработке вашего запроса. Пожалуйста, попробуйте ещё раз через несколько секунд."

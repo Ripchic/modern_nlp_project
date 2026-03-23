@@ -242,19 +242,26 @@ class TestBuildRagSystemPrompt:
         assert "ПРАВИЛА" in result
 
     def test_contains_context_header(self):
-        result = build_rag_system_prompt([])
+        chunks = [ChunkContext(text="Test text", source_url="https://ex.com")]
+        result = build_rag_system_prompt(chunks)
         assert "КОНТЕКСТ" in result
 
     def test_contains_history_header(self):
-        result = build_rag_system_prompt([])
+        chunks = [ChunkContext(text="Test text", source_url="https://ex.com")]
+        result = build_rag_system_prompt(chunks)
         assert "ИСТОРИЯ ДИАЛОГА" in result
 
-    def test_no_chunks_injects_no_context_text(self):
+    def test_no_chunks_returns_fallback_prompt(self):
         result = build_rag_system_prompt([])
-        assert NO_CONTEXT_TEXT in result
+        assert result == FALLBACK_SYSTEM_PROMPT
+
+    def test_no_chunks_fallback_has_rules(self):
+        result = build_rag_system_prompt([])
+        assert "ПРАВИЛА" in result
 
     def test_no_history_injects_no_history_text(self):
-        result = build_rag_system_prompt([])
+        chunks = [ChunkContext(text="Test text", source_url="https://ex.com")]
+        result = build_rag_system_prompt(chunks)
         assert NO_HISTORY_TEXT in result
 
     def test_chunks_text_appears_in_prompt(self):
@@ -263,8 +270,9 @@ class TestBuildRagSystemPrompt:
         assert "Great sound quality" in result
 
     def test_history_appears_in_prompt(self):
+        chunks = [ChunkContext(text="Product text", source_url="https://ex.com")]
         history = [{"role": "user", "content": "Tell me about ANC"}]
-        result = build_rag_system_prompt([], chat_history=history)
+        result = build_rag_system_prompt(chunks, chat_history=history)
         assert "Tell me about ANC" in result
 
     def test_sponsored_source_marked_in_prompt(self):
@@ -291,7 +299,8 @@ class TestBuildRagSystemPrompt:
 
     def test_structured_format_rule_present(self):
         """PRD rule 4: Структурируй ответ must be in the template."""
-        result = build_rag_system_prompt([])
+        chunks = [ChunkContext(text="Test text", source_url="https://ex.com")]
+        result = build_rag_system_prompt(chunks)
         assert "✅ Плюсы" in result
         assert "❌ Минусы" in result
         assert "⚖️ Спорные моменты" in result
@@ -309,7 +318,8 @@ class TestBuildRagSystemPrompt:
 
     def test_generation_params_mentioned_in_prompt(self):
         """PRD specifies temperature=0.3, max_tokens=1000, top_p=0.9 in prompt."""
-        result = build_rag_system_prompt([])
+        chunks = [ChunkContext(text="Test text", source_url="https://ex.com")]
+        result = build_rag_system_prompt(chunks)
         assert "temperature=0.3" in result
         assert "max_tokens=1000" in result
         assert "top_p=0.9" in result
