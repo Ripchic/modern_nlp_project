@@ -13,6 +13,7 @@ dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",
     "aiogram>=3.13.0",
+    "aiohttp-socks>=0.9.0",
     "openai>=1.50.0",
     "qdrant-client>=1.12.0,<1.14.0",
     "sqlalchemy[asyncio]>=2.0.35",
