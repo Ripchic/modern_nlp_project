@@ -227,9 +227,9 @@ class YouTubeScraper:
             logger.error(
                 "youtube.request_blocked",
                 video_id=video_id,
-                hint="IP blocked by YouTube. Re-export cookies.txt from browser.",
+                hint="IP blocked by YouTube. Trying yt-dlp fallback.",
             )
-            return None
+            return self._ytdlp_transcript_fallback(video_id, langs)
         except Exception:
             logger.exception("youtube.unexpected_error", video_id=video_id)
             return None
@@ -363,6 +363,134 @@ class YouTubeScraper:
                 parts.append(text)
 
         return " ".join(parts)
+
+    def _ytdlp_transcript_fallback(
+        self,
+        video_id: str,
+        languages: tuple[str, ...],
+    ) -> TranscriptResult | None:
+        """Use yt-dlp to extract subtitles when youtube-transcript-api is blocked.
+
+        yt-dlp handles YouTube's anti-bot measures (PO tokens, consent pages)
+        more robustly than the transcript API.
+        """
+        import json
+        import tempfile
+
+        logger.info("youtube.ytdlp_fallback_start", video_id=video_id)
+
+        try:
+            import yt_dlp  # noqa: PLC0415
+        except ImportError:
+            logger.warning("youtube.ytdlp_not_installed")
+            return None
+
+        url = f"https://www.youtube.com/watch?v={video_id}"
+        lang_list = list(languages)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ydl_opts: dict = {
+                "skip_download": True,
+                "writesubtitles": True,
+                "writeautomaticsub": True,
+                "subtitleslangs": lang_list,
+                "subtitlesformat": "json3",
+                "outtmpl": f"{tmpdir}/%(id)s.%(ext)s",
+                "quiet": True,
+                "no_warnings": True,
+                "socket_timeout": 30,
+            }
+
+            # Use cookies if available
+            if hasattr(self, "_api") and hasattr(self._api, "_http_client"):
+                pass  # youtube-transcript-api session, not useful for yt-dlp
+            # Check for cookie file directly
+            from reviewmind.config import settings  # noqa: PLC0415
+
+            cookie_file = settings.youtube_cookies_path
+            if cookie_file:
+                cookie_path = Path(cookie_file)
+                if cookie_path.is_file():
+                    ydl_opts["cookiefile"] = str(cookie_path)
+                    logger.debug("youtube.ytdlp_using_cookies", path=str(cookie_path))
+
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([url])
+            except Exception as exc:
+                logger.warning("youtube.ytdlp_download_failed", video_id=video_id, error=str(exc))
+                return None
+
+            # Find the subtitle file — try each language
+            sub_path = None
+            actual_lang = None
+            for lang in lang_list:
+                for suffix in (f".{lang}.json3", f".{lang}.json"):
+                    candidate = Path(tmpdir) / f"{video_id}{suffix}"
+                    if candidate.is_file():
+                        sub_path = candidate
+                        actual_lang = lang
+                        break
+                if sub_path:
+                    break
+
+            if not sub_path:
+                # Try any json3 file in the directory
+                json3_files = list(Path(tmpdir).glob(f"{video_id}*.json3"))
+                if json3_files:
+                    sub_path = json3_files[0]
+                    actual_lang = sub_path.stem.split(".")[-1] if "." in sub_path.stem else "unknown"
+
+            if not sub_path:
+                logger.warning("youtube.ytdlp_no_subtitles_found", video_id=video_id)
+                return None
+
+            # Parse json3 subtitle format
+            try:
+                raw = sub_path.read_text(encoding="utf-8")
+                data = json.loads(raw)
+                events = data.get("events", [])
+                parts: list[str] = []
+                for event in events:
+                    segs = event.get("segs", [])
+                    for seg in segs:
+                        text = seg.get("utf8", "").strip()
+                        if text and text != "\n":
+                            cleaned = re.sub(r"\[.*?\]", "", text)
+                            cleaned = re.sub(r"\s+", " ", cleaned).strip()
+                            if cleaned:
+                                parts.append(cleaned)
+                text = " ".join(parts)
+            except Exception as exc:
+                logger.warning("youtube.ytdlp_parse_failed", video_id=video_id, error=str(exc))
+                return None
+
+        word_count = len(text.split())
+        if word_count < self._min_word_count:
+            logger.info(
+                "youtube.ytdlp_transcript_too_short",
+                video_id=video_id,
+                word_count=word_count,
+                min_required=self._min_word_count,
+            )
+            return None
+
+        logger.info(
+            "youtube.ytdlp_fallback_ok",
+            video_id=video_id,
+            word_count=word_count,
+            language=actual_lang,
+        )
+
+        return TranscriptResult(
+            video_id=video_id,
+            text=text,
+            language=actual_lang or "unknown",
+            language_code=actual_lang or "unknown",
+            is_generated=True,
+            word_count=word_count,
+            snippet_count=len(parts),
+        )
 
     @staticmethod
     def is_youtube_url(url: str) -> bool:
