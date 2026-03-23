@@ -28,6 +28,7 @@ class SourceType(str, Enum):
     WEB = "web"
     TAVILY = "tavily"
     CURATED = "curated"
+    FORUM = "forum"  # 4PDA and other IP.Board forums
 
 
 @dataclass(frozen=True)

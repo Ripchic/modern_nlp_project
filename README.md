@@ -222,14 +222,17 @@ flowchart TD
 | **API** | FastAPI + uvicorn | Async, fast, auto-docs |
 | **Task Queue** | Celery + Redis | Durable background jobs, survive restarts, easy retry |
 | **Vector DB** | Qdrant (self-hosted, 2 collections) | Purpose-built ANN, free, payload filters, score boost |
-| **Relational DB** | PostgreSQL + asyncpg | Metadata, logs, source deduplication |
+| **Relational DB** | PostgreSQL + asyncpg + Alembic | Metadata, logs, source deduplication, schema migrations |
 | **Cache / Broker** | Redis | Session context (30min TTL) + Celery broker |
 | **Embeddings** | OpenAI text-embedding-3-small | $0.02/1M tokens, multilingual, no GPU needed |
 | **LLM** | gpt-4o-mini via OpenAI API | Best price/quality for synthesis; GitHub Student Pack for dev |
 | **YouTube** | youtube-transcript-api + YouTube Data API v3 | Official + free transcript extraction |
 | **Reddit** | PRAW (official API) | Rate-limit safe, stable |
+| **4PDA** | httpx + BeautifulSoup4 | Russian-language forum: pinned posts, specs, review links |
 | **Web scraping** | trafilatura | Extracts clean article text from any URL, no headless browser |
 | **Web search fallback** | Tavily API (free tier: 1000 req/month) | LLM-ready results, zero-shot answers when DB is empty |
+| **Expert portals** | Tavily include_domains (Rozetked, Спорт-Марафон, DNS Club) | Targeted search on trusted review sites |
+| **Monitoring** | Prometheus + Grafana | Metrics collection + pre-built dashboards (health, users, DB) |
 | **Containers** | Docker + Docker Compose | Isolation, reproducibility, arm64 + amd64 compatible |
 | **CI/CD** | GitHub Actions | Auto test + build + deploy on push |
 | **Proxy** | Nginx + Let's Encrypt | TLS termination (required for webhook, Phase 2+) |
@@ -239,7 +242,121 @@ flowchart TD
 ---
 
 ## Project Structure
-### WIP
+
+```
+modern_nlp_project/
+├── docker-compose.yml              # Core services (postgres, redis, qdrant, api, bot, worker, beat)
+├── docker-compose.override.yml     # Local dev overrides (localhost-only ports)
+├── docker-compose.prod.yml         # Production overrides (0.0.0.0 binds, proxy settings)
+├── Dockerfile                      # 2-stage build (builder → runtime, ~200MB)
+├── pyproject.toml                  # Dependencies + build config (hatchling)
+├── alembic.ini                     # Alembic config → DATABASE_URL from env
+│
+├── alembic/
+│   └── versions/
+│       └── 0001_initial_schema.py  # 6 tables: users, user_limits, subscriptions, sources, jobs, query_logs
+│
+├── src/reviewmind/
+│   ├── main.py                     # Entrypoint: FastAPI app + aiogram bot + lifespan init
+│   ├── config.py                   # Pydantic Settings (all env vars, defaults, validation)
+│   │
+│   ├── api/
+│   │   ├── router.py               # FastAPI router: /health, /query, /ingest, /status/{job_id}, /feedback
+│   │   ├── schemas.py              # Pydantic request/response models
+│   │   ├── dependencies.py         # DI: get_db, get_qdrant, get_redis
+│   │   ├── rate_limit.py           # SlowAPI rate limiter (10 req/min default)
+│   │   └── endpoints/              # Endpoint handlers (query, ingest, status, feedback)
+│   │
+│   ├── bot/
+│   │   ├── main.py                 # Bot setup: aiogram Dispatcher, register handlers
+│   │   ├── keyboards.py            # Inline keyboards (mode select, feedback, payment)
+│   │   ├── middlewares.py          # User registration middleware (auto-create on first message)
+│   │   └── handlers/
+│   │       ├── start.py            # /start — welcome + mode selection
+│   │       ├── query.py            # Product queries + auto-mode pipeline + expert portals
+│   │       ├── links.py            # Manual mode — user pastes URLs
+│   │       ├── mode.py             # Switch auto ↔ manual
+│   │       ├── payment.py          # Telegram Stars payments (pre_checkout + successful_payment)
+│   │       ├── feedback.py         # 👍/👎 inline feedback → query_logs.rating
+│   │       ├── admin.py            # /stats, /broadcast, /export (admin_user_ids only)
+│   │       └── gdpr.py             # /mydata, /deleteme — GDPR compliance
+│   │
+│   ├── core/
+│   │   ├── llm.py                  # OpenAI chat completion wrapper (gpt-4o-mini)
+│   │   ├── embeddings.py           # OpenAI embeddings wrapper (text-embedding-3-small, 1536d)
+│   │   ├── prompts.py              # System prompt (8 rules, model disambiguation, 5–7 facts)
+│   │   ├── rag.py                  # RAG pipeline: dual-collection search → rerank → generate
+│   │   └── reranker.py             # Score-based reranker (curated boost, sponsor penalty)
+│   │
+│   ├── scrapers/
+│   │   ├── base.py                 # BaseScraper ABC
+│   │   ├── youtube.py              # YouTube transcript + metadata (youtube-transcript-api)
+│   │   ├── reddit.py               # Reddit posts + comments (PRAW)
+│   │   ├── fourpda.py              # 4PDA forum parser (pinned posts, specs, links, ranking)
+│   │   ├── web.py                  # General web page extraction (trafilatura)
+│   │   └── tavily.py               # Tavily API search (include_domains for expert portals)
+│   │
+│   ├── ingestion/
+│   │   ├── pipeline.py             # Full ingestion pipeline (scrape → clean → chunk → embed → store)
+│   │   ├── cleaner.py              # Text normalization (remove ads, timestamps, HTML)
+│   │   ├── chunker.py              # Token-based chunking (400–600 tokens, 50 overlap)
+│   │   ├── sponsor.py              # Sponsor detection (regex heuristics → is_sponsored flag)
+│   │   └── url_detector.py         # URL type classifier (youtube/reddit/4pda/web)
+│   │
+│   ├── services/
+│   │   ├── query_service.py        # Query orchestration (cache check → RAG → fallback)
+│   │   ├── ingest_service.py       # Ingestion orchestration (deduplicate → scrape → store)
+│   │   ├── comparison_service.py   # Product comparison logic
+│   │   ├── product_extractor.py    # Extract product name from free-text query
+│   │   ├── language.py             # Language detection (langdetect)
+│   │   ├── limit_service.py        # Daily request limits (free: 5/day, premium: unlimited)
+│   │   └── payment_service.py      # Telegram Stars payment processing
+│   │
+│   ├── db/
+│   │   ├── models.py               # SQLAlchemy models (6 tables, cascade deletes)
+│   │   ├── session.py              # Async session factory (asyncpg)
+│   │   └── repositories/           # CRUD repositories (user, source, job, query_log)
+│   │
+│   ├── cache/
+│   │   └── redis.py                # Redis client (session TTL 30min, result caching)
+│   │
+│   ├── vectorstore/
+│   │   ├── client.py               # Qdrant client wrapper
+│   │   └── collections.py          # Collection config (auto_crawled + curated_kb)
+│   │
+│   └── workers/
+│       ├── celery_app.py           # Celery app config (Redis broker, 3 retries, exp backoff)
+│       ├── tasks.py                # Tasks: ingest_sources_task, ping
+│       ├── beat_schedule.py        # Beat: daily limit reset, monthly query refresh
+│       └── notifications.py        # Push results to user via bot (success/failure/admin alerts)
+│
+├── scripts/
+│   ├── init_qdrant.py              # Create Qdrant collections + payload indexes
+│   ├── seed_test_data.py           # Seed 3 test products with reviews
+│   ├── seed_curated_kb.py          # Load curated expert reviews into curated_kb
+│   ├── reset_limit.py              # Admin: reset user's daily request counter
+│   └── restart.sh                  # docker compose down && up -d
+│
+├── monitoring/
+│   ├── prometheus.yml              # Prometheus scrape config
+│   └── grafana/
+│       └── dashboards/             # Pre-built dashboards (system-health, user-activity, db-stats)
+│
+└── tests/
+    ├── conftest.py                 # Shared fixtures (async DB, mock Redis, mock Qdrant)
+    └── unit/
+        ├── test_config.py
+        ├── test_main.py
+        ├── test_api/
+        ├── test_bot/
+        ├── test_core/
+        ├── test_scrapers/          # incl. test_fourpda.py (30 tests)
+        ├── test_services/
+        ├── test_ingestion/
+        ├── test_db/
+        ├── test_vectorstore/
+        └── test_workers/
+```
 
 ---
 
@@ -256,13 +373,81 @@ flowchart TD
 ### Quick Start
 
 ```bash
-# TO-DO
+# 1. Clone the repository
+git clone https://github.com/<your-username>/modern_nlp_project.git
+cd modern_nlp_project
+
+# 2. Copy and fill in environment variables
+cp .env.example .env
+# Edit .env — at minimum set TELEGRAM_BOT_TOKEN, OPENAI_API_KEY, POSTGRES_PASSWORD
+
+# 3. Start all services
+docker compose up -d --build
+
+# 4. Run database migrations
+docker compose exec api alembic upgrade head
+
+# 5. Initialize Qdrant collections
+docker compose exec api python scripts/init_qdrant.py
+
+# 6. (Optional) Seed test data for development
+docker compose exec api python scripts/seed_test_data.py
+docker compose exec api python scripts/seed_curated_kb.py
+
+# 7. Verify everything is running
+docker compose ps
+curl http://localhost:8000/health
 ```
+
+**Service endpoints after launch:**
+
+| Service | URL |
+|---------|-----|
+| API | http://localhost:8000 |
+| API docs (Swagger) | http://localhost:8000/docs |
+| Qdrant dashboard | http://localhost:6333/dashboard |
+| Flower (Celery monitor) | http://localhost:5555 |
+| Prometheus | http://localhost:9090 |
+| Grafana | http://localhost:3000 |
 
 ### Environment Variables
 
 ```env
-# TO-DO
+# ── Telegram ──────────────────────────────────────────
+TELEGRAM_BOT_TOKEN=           # Required — from @BotFather
+ADMIN_USER_IDS=123456789      # Comma-separated Telegram user IDs for /stats, /broadcast
+
+# ── LLM (OpenAI-compatible) ──────────────────────────
+OPENAI_API_KEY=               # Required — OpenAI or GitHub Models key
+OPENAI_BASE_URL=https://models.inference.ai.azure.com   # GitHub Models (dev) or https://api.openai.com/v1 (prod)
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+LLM_TEMPERATURE=0.3
+LLM_MAX_TOKENS=1000
+
+# ── Database ──────────────────────────────────────────
+POSTGRES_PASSWORD=            # Required
+DATABASE_URL=postgresql+asyncpg://reviewmind:${POSTGRES_PASSWORD}@postgres:5432/reviewmind
+
+# ── Redis ─────────────────────────────────────────────
+REDIS_URL=redis://redis:6379/0
+CELERY_BROKER_URL=redis://redis:6379/1
+CELERY_RESULT_BACKEND=redis://redis:6379/2
+
+# ── Qdrant ────────────────────────────────────────────
+QDRANT_URL=http://qdrant:6333
+
+# ── Session & Rate Limits ─────────────────────────────
+SESSION_TTL_SECONDS=1800      # 30 min chat context window
+RATE_LIMIT_PER_MINUTE=10
+
+# ── Optional: Data Sources ────────────────────────────
+YOUTUBE_API_KEY=              # YouTube Data API v3 (omit → transcript-only mode)
+YOUTUBE_COOKIES_PATH=         # Path to cookies.txt for age-restricted videos
+REDDIT_CLIENT_ID=             # Reddit app credentials (omit → skip Reddit)
+REDDIT_CLIENT_SECRET=
+REDDIT_USER_AGENT=ReviewMind/1.0
+TAVILY_API_KEY=               # Tavily web search (omit → skip Tavily fallback)
 ```
 
 ---

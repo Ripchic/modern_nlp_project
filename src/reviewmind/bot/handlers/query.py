@@ -45,6 +45,14 @@ _UNEXPECTED_ERROR_MSG = "⚠️ Произошла непредвиденная 
 
 MAX_SEARCH_URLS = 10  # cap on URLs collected from YouTube + Reddit search
 
+# Expert review portals — always searched for product reviews.
+# Each entry: (domain, query_template) where {product} is replaced with product name.
+EXPERT_PORTALS: list[tuple[list[str], str]] = [
+    (["rozetked.me"], "обзор {product}"),
+    (["sport-marafon.ru"], "обзор {product}"),
+    (["club.dns-shop.ru"], "обзор {product}"),
+]
+
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -198,6 +206,48 @@ async def _collect_source_urls(product_names: list[str]) -> list[str]:
                 urls.append(p.url)
     except Exception as exc:
         logger.warning("auto_reddit_search_failed", error=str(exc))
+
+    # ── 4PDA forum search ────────────────────────────────────
+    try:
+        from reviewmind.scrapers.fourpda import Forum4PDAScraper  # noqa: PLC0415
+
+        fourpda = Forum4PDAScraper()
+        # Use product name + "обсуждение" for 4PDA (Russian forum)
+        fourpda_query = " ".join(product_names) + " обсуждение"
+        topics = await fourpda.search_topics(fourpda_query, max_results=5)
+        for t in topics:
+            if t.url and t.url not in seen:
+                seen.add(t.url)
+                urls.append(t.url)
+    except Exception as exc:
+        logger.warning("auto_4pda_search_failed", error=str(exc))
+
+    # ── Expert portals (Rozetked, etc.) via Tavily ───────────
+    try:
+        from reviewmind.scrapers.tavily import TavilyScraper  # noqa: PLC0415
+
+        tavily = TavilyScraper()
+        product_str = " ".join(product_names)
+        for domains, query_tpl in EXPERT_PORTALS:
+            try:
+                portal_query = query_tpl.format(product=product_str)
+                results = await tavily.search(
+                    portal_query,
+                    max_results=3,
+                    include_domains=domains,
+                )
+                for r in results:
+                    if r.url and r.url not in seen:
+                        seen.add(r.url)
+                        urls.append(r.url)
+            except Exception as exc:
+                logger.warning(
+                    "auto_expert_portal_search_failed",
+                    domains=domains,
+                    error=str(exc),
+                )
+    except Exception as exc:
+        logger.warning("auto_expert_portals_init_failed", error=str(exc))
 
     return urls[:MAX_SEARCH_URLS]
 

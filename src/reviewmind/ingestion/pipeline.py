@@ -21,6 +21,7 @@ from reviewmind.db.repositories.sources import SourceRepository
 from reviewmind.ingestion.chunker import Chunk, chunk_text
 from reviewmind.ingestion.cleaner import clean_text
 from reviewmind.ingestion.sponsor import detect_sponsor_detailed
+from reviewmind.scrapers.fourpda import Forum4PDAScraper
 from reviewmind.scrapers.reddit import RedditScraper
 from reviewmind.scrapers.web import WebScraper
 from reviewmind.scrapers.youtube import YouTubeScraper
@@ -39,14 +40,17 @@ _YOUTUBE_RE = re.compile(
     re.IGNORECASE,
 )
 _REDDIT_RE = re.compile(r"(?:reddit\.com|redd\.it)", re.IGNORECASE)
+_4PDA_RE = re.compile(r"4pda\.to/forum", re.IGNORECASE)
 
 
 def detect_url_type(url: str) -> str:
-    """Return ``'youtube'``, ``'reddit'``, or ``'web'`` for the given URL."""
+    """Return ``'youtube'``, ``'reddit'``, ``'forum'``, or ``'web'`` for the given URL."""
     if _YOUTUBE_RE.search(url):
         return SourceType.YOUTUBE.value
     if _REDDIT_RE.search(url):
         return SourceType.REDDIT.value
+    if _4PDA_RE.search(url):
+        return SourceType.FORUM.value
     return SourceType.WEB.value
 
 
@@ -118,6 +122,7 @@ class IngestionPipeline:
         self._youtube: YouTubeScraper | None = None
         self._reddit: RedditScraper | None = None
         self._web: WebScraper | None = None
+        self._fourpda: Forum4PDAScraper | None = None
 
     # -- lazy helpers -------------------------------------------------------
 
@@ -145,6 +150,11 @@ class IngestionPipeline:
         if self._web is None:
             self._web = WebScraper()
         return self._web
+
+    def _get_fourpda(self) -> Forum4PDAScraper:
+        if self._fourpda is None:
+            self._fourpda = Forum4PDAScraper()
+        return self._fourpda
 
     # -- public API ---------------------------------------------------------
 
@@ -383,6 +393,16 @@ class IngestionPipeline:
             metadata["language"] = None  # Reddit doesn't report language
             metadata["date"] = None
             return post.full_text, metadata
+
+        if source_type == SourceType.FORUM.value:
+            scraper = self._get_fourpda()
+            topic = scraper.parse_topic_sync(url)
+            if topic is None:
+                return "", metadata
+            metadata["author"] = None
+            metadata["language"] = "ru"
+            metadata["date"] = topic.posts[0].date if topic.posts else None
+            return topic.full_text, metadata
 
         # default: web
         scraper = self._get_web()

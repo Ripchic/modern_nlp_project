@@ -127,6 +127,7 @@ class TavilyScraper:
         max_results: int | None = None,
         search_depth: str | None = None,
         include_raw_content: bool = False,
+        include_domains: list[str] | None = None,
     ) -> list[TavilyResult]:
         """Execute a web search via the Tavily API.
 
@@ -163,14 +164,18 @@ class TavilyScraper:
             log.error("tavily_no_api_key", error=str(exc))
             return []
 
+        search_kwargs: dict = {
+            "query": query,
+            "max_results": effective_max,
+            "search_depth": effective_depth,
+            "include_raw_content": include_raw_content,
+            "timeout": self._timeout,
+        }
+        if include_domains:
+            search_kwargs["include_domains"] = include_domains
+
         try:
-            response = await client.search(
-                query=query,
-                max_results=effective_max,
-                search_depth=effective_depth,
-                include_raw_content=include_raw_content,
-                timeout=self._timeout,
-            )
+            response = await client.search(**search_kwargs)
         except (InvalidAPIKeyError, MissingAPIKeyError) as exc:
             log.error("tavily_auth_error", error=str(exc))
             return []

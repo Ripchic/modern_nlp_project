@@ -1,5 +1,19 @@
-"""reviewmind.scrapers — Data source scrapers (YouTube, Reddit, Web, Tavily)."""
+"""reviewmind.scrapers — Data source scrapers (YouTube, Reddit, Web, Tavily, 4PDA)."""
 
+from reviewmind.scrapers.fourpda import (
+    DEFAULT_MAX_RESULTS as FOURPDA_DEFAULT_MAX_RESULTS,
+)
+from reviewmind.scrapers.fourpda import (
+    DEFAULT_MAX_POSTS_PER_TOPIC as FOURPDA_DEFAULT_MAX_POSTS,
+)
+from reviewmind.scrapers.fourpda import (
+    ExtractedLink,
+    Forum4PDAScraper,
+    ForumPost4PDA,
+    ForumSearchResult4PDA,
+    ForumTopic4PDA,
+    PinnedPostData,
+)
 from reviewmind.scrapers.reddit import (
     DEFAULT_COMMENT_LIMIT,
     DEFAULT_REVIEW_SUBREDDITS,
@@ -51,9 +65,17 @@ __all__ = [
     "DEFAULT_SEARCH_MAX_RESULTS",
     "DEFAULT_SUBREDDIT",
     "DEFAULT_TIMEOUT",
+    "ExtractedLink",
+    "FOURPDA_DEFAULT_MAX_POSTS",
+    "FOURPDA_DEFAULT_MAX_RESULTS",
+    "Forum4PDAScraper",
+    "ForumPost4PDA",
+    "ForumSearchResult4PDA",
+    "ForumTopic4PDA",
     "MAX_AGE_DAYS",
     "MIN_TEXT_LENGTH",
     "MIN_WORD_COUNT",
+    "PinnedPostData",
     "RedditComment",
     "RedditPost",
     "RedditScraper",

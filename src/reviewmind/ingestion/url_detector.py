@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 
 import structlog
 
+from reviewmind.scrapers.fourpda import Forum4PDAScraper
 from reviewmind.scrapers.reddit import RedditScraper
 from reviewmind.scrapers.web import WebScraper
 from reviewmind.scrapers.youtube import YouTubeScraper
@@ -31,11 +32,16 @@ _REDDIT_RE = re.compile(
     re.IGNORECASE,
 )
 
+_4PDA_RE = re.compile(
+    r"4pda\.to/forum",
+    re.IGNORECASE,
+)
+
 # Allowed schemes for URL validation.
 _ALLOWED_SCHEMES = frozenset({"http", "https"})
 
 # Type alias for scraper instances returned by route_to_scraper.
-ScraperType = Union[YouTubeScraper, RedditScraper, WebScraper]
+ScraperType = Union[YouTubeScraper, RedditScraper, WebScraper, Forum4PDAScraper]
 
 
 # ── URL validation ────────────────────────────────────────────
@@ -92,6 +98,8 @@ def detect_url_type(url: str) -> str:
         return SourceType.YOUTUBE.value
     if _REDDIT_RE.search(validated):
         return SourceType.REDDIT.value
+    if _4PDA_RE.search(validated):
+        return SourceType.FORUM.value
     return SourceType.WEB.value
 
 
@@ -123,4 +131,6 @@ def route_to_scraper(url: str) -> ScraperType:
         )
     if url_type == SourceType.REDDIT.value:
         return RedditScraper()
+    if url_type == SourceType.FORUM.value:
+        return Forum4PDAScraper()
     return WebScraper()
