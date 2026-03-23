@@ -324,6 +324,20 @@ async def on_text_message(message: Message) -> None:
             await message.answer(answer, reply_markup=feedback_keyboard(query_log_id=log_id))
             await _increment_user_limit(user_id, log)
             await _store_exchange(session_mgr, user_id, message.text, answer, log)
+
+            # Schedule background ingestion for Tavily source URLs so they
+            # are persisted in auto_crawled for future queries.
+            if rag_response.used_tavily and rag_response.sources:
+                tavily_urls = [s for s in rag_response.sources if s.startswith("http")]
+                if tavily_urls:
+                    job_id = await _schedule_background_job(
+                        user_id=user_id,
+                        product_query=message.text,
+                        urls=tavily_urls,
+                    )
+                    if job_id:
+                        log.info("no_product_ingestion_scheduled", job_id=job_id, url_count=len(tavily_urls))
+
             log.info(
                 "no_product_tavily_answer",
                 used_tavily=rag_response.used_tavily,
@@ -417,6 +431,15 @@ async def on_text_message(message: Message) -> None:
 
     # 4b: Collect source URLs from YouTube + Reddit
     source_urls = await _collect_source_urls(product_names)
+
+    # Merge Tavily source URLs (from step 4a) into collected URLs for ingestion
+    if rag_response and rag_response.used_tavily and rag_response.sources:
+        seen = set(source_urls)
+        for url in rag_response.sources:
+            if url.startswith("http") and url not in seen:
+                seen.add(url)
+                source_urls.append(url)
+
     log.info("auto_source_urls_collected", url_count=len(source_urls))
 
     if source_urls:
