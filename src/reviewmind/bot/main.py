@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import sys
 
 import structlog
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
 from aiogram.types import BotCommand
 
@@ -70,8 +72,11 @@ def create_dispatcher() -> Dispatcher:
 
 def create_bot(token: str) -> Bot:
     """Create the aiogram Bot instance with default properties."""
+    proxy_url = os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
+    session = AiohttpSession(proxy=proxy_url) if proxy_url else None
     return Bot(
         token=token,
+        session=session,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
 

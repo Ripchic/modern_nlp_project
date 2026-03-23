@@ -139,7 +139,7 @@ services:
       - reviewmind-network
     depends_on:
       - worker
-    command: ["celery", "-A", "reviewmind.workers.celery_app", "beat", "--loglevel=info"]
+    command: ["celery", "-A", "reviewmind.workers.celery_app", "beat", "--loglevel=info", "--schedule=/tmp/celerybeat-schedule"]
 
   flower:
     build:
