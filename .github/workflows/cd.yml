@@ -76,14 +76,28 @@ jobs:
             # Pull latest code
             git pull --ff-only
 
-            # Build images on the server
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml build --pull
+            # Build images on the server (no-cache ensures fresh src/ layers)
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml build --no-cache
 
-            # Run DB migrations (one-off container)
+            # Stop current app containers before migration
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml stop api bot worker beat flower
+
+            # Run DB migrations (one-off container, uses the freshly built image)
             docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm api alembic upgrade head
 
-            # Restart all services
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
+            # Recreate and restart ALL services with the new images
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
+
+            # Wait for API health check
+            echo "Waiting for API health..."
+            for i in $(seq 1 30); do
+              if curl -sf http://localhost:8000/health > /dev/null 2>&1; then
+                echo "API healthy after ${i}s"
+                break
+              fi
+              sleep 1
+            done
+            curl -sf http://localhost:8000/health || echo "WARNING: API health check failed"
 
             # Cleanup dangling images
             docker image prune -f
