@@ -1,16 +1,27 @@
 {
   "uid": "reviewmind-system-health",
   "title": "ReviewMind — System Health",
-  "tags": ["reviewmind", "system"],
+  "tags": [
+    "reviewmind",
+    "system"
+  ],
   "timezone": "browser",
   "refresh": "30s",
-  "time": { "from": "now-1h", "to": "now" },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
   "editable": true,
   "panels": [
     {
       "type": "row",
       "title": "HTTP Metrics",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "collapsed": false,
       "panels": []
     },
@@ -18,17 +29,37 @@
       "id": 1,
       "type": "timeseries",
       "title": "Request Rate (req/s)",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 1 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 1
+      },
       "fieldConfig": {
-        "defaults": { "unit": "reqps" },
+        "defaults": {
+          "unit": "reqps"
+        },
         "overrides": []
       },
-      "options": { "legend": { "displayMode": "table", "placement": "bottom" } },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
       "targets": [
         {
           "expr": "sum(rate(http_requests_total[5m])) by (endpoint)",
-          "legendFormat": "{{ endpoint }}"
+          "legendFormat": "{{ endpoint }}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ]
     },
@@ -36,25 +67,55 @@
       "id": 2,
       "type": "timeseries",
       "title": "Latency p50 / p95 / p99",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 1 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 1
+      },
       "fieldConfig": {
-        "defaults": { "unit": "s" },
+        "defaults": {
+          "unit": "s"
+        },
         "overrides": []
       },
-      "options": { "legend": { "displayMode": "table", "placement": "bottom" } },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
       "targets": [
         {
           "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
-          "legendFormat": "p50"
+          "legendFormat": "p50",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         },
         {
           "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
-          "legendFormat": "p95"
+          "legendFormat": "p95",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         },
         {
           "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
-          "legendFormat": "p99"
+          "legendFormat": "p99",
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ]
     },
@@ -62,16 +123,31 @@
       "id": 3,
       "type": "timeseries",
       "title": "Error Rate (5xx)",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 4, "x": 16, "y": 1 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 16,
+        "y": 1
+      },
       "fieldConfig": {
-        "defaults": { "unit": "percentunit" },
+        "defaults": {
+          "unit": "percentunit"
+        },
         "overrides": []
       },
       "targets": [
         {
           "expr": "sum(rate(http_requests_total{status_code=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m]))",
-          "legendFormat": "5xx rate"
+          "legendFormat": "5xx rate",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ]
     },
@@ -79,15 +155,32 @@
       "id": 4,
       "type": "gauge",
       "title": "Active Requests",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 4, "x": 20, "y": 1 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 20,
+        "y": 1
+      },
       "fieldConfig": {
         "defaults": {
           "thresholds": {
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 50 },
-              { "color": "red", "value": 100 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "red",
+                "value": 100
+              }
             ]
           }
         },
@@ -96,14 +189,24 @@
       "targets": [
         {
           "expr": "sum(http_requests_in_progress)",
-          "legendFormat": "in-progress"
+          "legendFormat": "in-progress",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ]
     },
     {
       "type": "row",
       "title": "Service Health",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
       "collapsed": false,
       "panels": []
     },
@@ -111,12 +214,32 @@
       "id": 5,
       "type": "stat",
       "title": "FastAPI Health",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 10 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 0,
+        "y": 10
+      },
       "fieldConfig": {
         "defaults": {
           "mappings": [
-            { "type": "value", "options": { "1": { "text": "UP", "color": "green" }, "0": { "text": "DOWN", "color": "red" } } }
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "UP",
+                  "color": "green"
+                },
+                "0": {
+                  "text": "DOWN",
+                  "color": "red"
+                }
+              }
+            }
           ]
         },
         "overrides": []
@@ -124,7 +247,12 @@
       "targets": [
         {
           "expr": "up{job=\"fastapi\"}",
-          "legendFormat": "fastapi"
+          "legendFormat": "fastapi",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ]
     },
@@ -132,12 +260,32 @@
       "id": 6,
       "type": "stat",
       "title": "Qdrant Health",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 10 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 8,
+        "y": 10
+      },
       "fieldConfig": {
         "defaults": {
           "mappings": [
-            { "type": "value", "options": { "1": { "text": "UP", "color": "green" }, "0": { "text": "DOWN", "color": "red" } } }
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "UP",
+                  "color": "green"
+                },
+                "0": {
+                  "text": "DOWN",
+                  "color": "red"
+                }
+              }
+            }
           ]
         },
         "overrides": []
@@ -145,7 +293,12 @@
       "targets": [
         {
           "expr": "up{job=\"qdrant\"}",
-          "legendFormat": "qdrant"
+          "legendFormat": "qdrant",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ]
     },
@@ -153,14 +306,28 @@
       "id": 7,
       "type": "stat",
       "title": "Prometheus Targets Up",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 10 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 16,
+        "y": 10
+      },
       "fieldConfig": {
         "defaults": {
           "thresholds": {
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "green", "value": 2 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 2
+              }
             ]
           }
         },
@@ -169,14 +336,24 @@
       "targets": [
         {
           "expr": "count(up == 1)",
-          "legendFormat": "targets up"
+          "legendFormat": "targets up",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ]
     },
     {
       "type": "row",
       "title": "Celery",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
       "collapsed": false,
       "panels": []
     },
@@ -184,16 +361,31 @@
       "id": 8,
       "type": "timeseries",
       "title": "Task Throughput (tasks/s)",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 15 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 15
+      },
       "fieldConfig": {
-        "defaults": { "unit": "ops" },
+        "defaults": {
+          "unit": "ops"
+        },
         "overrides": []
       },
       "targets": [
         {
           "expr": "sum(rate(celery_tasks_total[5m])) by (task_name)",
-          "legendFormat": "{{ task_name }}"
+          "legendFormat": "{{ task_name }}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ]
     },
@@ -201,16 +393,31 @@
       "id": 9,
       "type": "timeseries",
       "title": "Task Duration p95",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 15 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 15
+      },
       "fieldConfig": {
-        "defaults": { "unit": "s" },
+        "defaults": {
+          "unit": "s"
+        },
         "overrides": []
       },
       "targets": [
         {
           "expr": "histogram_quantile(0.95, sum(rate(celery_task_duration_seconds_bucket[5m])) by (le, task_name))",
-          "legendFormat": "{{ task_name }}"
+          "legendFormat": "{{ task_name }}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ]
     },
@@ -218,23 +425,43 @@
       "id": 10,
       "type": "timeseries",
       "title": "Task Failures",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 15 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 15
+      },
       "fieldConfig": {
-        "defaults": { "unit": "ops" },
+        "defaults": {
+          "unit": "ops"
+        },
         "overrides": []
       },
       "targets": [
         {
           "expr": "sum(rate(celery_tasks_total{status=\"failure\"}[5m])) by (task_name)",
-          "legendFormat": "{{ task_name }}"
+          "legendFormat": "{{ task_name }}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ]
     },
     {
       "type": "row",
       "title": "Application",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
       "collapsed": false,
       "panels": []
     },
@@ -242,20 +469,40 @@
       "id": 11,
       "type": "timeseries",
       "title": "RAG Query Latency p95",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 24 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 24
+      },
       "fieldConfig": {
-        "defaults": { "unit": "s" },
+        "defaults": {
+          "unit": "s"
+        },
         "overrides": []
       },
       "targets": [
         {
           "expr": "histogram_quantile(0.95, sum(rate(rag_query_duration_seconds_bucket[5m])) by (le))",
-          "legendFormat": "p95"
+          "legendFormat": "p95",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         },
         {
           "expr": "histogram_quantile(0.50, sum(rate(rag_query_duration_seconds_bucket[5m])) by (le))",
-          "legendFormat": "p50"
+          "legendFormat": "p50",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ]
     },
@@ -263,20 +510,40 @@
       "id": 12,
       "type": "timeseries",
       "title": "Embedding Latency p95",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 24 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 24
+      },
       "fieldConfig": {
-        "defaults": { "unit": "s" },
+        "defaults": {
+          "unit": "s"
+        },
         "overrides": []
       },
       "targets": [
         {
           "expr": "histogram_quantile(0.95, sum(rate(embedding_duration_seconds_bucket[5m])) by (le))",
-          "legendFormat": "p95"
+          "legendFormat": "p95",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         },
         {
           "expr": "histogram_quantile(0.50, sum(rate(embedding_duration_seconds_bucket[5m])) by (le))",
-          "legendFormat": "p50"
+          "legendFormat": "p50",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ]
     },
@@ -284,16 +551,31 @@
       "id": 13,
       "type": "timeseries",
       "title": "Rate Limit Hits",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 24 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 24
+      },
       "fieldConfig": {
-        "defaults": { "unit": "ops" },
+        "defaults": {
+          "unit": "ops"
+        },
         "overrides": []
       },
       "targets": [
         {
           "expr": "rate(rate_limit_hits_total[5m])",
-          "legendFormat": "429 hits/s"
+          "legendFormat": "429 hits/s",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ]
     }

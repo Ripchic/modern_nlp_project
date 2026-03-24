@@ -1,16 +1,27 @@
 {
   "uid": "reviewmind-user-activity",
   "title": "ReviewMind — User Activity",
-  "tags": ["reviewmind", "users"],
+  "tags": [
+    "reviewmind",
+    "users"
+  ],
   "timezone": "browser",
   "refresh": "5m",
-  "time": { "from": "now-7d", "to": "now" },
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
   "editable": true,
   "panels": [
     {
       "type": "row",
       "title": "User Metrics",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "collapsed": false,
       "panels": []
     },
@@ -18,13 +29,31 @@
       "id": 1,
       "type": "timeseries",
       "title": "Daily Active Users (DAU)",
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "postgresql" },
-      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 1 },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgresql"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "targets": [
         {
           "rawSql": "SELECT DATE(created_at) AS time, COUNT(DISTINCT user_id) AS dau FROM query_logs WHERE $__timeFilter(created_at) GROUP BY 1 ORDER BY 1",
-          "format": "time_series"
+          "format": "time_series",
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgresql"
+          }
         }
       ]
     },
@@ -32,13 +61,31 @@
       "id": 2,
       "type": "timeseries",
       "title": "Weekly Active Users (WAU)",
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "postgresql" },
-      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 1 },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgresql"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 6,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "targets": [
         {
           "rawSql": "SELECT DATE_TRUNC('week', created_at)::date AS time, COUNT(DISTINCT user_id) AS wau FROM query_logs WHERE $__timeFilter(created_at) GROUP BY 1 ORDER BY 1",
-          "format": "time_series"
+          "format": "time_series",
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgresql"
+          }
         }
       ]
     },
@@ -46,13 +93,31 @@
       "id": 3,
       "type": "timeseries",
       "title": "Monthly Active Users (MAU)",
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "postgresql" },
-      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 1 },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgresql"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "targets": [
         {
           "rawSql": "SELECT DATE_TRUNC('month', created_at)::date AS time, COUNT(DISTINCT user_id) AS mau FROM query_logs WHERE $__timeFilter(created_at) GROUP BY 1 ORDER BY 1",
-          "format": "time_series"
+          "format": "time_series",
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgresql"
+          }
         }
       ]
     },
@@ -60,20 +125,43 @@
       "id": 4,
       "type": "stat",
       "title": "Total Users",
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "postgresql" },
-      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 1 },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgresql"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "targets": [
         {
           "rawSql": "SELECT COUNT(*) AS total_users FROM users",
-          "format": "table"
+          "format": "table",
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgresql"
+          }
         }
       ]
     },
     {
       "type": "row",
       "title": "Query Metrics",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
       "collapsed": false,
       "panels": []
     },
@@ -81,13 +169,31 @@
       "id": 5,
       "type": "timeseries",
       "title": "Queries Per Day",
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "postgresql" },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 10 },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgresql"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "targets": [
         {
           "rawSql": "SELECT DATE(created_at) AS time, COUNT(*) AS queries FROM query_logs WHERE $__timeFilter(created_at) GROUP BY 1 ORDER BY 1",
-          "format": "time_series"
+          "format": "time_series",
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgresql"
+          }
         }
       ]
     },
@@ -95,12 +201,25 @@
       "id": 6,
       "type": "piechart",
       "title": "Mode Distribution",
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "postgresql" },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 10 },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgresql"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 10
+      },
       "targets": [
         {
           "rawSql": "SELECT COALESCE(mode, 'unknown') AS mode, COUNT(*) AS cnt FROM query_logs WHERE $__timeFilter(created_at) GROUP BY 1 ORDER BY 2 DESC",
-          "format": "table"
+          "format": "table",
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgresql"
+          }
         }
       ]
     },
@@ -108,20 +227,43 @@
       "id": 7,
       "type": "timeseries",
       "title": "Avg Response Time (ms)",
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "postgresql" },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 10 },
-      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgresql"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      },
       "targets": [
         {
           "rawSql": "SELECT DATE(created_at) AS time, AVG(response_time_ms) AS avg_ms FROM query_logs WHERE response_time_ms IS NOT NULL AND $__timeFilter(created_at) GROUP BY 1 ORDER BY 1",
-          "format": "time_series"
+          "format": "time_series",
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgresql"
+          }
         }
       ]
     },
     {
       "type": "row",
       "title": "Engagement",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
       "collapsed": false,
       "panels": []
     },
@@ -129,13 +271,29 @@
       "id": 8,
       "type": "timeseries",
       "title": "Feedback Score Trend",
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "postgresql" },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 19 },
-      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgresql"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 19
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
       "targets": [
         {
           "rawSql": "SELECT DATE(created_at) AS time, AVG(rating) FILTER (WHERE rating IS NOT NULL) AS avg_rating FROM query_logs WHERE $__timeFilter(created_at) GROUP BY 1 ORDER BY 1",
-          "format": "time_series"
+          "format": "time_series",
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgresql"
+          }
         }
       ]
     },
@@ -143,12 +301,25 @@
       "id": 9,
       "type": "piechart",
       "title": "Feedback Distribution",
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "postgresql" },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 19 },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgresql"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 19
+      },
       "targets": [
         {
           "rawSql": "SELECT CASE WHEN rating = 1 THEN 'positive' WHEN rating = -1 THEN 'negative' ELSE 'no rating' END AS feedback, COUNT(*) AS cnt FROM query_logs WHERE $__timeFilter(created_at) GROUP BY 1",
-          "format": "table"
+          "format": "table",
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgresql"
+          }
         }
       ]
     },
@@ -156,20 +327,43 @@
       "id": 10,
       "type": "timeseries",
       "title": "Tavily Fallback Rate",
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "postgresql" },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 19 },
-      "fieldConfig": { "defaults": { "unit": "percentunit" }, "overrides": [] },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgresql"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 19
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
       "targets": [
         {
           "rawSql": "SELECT DATE(created_at) AS time, AVG(CASE WHEN used_tavily THEN 1 ELSE 0 END) AS tavily_rate FROM query_logs WHERE $__timeFilter(created_at) GROUP BY 1 ORDER BY 1",
-          "format": "time_series"
+          "format": "time_series",
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgresql"
+          }
         }
       ]
     },
     {
       "type": "row",
       "title": "Monetization",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 27
+      },
       "collapsed": false,
       "panels": []
     },
@@ -177,13 +371,31 @@
       "id": 11,
       "type": "timeseries",
       "title": "Subscription Conversions",
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "postgresql" },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 28 },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgresql"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 28
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "targets": [
         {
           "rawSql": "SELECT DATE(activated_at) AS time, COUNT(*) AS conversions FROM subscriptions WHERE $__timeFilter(activated_at) GROUP BY 1 ORDER BY 1",
-          "format": "time_series"
+          "format": "time_series",
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgresql"
+          }
         }
       ]
     },
@@ -191,13 +403,31 @@
       "id": 12,
       "type": "timeseries",
       "title": "Free Tier Exhaustion (users hitting limit)",
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "postgresql" },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 28 },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgresql"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 28
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "targets": [
         {
           "rawSql": "SELECT date AS time, COUNT(*) FILTER (WHERE requests_used >= 3) AS exhausted FROM user_limits WHERE $__timeFilter(date) GROUP BY 1 ORDER BY 1",
-          "format": "time_series"
+          "format": "time_series",
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgresql"
+          }
         }
       ]
     },
@@ -205,13 +435,28 @@
       "id": 13,
       "type": "table",
       "title": "Top Queried Products",
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "postgresql" },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 28 },
-      "options": { "showHeader": true },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgresql"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 28
+      },
+      "options": {
+        "showHeader": true
+      },
       "targets": [
         {
           "rawSql": "SELECT query_text AS product, COUNT(*) AS queries FROM query_logs WHERE query_text IS NOT NULL AND $__timeFilter(created_at) GROUP BY 1 ORDER BY 2 DESC LIMIT 20",
-          "format": "table"
+          "format": "table",
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgresql"
+          }
         }
       ]
     }

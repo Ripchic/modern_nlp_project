@@ -11,6 +11,7 @@ Flow:
 
 from __future__ import annotations
 
+import time
 import uuid
 
 import structlog
@@ -107,6 +108,7 @@ async def _save_query_log(
     *,
     mode: str = "auto",
     used_tavily: bool = False,
+    response_time_ms: int | None = None,
 ) -> int | None:
     """Persist a QueryLog row and return its id.  Best-effort."""
     try:
@@ -133,6 +135,7 @@ async def _save_query_log(
                     response_text=response_text,
                     sources_used=sources,
                     used_tavily=used_tavily,
+                    response_time_ms=response_time_ms,
                 )
                 await session.commit()
                 return log_entry.id
@@ -347,6 +350,7 @@ async def on_text_message(message: Message) -> None:
     if not message.text:
         return
 
+    _start_time = time.monotonic()
     user_id = message.from_user.id if message.from_user else 0
     log = logger.bind(user_id=user_id, text_len=len(message.text))
     log.info("query_received")
@@ -405,6 +409,7 @@ async def on_text_message(message: Message) -> None:
                 answer,
                 sources=rag_response.sources,
                 used_tavily=rag_response.used_tavily,
+                response_time_ms=int((time.monotonic() - _start_time) * 1000),
             )
             await message.answer(answer, reply_markup=feedback_keyboard(query_log_id=log_id))
             await _increment_user_limit(user_id, log)
@@ -449,6 +454,7 @@ async def on_text_message(message: Message) -> None:
             chat_history=chat_history,
             session_mgr=session_mgr,
             redis_client=redis_client,
+            start_time=_start_time,
         )
         return
 
@@ -480,6 +486,7 @@ async def on_text_message(message: Message) -> None:
             answer,
             sources=rag_response.sources,
             used_tavily=getattr(rag_response, "used_tavily", False),
+            response_time_ms=int((time.monotonic() - _start_time) * 1000),
         )
         await message.answer(answer, reply_markup=feedback_keyboard(query_log_id=log_id))
         await _increment_user_limit(user_id, log)
@@ -509,6 +516,7 @@ async def on_text_message(message: Message) -> None:
             answer,
             sources=rag_response.sources,
             used_tavily=True,
+            response_time_ms=int((time.monotonic() - _start_time) * 1000),
         )
         await message.answer(answer, reply_markup=feedback_keyboard(query_log_id=log_id))
         await _increment_user_limit(user_id, log)
@@ -570,6 +578,7 @@ async def _handle_comparison(
     chat_history: list[dict[str, str]] | None = None,
     session_mgr: SessionManager | None = None,
     redis_client=None,
+    start_time: float | None = None,
 ) -> None:
     """Handle a comparison query by running parallel RAG and generating a table."""
     try:
@@ -606,6 +615,7 @@ async def _handle_comparison(
             message.text,
             answer,
             sources=result.sources,
+            response_time_ms=int((time.monotonic() - start_time) * 1000) if start_time else None,
         )
         await message.answer(answer, reply_markup=feedback_keyboard(query_log_id=log_id))
         await _increment_user_limit(user_id, log)

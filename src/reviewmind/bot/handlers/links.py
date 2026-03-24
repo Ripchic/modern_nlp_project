@@ -12,6 +12,7 @@ When a user sends a message containing one or more HTTP(S) URLs, this handler:
 from __future__ import annotations
 
 import re
+import time
 
 import structlog
 from aiogram import Router
@@ -218,6 +219,7 @@ async def _save_query_log(
     *,
     mode: str = "links",
     used_tavily: bool = False,
+    response_time_ms: int | None = None,
 ) -> int | None:
     """Persist a QueryLog row and return its id.  Best-effort."""
     try:
@@ -240,6 +242,7 @@ async def _save_query_log(
                     response_text=response_text,
                     sources_used=sources,
                     used_tavily=used_tavily,
+                    response_time_ms=response_time_ms,
                 )
                 await session.commit()
                 return log_entry.id
@@ -259,6 +262,7 @@ async def on_links_message(message: Message) -> None:
     if not urls:
         return
 
+    _start_time = time.monotonic()
     user_id = message.from_user.id if message.from_user else 0
     query_text = extract_query_text(text, urls)
     log = logger.bind(user_id=user_id, url_count=len(urls))
@@ -312,6 +316,7 @@ async def on_links_message(message: Message) -> None:
             qdrant=qdrant,
             log=log,
             chat_history=chat_history,
+            start_time=_start_time,
         )
         # Store exchange in Redis history
         await _store_exchange(session_mgr, user_id, text, answer_text, log)
@@ -332,6 +337,7 @@ async def _ingest_and_analyse(
     qdrant,
     log,
     chat_history: list[dict[str, str]] | None = None,
+    start_time: float | None = None,
 ) -> str | None:
     """Run the ingestion pipeline and RAG query, editing *status_msg* with the result.
 
@@ -427,6 +433,7 @@ async def _ingest_and_analyse(
         sources=rag_response.sources,
         mode="links",
         used_tavily=rag_response.used_tavily,
+        response_time_ms=int((time.monotonic() - start_time) * 1000) if start_time else None,
     )
     log.info("links_query_log_saved", query_log_id=query_log_id)
 
